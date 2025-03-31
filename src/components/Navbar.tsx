@@ -44,7 +44,7 @@ const Navbar = () => {
                 location.pathname === item.to
                   ? "text-foreground font-medium"
                   : "text-muted-foreground",
-                item.isPro && "opacity-50 border-gold border-2 rounded-lg"
+                item.isPro && "opacity-50 text-tier-pro"
               )}
             >
               {item.icon}

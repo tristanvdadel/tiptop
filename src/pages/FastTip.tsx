@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,21 @@ const FastTip = () => {
   const navigate = useNavigate();
   const [amount, setAmount] = useState<number>(0);
   const [note, setNote] = useState<string>('');
+  const [placeholderIndex, setPlaceholderIndex] = useState<number>(0);
+  
+  const placeholders = [
+    "bijvoorbeeld: Tafel 6",
+    "bijvoorbeeld: Vrijdag 20/4",
+    "bijvoorbeeld: Speciaal voor de cocktail"
+  ];
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderIndex((prevIndex) => (prevIndex + 1) % placeholders.length);
+    }, 3000);
+    
+    return () => clearInterval(interval);
+  }, []);
   
   const handleAddAmount = (value: number) => {
     setAmount(prev => prev + value);
@@ -71,8 +86,8 @@ const FastTip = () => {
           <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Tafel 6 of Vrijdag 20/4 of Speciaal voor de cocktail"
-            className="w-full"
+            placeholder={placeholders[placeholderIndex]}
+            className="w-full placeholder:italic"
             rows={3}
           />
         </div>

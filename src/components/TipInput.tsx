@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,21 @@ const TipInput = () => {
   const [amount, setAmount] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [showNote, setShowNote] = useState<boolean>(false);
+  const [placeholderIndex, setPlaceholderIndex] = useState<number>(0);
+  
+  const placeholders = [
+    "bijvoorbeeld: Tafel 6",
+    "bijvoorbeeld: Vrijdag 20/4",
+    "bijvoorbeeld: Speciaal voor de cocktail"
+  ];
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderIndex((prevIndex) => (prevIndex + 1) % placeholders.length);
+    }, 3000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,8 +87,8 @@ const TipInput = () => {
             <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Tafel 6 of Vrijdag 20/4 of Speciaal voor de cocktail"
-              className="mb-4"
+              placeholder={placeholders[placeholderIndex]}
+              className="mb-4 placeholder:italic"
               rows={2}
             />
           ) : (

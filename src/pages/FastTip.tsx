@@ -71,7 +71,7 @@ const FastTip = () => {
           <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Optionele notitie"
+            placeholder="Tafel 6 of Vrijdag 20/4 of Speciaal voor de cocktail"
             className="w-full"
             rows={3}
           />

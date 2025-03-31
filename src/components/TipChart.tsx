@@ -2,16 +2,19 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { nl } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { BarChart2 } from 'lucide-react';
 
 const TipChart = () => {
-  const { currentPeriod } = useApp();
+  const { periods, currentPeriod, calculateAverageTipPerHour } = useApp();
+  const navigate = useNavigate();
   
   const chartData = useMemo(() => {
-    if (!currentPeriod) return [];
-    
+    // Get periods data from the last 7 days, regardless of whether there is an active period
     const today = new Date();
     const data = [];
     
@@ -21,48 +24,105 @@ const TipChart = () => {
       const dateStart = startOfDay(date);
       const dateEnd = endOfDay(date);
       
-      // Filter tips for this day
-      const dayTips = currentPeriod.tips.filter(tip => {
-        const tipDate = new Date(tip.date);
-        return tipDate >= dateStart && tipDate <= dateEnd;
-      });
-      
-      // Sum up tips for the day
-      const totalAmount = dayTips.reduce((sum, tip) => sum + tip.amount, 0);
-      
-      data.push({
+      const dayData = {
         name: format(date, 'E', { locale: nl }),
-        amount: totalAmount,
+        date: date.toISOString(),
+      };
+      
+      // Add data for each period
+      periods.forEach((period, index) => {
+        const periodTips = period.tips.filter(tip => {
+          const tipDate = new Date(tip.date);
+          return tipDate >= dateStart && tipDate <= dateEnd;
+        });
+        
+        const totalAmount = periodTips.reduce((sum, tip) => sum + tip.amount, 0);
+        
+        // Add to chart data with the period id as the key
+        if (totalAmount > 0) {
+          dayData[`period${index}`] = totalAmount;
+          // Store period id for reference
+          dayData[`periodId${index}`] = period.id;
+        }
       });
+      
+      data.push(dayData);
     }
     
     return data;
-  }, [currentPeriod]);
+  }, [periods]);
   
-  if (!currentPeriod || chartData.every(day => day.amount === 0)) {
+  const averageTipPerHour = useMemo(() => {
+    return calculateAverageTipPerHour();
+  }, [calculateAverageTipPerHour]);
+  
+  const chartColors = ['#9b87f5', '#F97316', '#0EA5E9', '#D946EF', '#8B5CF6'];
+  
+  // Create bar components for each period
+  const barComponents = useMemo(() => {
+    const bars = [];
+    
+    periods.forEach((period, index) => {
+      if (chartData.some(day => day[`period${index}`] !== undefined)) {
+        bars.push(
+          <Bar 
+            key={period.id} 
+            dataKey={`period${index}`} 
+            name={period.isActive ? 'Actieve periode' : `Periode ${format(new Date(period.startDate), 'd MMM', { locale: nl })}`} 
+            fill={chartColors[index % chartColors.length]} 
+          />
+        );
+      }
+    });
+    
+    return bars;
+  }, [chartData, periods, chartColors]);
+  
+  const handleAverageClick = () => {
+    navigate('/analytics');
+  };
+  
+  if (chartData.every(day => Object.keys(day).length <= 2)) { // Only has name and date props
     return null;
   }
   
   return (
-    <Card className="mb-6">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">Afgelopen 7 dagen</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
-              <XAxis dataKey="name" />
-              <Tooltip 
-                formatter={(value: number) => [`€${value.toFixed(2)}`, 'Fooi']}
-                labelFormatter={(label) => `${label}`}
-              />
-              <Bar dataKey="amount" fill="#FFD700" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <Card className="mb-6">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Afgelopen 7 dagen</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <XAxis dataKey="name" />
+                <Tooltip 
+                  formatter={(value: number, name: string) => [`€${value.toFixed(2)}`, name]}
+                  labelFormatter={(label) => `${label}`}
+                />
+                <Legend />
+                {barComponents}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+      
+      {averageTipPerHour > 0 && (
+        <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={handleAverageClick}>
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <h3 className="font-medium">Gemiddeld fooi per uur</h3>
+              <p className="text-2xl font-bold">€{averageTipPerHour.toFixed(2)}</p>
+            </div>
+            <Button variant="ghost" size="icon" onClick={handleAverageClick}>
+              <BarChart2 size={20} />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 };
 

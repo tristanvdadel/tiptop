@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
 // Define types
@@ -7,6 +6,7 @@ export type TeamMember = {
   name: string;
   hours: number;
   tipAmount?: number;
+  lastPayout?: string; // Date of last payout
 };
 
 export type TipEntry = {
@@ -24,6 +24,16 @@ export type Period = {
   isActive: boolean;
   tips: TipEntry[];
   totalTip?: number;
+  isPaid?: boolean; // Track if the period has been paid out
+};
+
+export type PayoutData = {
+  periodIds: string[];
+  date: string;
+  distribution: {
+    memberId: string;
+    amount: number;
+  }[];
 };
 
 type AppContextType = {
@@ -32,6 +42,7 @@ type AppContextType = {
   periods: Period[];
   teamMembers: TeamMember[];
   tier: 'free' | 'team' | 'pro';
+  payouts: PayoutData[];
   
   // Actions
   addTip: (amount: number, note?: string) => void;
@@ -40,7 +51,9 @@ type AppContextType = {
   updateTeamMemberHours: (id: string, hours: number) => void;
   startNewPeriod: () => void;
   endCurrentPeriod: () => void;
-  calculateTipDistribution: () => TeamMember[];
+  calculateTipDistribution: (periodIds?: string[]) => TeamMember[];
+  calculateAverageTipPerHour: (periodId?: string) => number;
+  markPeriodsAsPaid: (periodIds: string[]) => void;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -50,11 +63,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [currentPeriod, setCurrentPeriod] = useState<Period | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [tier] = useState<'free' | 'team' | 'pro'>('free');
+  const [payouts, setPayouts] = useState<PayoutData[]>([]);
 
   // Load data from localStorage on mount
   useEffect(() => {
     const storedPeriods = localStorage.getItem('periods');
     const storedTeamMembers = localStorage.getItem('teamMembers');
+    const storedPayouts = localStorage.getItem('payouts');
     
     if (storedPeriods) {
       const parsedPeriods = JSON.parse(storedPeriods);
@@ -70,6 +85,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (storedTeamMembers) {
       setTeamMembers(JSON.parse(storedTeamMembers));
     }
+    
+    if (storedPayouts) {
+      setPayouts(JSON.parse(storedPayouts));
+    }
   }, []);
 
   // Save data to localStorage when it changes
@@ -80,6 +99,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     localStorage.setItem('teamMembers', JSON.stringify(teamMembers));
   }, [teamMembers]);
+  
+  useEffect(() => {
+    localStorage.setItem('payouts', JSON.stringify(payouts));
+  }, [payouts]);
 
   // Generate a unique ID
   const generateId = () => {
@@ -156,6 +179,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       startDate: new Date().toISOString(),
       isActive: true,
       tips: [],
+      isPaid: false,
     };
     
     setCurrentPeriod(newPeriod);
@@ -181,12 +205,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Calculate tip distribution based on hours worked
-  const calculateTipDistribution = () => {
-    if (!currentPeriod || !currentPeriod.tips.length || !teamMembers.length) {
+  const calculateTipDistribution = (periodIds?: string[]) => {
+    let periodsToCalculate: Period[] = [];
+    
+    if (periodIds && periodIds.length > 0) {
+      // If specific period IDs are provided, use those
+      periodsToCalculate = periods.filter(p => periodIds.includes(p.id));
+    } else if (currentPeriod) {
+      // Otherwise, use the current period
+      periodsToCalculate = [currentPeriod];
+    } else {
       return [];
     }
     
-    const totalTip = currentPeriod.tips.reduce((sum, tip) => sum + tip.amount, 0);
+    if (!periodsToCalculate.length || !teamMembers.length) {
+      return [];
+    }
+    
+    const totalTip = periodsToCalculate.reduce(
+      (sum, period) => sum + period.tips.reduce((s, tip) => s + tip.amount, 0), 
+      0
+    );
+    
     const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
     
     // If no hours recorded, can't distribute
@@ -205,6 +245,78 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       };
     });
   };
+  
+  // Calculate average tip per hour
+  const calculateAverageTipPerHour = (periodId?: string) => {
+    let periodsToCalculate: Period[] = [];
+    
+    if (periodId) {
+      // If a specific period ID is provided, use that
+      const period = periods.find(p => p.id === periodId);
+      if (period && !period.isActive) {
+        periodsToCalculate = [period];
+      }
+    } else {
+      // Otherwise, use all completed periods
+      periodsToCalculate = periods.filter(p => !p.isActive);
+    }
+    
+    if (!periodsToCalculate.length) {
+      return 0;
+    }
+    
+    // Calculate total tips from all periods
+    const totalTips = periodsToCalculate.reduce(
+      (sum, period) => sum + period.tips.reduce((s, tip) => s + tip.amount, 0),
+      0
+    );
+    
+    // Calculate total hours from all team members
+    const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+    
+    if (totalHours === 0) {
+      return 0;
+    }
+    
+    return totalTips / totalHours;
+  };
+  
+  // Mark periods as paid
+  const markPeriodsAsPaid = (periodIds: string[]) => {
+    if (!periodIds.length) return;
+    
+    // Create a distribution record for this payout
+    const distribution = calculateTipDistribution(periodIds);
+    
+    const newPayout: PayoutData = {
+      periodIds,
+      date: new Date().toISOString(),
+      distribution: distribution.map(member => ({
+        memberId: member.id,
+        amount: member.tipAmount || 0,
+      })),
+    };
+    
+    // Add the payout record
+    setPayouts(prev => [...prev, newPayout]);
+    
+    // Mark periods as paid
+    setPeriods(prev => 
+      prev.map(period => 
+        periodIds.includes(period.id) 
+          ? { ...period, isPaid: true } 
+          : period
+      )
+    );
+    
+    // Update team members' last payout date
+    setTeamMembers(prev => 
+      prev.map(member => ({
+        ...member,
+        lastPayout: newPayout.date,
+      }))
+    );
+  };
 
   return (
     <AppContext.Provider
@@ -213,6 +325,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         periods,
         teamMembers,
         tier,
+        payouts,
         addTip,
         addTeamMember,
         removeTeamMember,
@@ -220,6 +333,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         startNewPeriod,
         endCurrentPeriod,
         calculateTipDistribution,
+        calculateAverageTipPerHour,
+        markPeriodsAsPaid,
       }}
     >
       {children}

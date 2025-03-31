@@ -72,7 +72,7 @@ const TipInput = () => {
             <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Voeg een notitie toe (optioneel)"
+              placeholder="Tafel 6 of Vrijdag 20/4 of Speciaal voor de cocktail"
               className="mb-4"
               rows={2}
             />

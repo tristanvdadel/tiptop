@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Crown, AlertTriangle } from 'lucide-react';
+import { Plus, Crown, AlertTriangle, ArrowRight, Trash2, TrendingUp } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -28,9 +28,21 @@ import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 const Periods = () => {
-  const { periods, startNewPeriod, tier, currentPeriod, hasReachedPeriodLimit, getUnpaidPeriodsCount } = useApp();
+  const { 
+    periods, 
+    startNewPeriod, 
+    tier, 
+    currentPeriod, 
+    hasReachedPeriodLimit, 
+    getUnpaidPeriodsCount,
+    calculateAverageTipPerHour,
+    deletePaidPeriods
+  } = useApp();
+  
   const [showLimitDialog, setShowLimitDialog] = useState(false);
   const [showPaidPeriodsDialog, setShowPaidPeriodsDialog] = useState(false);
+  const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const { toast } = useToast();
   
   // Sort periods by start date, most recent first
@@ -45,6 +57,7 @@ const Periods = () => {
   const tierPeriodLimit = tier === 'free' ? 3 : tier === 'team' ? 7 : Infinity;
   const unpaidPeriodsCount = getUnpaidPeriodsCount();
   const paidPeriodsCount = periods.filter(p => p.isPaid).length;
+  const averageTipPerHour = calculateAverageTipPerHour();
   
   const handleStartNewPeriod = () => {
     if (currentPeriod) {
@@ -62,16 +75,41 @@ const Periods = () => {
     }
     
     startNewPeriod();
+    toast({
+      title: "Nieuwe periode gestart",
+      description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode.",
+    });
   };
   
   const handleDeletePaidPeriods = () => {
-    // This would be implemented in AppContext
-    toast({
-      title: "Functie nog niet beschikbaar",
-      description: "Het verwijderen van uitbetaalde perioden is nog niet geïmplementeerd. Upgrade naar een hoger abonnement om meer perioden te gebruiken.",
-      variant: "destructive"
-    });
     setShowPaidPeriodsDialog(false);
+    setShowDeleteConfirmDialog(true);
+  };
+  
+  const confirmDeletePaidPeriods = () => {
+    deletePaidPeriods();
+    setShowDeleteConfirmDialog(false);
+    toast({
+      title: "Uitbetaalde perioden verwijderd",
+      description: "Alle uitbetaalde perioden zijn verwijderd. Je kunt nu nieuwe perioden starten.",
+      variant: "default"
+    });
+  };
+  
+  const handleUpgrade = () => {
+    setShowUpgradeDialog(true);
+    setShowPaidPeriodsDialog(false);
+    setShowLimitDialog(false);
+  };
+  
+  const doUpgrade = (newTier: 'team' | 'pro') => {
+    toast({
+      title: `Upgraden naar ${newTier.toUpperCase()}`,
+      description: `Je account is succesvol geüpgraded naar ${newTier.toUpperCase()}.`,
+      variant: "default"
+    });
+    setShowUpgradeDialog(false);
+    // In a real app, this would trigger a subscription change
   };
 
   return (
@@ -92,36 +130,60 @@ const Periods = () => {
         </div>
       </div>
       
+      {/* Average tip per hour info card */}
+      {averageTipPerHour > 0 && (
+        <Card className="bg-gradient-to-r from-[#9b87f5]/10 to-[#7E69AB]/5 border-[#9b87f5]/20">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center">
+              <TrendingUp size={20} className="text-[#9b87f5] mr-2" />
+              <div>
+                <p className="text-sm font-medium">Gemiddelde fooi per uur</p>
+                <p className="text-lg font-bold">€{averageTipPerHour.toFixed(2)}</p>
+              </div>
+            </div>
+            <Button variant="outline" className="text-[#9b87f5] border-[#9b87f5]/30 hover:bg-[#9b87f5]/10">
+              Bekijk analyse <ArrowRight size={14} className="ml-1" />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+      
       {/* Period Limit Dialog */}
       <Dialog open={showLimitDialog} onOpenChange={setShowLimitDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Periodelimiet bereikt</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-center text-xl">Periodelimiet bereikt</DialogTitle>
+            <DialogDescription className="text-center pt-2">
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                  <AlertTriangle className="text-amber-500" size={24} />
+                </div>
+              </div>
               Je hebt het maximale aantal perioden ({tierPeriodLimit}) bereikt voor je {tier.toUpperCase()}-abonnement.
               {unpaidPeriodsCount > 0 && (
-                <p className="mt-2">
+                <p className="mt-2 font-medium">
                   Je hebt {unpaidPeriodsCount} onbetaalde perioden. Betaal deze uit om ruimte te maken voor nieuwe perioden.
                 </p>
               )}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="sm:justify-center gap-2 flex-col sm:flex-row">
             {unpaidPeriodsCount > 0 ? (
               <Button 
                 onClick={() => {
                   setShowLimitDialog(false);
                   window.location.href = '/team'; // Navigate to team page for payout
                 }}
+                className="w-full sm:w-auto"
               >
                 Ga naar uitbetalen
               </Button>
             ) : (
               <Button 
-                className="bg-tier-pro hover:bg-tier-pro/90 text-white"
-                onClick={() => setShowLimitDialog(false)}
+                className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white w-full sm:w-auto"
+                onClick={handleUpgrade}
               >
-                Upgraden naar {tier === 'free' ? 'TEAM' : 'PRO'}
+                <Crown size={16} className="mr-1" /> Upgraden naar {tier === 'free' ? 'TEAM' : 'PRO'}
               </Button>
             )}
           </DialogFooter>
@@ -130,36 +192,35 @@ const Periods = () => {
       
       {/* Paid Periods Dialog */}
       <AlertDialog open={showPaidPeriodsDialog} onOpenChange={setShowPaidPeriodsDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Periodelimiet bereikt</AlertDialogTitle>
+            <AlertDialogTitle className="text-center text-xl">Periodelimiet bereikt</AlertDialogTitle>
             <AlertDialogDescription>
-              <div className="flex items-start gap-2 mb-4">
-                <AlertTriangle className="text-amber-500 mt-0.5" size={18} />
-                <span>
-                  Je hebt het maximale aantal perioden ({tierPeriodLimit}) bereikt voor je {tier.toUpperCase()}-abonnement.
-                </span>
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                  <AlertTriangle className="text-amber-500" size={24} />
+                </div>
               </div>
-              <p className="mb-2">
-                Je hebt {paidPeriodsCount} uitbetaalde perioden. Je kunt deze perioden verwijderen om ruimte te maken voor nieuwe perioden, of je kunt upgraden naar een hoger abonnement.
+              <p className="text-center mb-4">
+                Je hebt het maximale aantal perioden ({tierPeriodLimit}) bereikt voor je {tier.toUpperCase()}-abonnement.
               </p>
-              <p className="text-sm text-amber-500 font-medium">
+              <p className="mb-3">
+                Je hebt {paidPeriodsCount} uitbetaalde perioden. Je kunt:
+              </p>
+              <ul className="list-disc pl-6 space-y-2 mb-4">
+                <li>Deze perioden verwijderen om ruimte te maken voor nieuwe perioden</li>
+                <li>Upgraden naar een hoger abonnement voor meer opslagruimte</li>
+              </ul>
+              <p className="text-sm bg-amber-50 p-3 rounded-md border border-amber-200 text-amber-700 font-medium">
                 Let op: Als je uitbetaalde perioden verwijdert, gaan alle gegevens van deze perioden verloren.
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel>Annuleren</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-tier-pro hover:bg-tier-pro/90 text-white"
-              onClick={() => {
-                setShowPaidPeriodsDialog(false);
-                // Navigate to upgrade page or show upgrade dialog
-                toast({
-                  title: "Upgraden naar " + (tier === 'free' ? 'TEAM' : 'PRO'),
-                  description: "Upgraden naar een hoger abonnement om meer perioden te gebruiken."
-                });
-              }}
+              className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white"
+              onClick={handleUpgrade}
             >
               <Crown size={16} className="mr-1" /> Upgraden
             </AlertDialogAction>
@@ -167,20 +228,148 @@ const Periods = () => {
               onClick={handleDeletePaidPeriods}
               className="bg-destructive hover:bg-destructive/90"
             >
-              Verwijder uitbetaalde perioden
+              <Trash2 size={16} className="mr-1" /> Perioden verwijderen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
       
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-center text-xl">Perioden verwijderen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                  <Trash2 className="text-red-500" size={24} />
+                </div>
+              </div>
+              <p className="text-center mb-4">
+                Weet je zeker dat je alle uitbetaalde perioden wilt verwijderen?
+              </p>
+              <div className="bg-red-50 p-4 rounded-md border border-red-200 mb-2">
+                <p className="text-red-700 font-medium mb-2">Deze actie is onomkeerbaar!</p>
+                <p className="text-sm text-red-600">
+                  Alle uitbetaalde perioden worden permanent verwijderd. Je verliest alle gegevens van deze perioden, inclusief fooi-invoeren en statistieken.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeletePaidPeriods}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Ja, verwijder uitbetaalde perioden
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Upgrade Dialog */}
+      <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl">Upgrade je abonnement</DialogTitle>
+            <DialogDescription className="text-center pt-2">
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-[#9b87f5]/20 flex items-center justify-center">
+                  <Crown className="text-[#9b87f5]" size={24} />
+                </div>
+              </div>
+              <p className="mb-4">Kies het abonnement dat bij jouw bedrijf past</p>
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <Card className={`border-[#7E69AB] ${tier === 'free' ? 'bg-[#9b87f5]/5' : ''}`}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex justify-between items-center">
+                  <span className="flex items-center">
+                    <Crown size={18} className="text-[#7E69AB] mr-2" /> TEAM
+                  </span>
+                  <span className="text-base font-normal">€9,99/maand</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm mb-4">
+                  <li className="flex items-start">
+                    <span className="text-green-500 mr-2">✓</span> 7 perioden opslaan
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-green-500 mr-2">✓</span> 10 teamleden
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-green-500 mr-2">✓</span> Meer statistieken
+                  </li>
+                </ul>
+                {tier === 'free' ? (
+                  <Button 
+                    onClick={() => doUpgrade('team')} 
+                    className="w-full bg-[#7E69AB] hover:bg-[#6E59A5]"
+                  >
+                    Upgrade naar TEAM
+                  </Button>
+                ) : (
+                  <Button disabled className="w-full bg-[#7E69AB]/50">
+                    Huidige Abonnement
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+            
+            <Card className={`border-[#9b87f5] ${tier === 'team' ? 'bg-[#9b87f5]/5' : ''}`}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex justify-between items-center">
+                  <span className="flex items-center">
+                    <Crown size={18} className="text-[#9b87f5] mr-2" /> PRO
+                  </span>
+                  <span className="text-base font-normal">€19,99/maand</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm mb-4">
+                  <li className="flex items-start">
+                    <span className="text-green-500 mr-2">✓</span> Onbeperkt perioden opslaan
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-green-500 mr-2">✓</span> Onbeperkt teamleden
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-green-500 mr-2">✓</span> Geavanceerde analyses
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-green-500 mr-2">✓</span> Prioriteit support
+                  </li>
+                </ul>
+                {tier !== 'pro' ? (
+                  <Button 
+                    onClick={() => doUpgrade('pro')} 
+                    className="w-full bg-[#9b87f5] hover:bg-[#8B5CF6]"
+                  >
+                    Upgrade naar PRO
+                  </Button>
+                ) : (
+                  <Button disabled className="w-full bg-[#9b87f5]/50">
+                    Huidige Abonnement
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
       {sortedPeriods.length > 0 ? (
         <div className="space-y-4">
           {tier === 'free' && sortedPeriods.length > 3 && (
-            <Card className="border-tier-team">
+            <Card className="border-[#7E69AB]">
               <CardContent className="p-4 flex items-center">
-                <Crown size={20} className="text-tier-team mr-2" />
+                <Crown size={20} className="text-[#7E69AB] mr-2" />
                 <p className="text-sm">
-                  Upgrade naar <span className="font-medium text-tier-team">TEAM</span> om toegang te krijgen tot meer historische periodes.
+                  Upgrade naar <span className="font-medium text-[#7E69AB]">TEAM</span> om toegang te krijgen tot meer historische periodes.
                 </p>
               </CardContent>
             </Card>
@@ -188,6 +377,8 @@ const Periods = () => {
           
           {sortedPeriods.map((period, index) => {
             const isPeriodHidden = (tier === 'free' && index >= 3) || (tier === 'team' && index >= 7);
+            const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
+            const periodAverageTipPerHour = period.isPaid ? calculateAverageTipPerHour(period.id) : 0;
             
             return (
               <Card 
@@ -201,16 +392,18 @@ const Periods = () => {
                         ? 'Actieve periode' 
                         : `Periode ${formatPeriodDate(period.startDate)}`}
                     </span>
-                    {period.isActive && (
-                      <span className="text-sm px-2 py-0.5 bg-tier-free/10 text-tier-free rounded-full">
-                        Actief
-                      </span>
-                    )}
-                    {period.isPaid && (
-                      <span className="text-sm px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                        Uitbetaald
-                      </span>
-                    )}
+                    <div className="flex gap-2">
+                      {period.isActive && (
+                        <span className="text-xs px-2 py-0.5 bg-tier-free/10 text-tier-free rounded-full">
+                          Actief
+                        </span>
+                      )}
+                      {period.isPaid && (
+                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                          Uitbetaald
+                        </span>
+                      )}
+                    </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -230,7 +423,7 @@ const Periods = () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Totaal fooi</span>
                       <span className="font-medium">
-                        €{period.tips.reduce((sum, tip) => sum + tip.amount, 0).toFixed(2)}
+                        €{totalTips.toFixed(2)}
                       </span>
                     </div>
                     
@@ -238,12 +431,27 @@ const Periods = () => {
                       <span className="text-muted-foreground">Aantal invoeren</span>
                       <span>{period.tips.length}</span>
                     </div>
+                    
+                    {period.isPaid && periodAverageTipPerHour > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground flex items-center">
+                          <TrendingUp size={14} className="mr-1 text-[#9b87f5]" /> Gem. fooi per uur
+                        </span>
+                        <span className="text-[#9b87f5] font-medium">
+                          €{periodAverageTipPerHour.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   
                   {isPeriodHidden && (
                     <div className="mt-4 flex justify-center">
-                      <Button variant="outline" className="text-tier-team border-tier-team">
-                        <Crown size={16} className="mr-1 text-tier-team" /> Upgraden naar {tier === 'free' ? 'TEAM' : 'PRO'}
+                      <Button 
+                        variant="outline" 
+                        className="text-[#7E69AB] border-[#7E69AB]"
+                        onClick={handleUpgrade}
+                      >
+                        <Crown size={16} className="mr-1 text-[#7E69AB]" /> Upgraden naar {tier === 'free' ? 'TEAM' : 'PRO'}
                       </Button>
                     </div>
                   )}

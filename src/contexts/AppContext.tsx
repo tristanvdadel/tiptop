@@ -72,6 +72,7 @@ type AppContextType = {
   markPeriodsAsPaid: (periodIds: string[]) => void;
   hasReachedPeriodLimit: () => boolean;
   getUnpaidPeriodsCount: () => number;
+  deletePaidPeriods: () => void;
 };
 
 // Define tier limits
@@ -322,7 +323,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (periodId) {
       // If a specific period ID is provided, use that
       const period = periods.find(p => p.id === periodId);
-      if (period && !period.isActive) {
+      if (period) {
         periodsToCalculate = [period];
       }
     } else {
@@ -387,6 +388,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     );
   };
 
+  // Delete all paid periods
+  const deletePaidPeriods = () => {
+    // Filter out paid periods
+    const filteredPeriods = periods.filter(period => !period.isPaid);
+    setPeriods(filteredPeriods);
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -406,6 +414,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         markPeriodsAsPaid,
         hasReachedPeriodLimit,
         getUnpaidPeriodsCount,
+        deletePaidPeriods,
       }}
     >
       {children}

@@ -199,6 +199,8 @@ const Team = () => {
     
   const tierMemberLimit = tier === 'free' ? 5 : tier === 'team' ? 10 : Infinity;
   
+  const hasReachedTeamMemberLimit = teamMembers.length >= tierMemberLimit;
+  
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -291,17 +293,35 @@ const Team = () => {
               <p className="text-muted-foreground">Nog geen teamleden toegevoegd.</p>
             )}
             
-            <form onSubmit={handleAddMember} className="mt-6 flex gap-2">
-              <Input
-                placeholder="Naam nieuw teamlid"
-                value={newMemberName}
-                onChange={(e) => setNewMemberName(e.target.value)}
-                className="flex-grow"
-              />
-              <Button type="submit" disabled={!newMemberName.trim() || (teamMembers.length >= tierMemberLimit)}>
-                <Plus size={16} className="mr-1" /> Toevoegen
-              </Button>
-            </form>
+            {hasReachedTeamMemberLimit ? (
+              <div className="mt-6 flex">
+                <Button 
+                  className="w-full bg-tier-team hover:bg-tier-team/90 text-white"
+                  onClick={() => {
+                    toast({
+                      title: "Upgraden naar TEAM",
+                      description: tier === 'free' 
+                        ? "Upgrade naar TEAM om meer teamleden toe te voegen." 
+                        : "Upgrade naar PRO om onbeperkt teamleden toe te voegen."
+                    });
+                  }}
+                >
+                  <Crown size={16} className="mr-1" /> Upgraden naar {tier === 'free' ? 'TEAM' : 'PRO'}
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleAddMember} className="mt-6 flex gap-2">
+                <Input
+                  placeholder="Naam nieuw teamlid"
+                  value={newMemberName}
+                  onChange={(e) => setNewMemberName(e.target.value)}
+                  className="flex-grow"
+                />
+                <Button type="submit" disabled={!newMemberName.trim()}>
+                  <Plus size={16} className="mr-1" /> Toevoegen
+                </Button>
+              </form>
+            )}
           </CardContent>
         </Card>
       )}

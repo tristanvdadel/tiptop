@@ -12,7 +12,6 @@ const FastTip = () => {
   const navigate = useNavigate();
   const [amount, setAmount] = useState<number>(0);
   const [note, setNote] = useState<string>('');
-  const [placeholderIndex, setPlaceholderIndex] = useState<number>(0);
   
   const placeholders = [
     "bijvoorbeeld: Tafel 6",
@@ -20,13 +19,10 @@ const FastTip = () => {
     "bijvoorbeeld: Speciaal voor de cocktail"
   ];
   
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPlaceholderIndex((prevIndex) => (prevIndex + 1) % placeholders.length);
-    }, 3000);
-    
-    return () => clearInterval(interval);
-  }, []);
+  // Select a random placeholder on component mount
+  const [placeholder] = useState(
+    placeholders[Math.floor(Math.random() * placeholders.length)]
+  );
   
   const handleAddAmount = (value: number) => {
     setAmount(prev => prev + value);
@@ -86,7 +82,7 @@ const FastTip = () => {
           <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder={placeholders[placeholderIndex]}
+            placeholder={placeholder}
             className="w-full placeholder:italic"
             rows={3}
           />

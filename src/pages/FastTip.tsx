@@ -3,27 +3,23 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Plus, Minus, Check } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { ArrowLeft, Check } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 
 const FastTip = () => {
   const { addTip } = useApp();
   const navigate = useNavigate();
   const [amount, setAmount] = useState<number>(0);
+  const [note, setNote] = useState<string>('');
   
-  const handleIncrement = (value: number) => {
+  const handleAddAmount = (value: number) => {
     setAmount(prev => prev + value);
-  };
-  
-  const handleDecrement = (value: number) => {
-    if (amount - value >= 0) {
-      setAmount(prev => prev - value);
-    }
   };
   
   const handleSave = () => {
     if (amount > 0) {
-      addTip(amount);
+      addTip(amount, note);
       navigate('/');
     }
   };
@@ -43,7 +39,7 @@ const FastTip = () => {
       </header>
       
       <div className="flex-grow flex flex-col items-center justify-center p-4">
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <h2 className="text-2xl font-medium mb-2">Bedrag</h2>
           <div className="relative inline-block">
             <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-2xl">€</span>
@@ -57,25 +53,28 @@ const FastTip = () => {
           </div>
         </div>
         
-        <div className="grid grid-cols-2 gap-3 w-full max-w-md mb-8">
+        <div className="grid grid-cols-2 gap-3 w-full max-w-md mb-6">
           {[1, 2, 5, 10].map((value) => (
-            <div key={value} className="flex space-x-2">
-              <Button 
-                variant="outline" 
-                className="flex-1 text-lg py-6" 
-                onClick={() => handleDecrement(value)}
-              >
-                <Minus size={18} className="mr-1" /> {value}
-              </Button>
-              <Button 
-                variant="outline" 
-                className="flex-1 text-lg py-6" 
-                onClick={() => handleIncrement(value)}
-              >
-                <Plus size={18} className="mr-1" /> {value}
-              </Button>
-            </div>
+            <Button 
+              key={value}
+              variant="outline" 
+              className="text-lg py-6" 
+              onClick={() => handleAddAmount(value)}
+            >
+              {value}
+            </Button>
           ))}
+        </div>
+        
+        <div className="w-full max-w-md mb-6">
+          <h3 className="text-base font-medium mb-2">Notitie</h3>
+          <Textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Optionele notitie"
+            className="w-full"
+            rows={3}
+          />
         </div>
         
         <Button 

@@ -67,15 +67,14 @@ type AppContextType = {
   updateTeamMemberHours: (id: string, hours: number) => void;
   startNewPeriod: () => void;
   endCurrentPeriod: () => void;
-  calculateTipDistribution: (periodIds?: string[]) => TeamMember[];
-  calculateAverageTipPerHour: (periodId?: string) => number;
+  calculateTipDistribution: (periodIds?: string[], calculationMode?: 'period' | 'day' | 'week' | 'month') => TeamMember[];
+  calculateAverageTipPerHour: (periodId?: string, calculationMode?: 'period' | 'day' | 'week' | 'month') => number;
   markPeriodsAsPaid: (periodIds: string[], customDistribution?: PayoutData['distribution']) => void;
   hasReachedPeriodLimit: () => boolean;
   getUnpaidPeriodsCount: () => number;
   deletePaidPeriods: () => void;
 };
 
-// Define tier limits
 const tierLimits: TierLimits = {
   free: {
     periods: 3,
@@ -101,7 +100,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [payouts, setPayouts] = useState<PayoutData[]>([]);
   const { toast } = useToast();
 
-  // Load data from localStorage on mount
   useEffect(() => {
     const storedPeriods = localStorage.getItem('periods');
     const storedTeamMembers = localStorage.getItem('teamMembers');
@@ -111,7 +109,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const parsedPeriods = JSON.parse(storedPeriods);
       setPeriods(parsedPeriods);
       
-      // Set current period if there's an active one
       const active = parsedPeriods.find((p: Period) => p.isActive);
       if (active) {
         setCurrentPeriod(active);
@@ -127,7 +124,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Save data to localStorage when it changes
   useEffect(() => {
     localStorage.setItem('periods', JSON.stringify(periods));
   }, [periods]);
@@ -140,12 +136,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('payouts', JSON.stringify(payouts));
   }, [payouts]);
 
-  // Generate a unique ID
   const generateId = () => {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
   };
 
-  // Add a new tip entry
   const addTip = (amount: number, note?: string) => {
     if (!currentPeriod) {
       if (hasReachedPeriodLimit()) {
@@ -163,7 +157,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       amount,
       date: new Date().toISOString(),
       note,
-      addedBy: 'current-user', // This would come from auth in a real app
+      addedBy: 'current-user',
     };
     
     const updatedPeriod = {
@@ -173,15 +167,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     setCurrentPeriod(updatedPeriod);
     
-    // Update in the periods array
     setPeriods(prev => 
       prev.map(p => p.id === updatedPeriod.id ? updatedPeriod : p)
     );
   };
 
-  // Add a new team member
   const addTeamMember = (name: string) => {
-    // Check if we're at the limit for the current tier
     if (teamMembers.length >= tierLimits[tier].teamMembers) {
       toast({
         title: "Limiet bereikt",
@@ -199,12 +190,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setTeamMembers(prev => [...prev, newMember]);
   };
 
-  // Remove a team member
   const removeTeamMember = (id: string) => {
     setTeamMembers(prev => prev.filter(member => member.id !== id));
   };
 
-  // Update a team member's hours
   const updateTeamMemberHours = (id: string, hours: number) => {
     setTeamMembers(prev => 
       prev.map(member => 
@@ -212,25 +201,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       )
     );
     
-    // Reset input field by dispatching a custom event
     window.dispatchEvent(new CustomEvent('reset-hours-input', { detail: { memberId: id } }));
   };
 
-  // Check if user has reached the period limit for their tier
   const hasReachedPeriodLimit = () => {
     const periodLimit = tierLimits[tier].periods;
     const currentPeriodsCount = periods.length;
     return currentPeriodsCount >= periodLimit;
   };
   
-  // Get count of unpaid periods
   const getUnpaidPeriodsCount = () => {
     return periods.filter(p => !p.isActive && !p.isPaid).length;
   };
 
-  // Start a new period
   const startNewPeriod = () => {
-    // Check if we're at the limit for the current tier
     if (hasReachedPeriodLimit()) {
       toast({
         title: "Limiet bereikt",
@@ -239,7 +223,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     
-    // End the current period if there is one
     if (currentPeriod && currentPeriod.isActive) {
       endCurrentPeriod();
     }
@@ -256,7 +239,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setPeriods(prev => [...prev, newPeriod]);
   };
 
-  // End the current period
   const endCurrentPeriod = () => {
     if (!currentPeriod) return;
     
@@ -268,21 +250,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     setCurrentPeriod(null);
     
-    // Update in the periods array
     setPeriods(prev => 
       prev.map(p => p.id === endedPeriod.id ? endedPeriod : p)
     );
   };
 
-  // Calculate tip distribution based on hours worked
-  const calculateTipDistribution = (periodIds?: string[]) => {
+  const calculateTipDistribution = (periodIds?: string[], calculationMode: 'period' | 'day' | 'week' | 'month' = 'period') => {
     let periodsToCalculate: Period[] = [];
     
     if (periodIds && periodIds.length > 0) {
-      // If specific period IDs are provided, use those
       periodsToCalculate = periods.filter(p => periodIds.includes(p.id));
     } else if (currentPeriod) {
-      // Otherwise, use the current period
       periodsToCalculate = [currentPeriod];
     } else {
       return [];
@@ -299,15 +277,45 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
     
-    // If no hours recorded, can't distribute
     if (totalHours === 0) {
       return [];
     }
     
+    if (calculationMode === 'period' || tier !== 'pro') {
+      return teamMembers.map(member => {
+        const tipShare = totalHours > 0 
+          ? (member.hours / totalHours) * totalTip 
+          : 0;
+          
+        return {
+          ...member,
+          tipAmount: parseFloat(tipShare.toFixed(2)),
+        };
+      });
+    }
+    
+    let adjustmentFactor = 1;
+    
+    switch (calculationMode) {
+      case 'day':
+        adjustmentFactor = 1.05;
+        break;
+      case 'week':
+        adjustmentFactor = 1.1;
+        break; 
+      case 'month':
+        adjustmentFactor = 1.15;
+        break;
+    }
+    
     return teamMembers.map(member => {
-      const tipShare = totalHours > 0 
+      let tipShare = totalHours > 0 
         ? (member.hours / totalHours) * totalTip 
         : 0;
+      
+      if (member.hours > 10) {
+        tipShare = tipShare * adjustmentFactor;
+      }
         
       return {
         ...member,
@@ -315,61 +323,69 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       };
     });
   };
-  
-  // Calculate average tip per hour
-  const calculateAverageTipPerHour = (periodId?: string) => {
+
+  const calculateAverageTipPerHour = (periodId?: string, calculationMode: 'period' | 'day' | 'week' | 'month' = 'period') => {
     let periodsToCalculate: Period[] = [];
     
     if (periodId) {
-      // If a specific period ID is provided, use that
       const period = periods.find(p => p.id === periodId);
       if (period) {
         periodsToCalculate = [period];
       }
     } else {
-      // Otherwise, use all completed periods
-      periodsToCalculate = periods.filter(p => !p.isActive);
+      periodsToCalculate = periods;
     }
     
     if (!periodsToCalculate.length) {
       return 0;
     }
     
-    // Calculate total tips from all periods
     const totalTips = periodsToCalculate.reduce(
       (sum, period) => sum + period.tips.reduce((s, tip) => s + tip.amount, 0),
       0
     );
     
-    // Calculate total hours from all team members
     const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
     
     if (totalHours === 0) {
       return 0;
     }
     
-    return totalTips / totalHours;
+    if (calculationMode === 'period' || tier !== 'pro') {
+      return totalTips / totalHours;
+    }
+    
+    let adjustmentFactor = 1;
+    
+    switch (calculationMode) {
+      case 'day':
+        adjustmentFactor = 1.05;
+        break;
+      case 'week':
+        adjustmentFactor = 1.1;
+        break;
+      case 'month':
+        adjustmentFactor = 1.15;
+        break;
+    }
+    
+    return (totalTips / totalHours) * adjustmentFactor;
   };
-  
-  // Mark periods as paid
+
   const markPeriodsAsPaid = (periodIds: string[], customDistribution?: PayoutData['distribution']) => {
     if (!periodIds.length) return;
     
-    // Create a distribution record for this payout
     let distribution;
     
     if (customDistribution) {
-      // Use custom distribution if provided (for partial payouts)
       distribution = customDistribution;
     } else {
-      // Calculate standard distribution based on hours
       distribution = calculateTipDistribution(periodIds).map(member => ({
         memberId: member.id,
         amount: member.tipAmount || 0,
       }));
     }
     
-    // Add the payout record
     const newPayout: PayoutData = {
       periodIds,
       date: new Date().toISOString(),
@@ -378,7 +394,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     setPayouts(prev => [...prev, newPayout]);
     
-    // Mark periods as paid
     setPeriods(prev => 
       prev.map(period => 
         periodIds.includes(period.id) 
@@ -387,7 +402,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       )
     );
     
-    // Update team members' last payout date
     setTeamMembers(prev => 
       prev.map(member => ({
         ...member,
@@ -396,9 +410,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     );
   };
 
-  // Delete all paid periods
   const deletePaidPeriods = () => {
-    // Filter out paid periods
     const filteredPeriods = periods.filter(period => !period.isPaid);
     setPeriods(filteredPeriods);
   };

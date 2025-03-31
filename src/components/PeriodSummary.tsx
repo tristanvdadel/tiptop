@@ -1,28 +1,13 @@
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Crown } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  RadioGroup,
-  RadioGroupItem,
-} from '@/components/ui/radio-group';
 
 const PeriodSummary = () => {
-  const { currentPeriod, endCurrentPeriod, calculateAverageTipPerHour, tier } = useApp();
-  const [averageView, setAverageView] = useState<'period' | 'day' | 'week' | 'month'>('period');
-  const { toast } = useToast();
+  const { currentPeriod, endCurrentPeriod, calculateAverageTipPerHour } = useApp();
   
   const totalTip = useMemo(() => {
     if (!currentPeriod) return 0;
@@ -30,20 +15,9 @@ const PeriodSummary = () => {
   }, [currentPeriod]);
   
   const averageTipPerHour = useMemo(() => {
-    if (!currentPeriod) return 0;
-    return calculateAverageTipPerHour(currentPeriod.id);
-  }, [currentPeriod, calculateAverageTipPerHour]);
-  
-  const handleAverageViewChange = (value: string) => {
-    if (tier === 'free' && value !== 'period') {
-      toast({
-        title: "PRO functie",
-        description: `Gemiddelde fooi per ${value === 'day' ? 'dag' : value === 'week' ? 'week' : 'maand'} is alleen beschikbaar in het PRO abonnement.`,
-      });
-      return;
-    }
-    setAverageView(value as 'period' | 'day' | 'week' | 'month');
-  };
+    // Calculate average tip per hour for all periods
+    return calculateAverageTipPerHour();
+  }, [calculateAverageTipPerHour]);
   
   if (!currentPeriod) {
     return (
@@ -74,36 +48,7 @@ const PeriodSummary = () => {
           
           <div className="mt-4 mb-2">
             <div className="flex justify-between items-center mb-2">
-              <h4 className="text-sm font-medium">Gemiddelde fooi per uur</h4>
-              <Select
-                value={averageView}
-                onValueChange={handleAverageViewChange}
-              >
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Weergave selecteren" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="period">Per periode</SelectItem>
-                  <SelectItem value="day" className={tier !== 'pro' ? "opacity-60" : ""}>
-                    <div className="flex items-center gap-1">
-                      Per dag
-                      {tier !== 'pro' && <Crown size={14} className="text-tier-pro" />}
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="week" className={tier !== 'pro' ? "opacity-60" : ""}>
-                    <div className="flex items-center gap-1">
-                      Per week
-                      {tier !== 'pro' && <Crown size={14} className="text-tier-pro" />}
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="month" className={tier !== 'pro' ? "opacity-60" : ""}>
-                    <div className="flex items-center gap-1">
-                      Per maand
-                      {tier !== 'pro' && <Crown size={14} className="text-tier-pro" />}
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <h4 className="text-sm font-medium">Gemiddelde fooi per uur (all-time)</h4>
             </div>
             <div className="bg-muted/50 p-3 rounded-md">
               <span className="font-medium text-xl">€{averageTipPerHour.toFixed(2)}</span>

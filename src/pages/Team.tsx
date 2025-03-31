@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +25,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const Team = () => {
   const { 
@@ -36,7 +42,8 @@ const Team = () => {
     tier, 
     periods,
     calculateTipDistribution, 
-    markPeriodsAsPaid 
+    markPeriodsAsPaid,
+    calculateAverageTipPerHour
   } = useApp();
   
   const [newMemberName, setNewMemberName] = useState('');
@@ -51,6 +58,7 @@ const Team = () => {
   const [showPartialPayoutDialog, setShowPartialPayoutDialog] = useState(false);
   const [partialPayoutAmounts, setPartialPayoutAmounts] = useState<Record<string, number>>({});
   const [isPartialPayout, setIsPartialPayout] = useState(false);
+  const [averageView, setAverageView] = useState<'period' | 'day' | 'week' | 'month'>('period');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -99,7 +107,6 @@ const Team = () => {
     updateTeamMemberHours(id, hourInputs[id] || 0);
     setEditingMember(null);
     setShowHoursDialog(false);
-    // Reset the hour input for this member
     setHourInputs(prev => ({
       ...prev,
       [id]: 0
@@ -110,7 +117,7 @@ const Team = () => {
     setEditingMember(member.id);
     setHourInputs(prev => ({
       ...prev,
-      [member.id]: 0 // Start at 0 instead of current hours
+      [member.id]: 0
     }));
     setShowHoursDialog(true);
   };
@@ -183,7 +190,6 @@ const Team = () => {
     if (tier === 'pro' && isPartialPayout) {
       setShowPartialPayoutDialog(true);
       
-      // Initialize partial payout amounts with default (full) values
       const initialAmounts: Record<string, number> = {};
       distribution.forEach(member => {
         initialAmounts[member.id] = member.tipAmount || 0;
@@ -205,7 +211,6 @@ const Team = () => {
   };
   
   const handlePartialPayout = () => {
-    // Convert partial payout data for the context
     const distribution = Object.entries(partialPayoutAmounts).map(([memberId, amount]) => ({
       memberId,
       amount
@@ -235,7 +240,7 @@ const Team = () => {
   const completedPeriods = periods.filter(p => !p.isActive && !p.isPaid);
   
   const distribution = selectedPeriods.length > 0 
-    ? calculateTipDistribution(selectedPeriods) 
+    ? calculateTipDistribution(selectedPeriods, averageView) 
     : [];
     
   const totalSelectedTip = selectedPeriods.length > 0
@@ -246,6 +251,13 @@ const Team = () => {
           0
         )
     : 0;
+  
+  const averageTipPerHour = useMemo(() => {
+    if (selectedPeriods.length > 0) {
+      return calculateAverageTipPerHour(selectedPeriods[0], averageView);
+    }
+    return 0;
+  }, [calculateAverageTipPerHour, selectedPeriods, averageView]);
     
   const tierMemberLimit = tier === 'free' ? 5 : tier === 'team' ? 10 : Infinity;
   
@@ -460,7 +472,46 @@ const Team = () => {
               {selectedPeriods.length > 0 && (
                 <div className="space-y-4 mt-6">
                   <div className="border-t pt-4">
-                    <h3 className="text-lg font-medium mb-4">Geselecteerde uitbetaling</h3>
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-medium">Geselecteerde uitbetaling</h3>
+                      <Select
+                        value={averageView}
+                        onValueChange={handleAverageViewChange}
+                      >
+                        <SelectTrigger className="w-[150px]">
+                          <SelectValue placeholder="Weergave selecteren" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="period">Per periode</SelectItem>
+                          <SelectItem value="day" className={tier !== 'pro' ? "opacity-60" : ""}>
+                            <div className="flex items-center gap-1">
+                              Per dag
+                              {tier !== 'pro' && <Crown size={14} className="text-tier-pro" />}
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="week" className={tier !== 'pro' ? "opacity-60" : ""}>
+                            <div className="flex items-center gap-1">
+                              Per week
+                              {tier !== 'pro' && <Crown size={14} className="text-tier-pro" />}
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="month" className={tier !== 'pro' ? "opacity-60" : ""}>
+                            <div className="flex items-center gap-1">
+                              Per maand
+                              {tier !== 'pro' && <Crown size={14} className="text-tier-pro" />}
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="bg-muted/50 p-3 rounded-md mb-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Gemiddelde fooi per uur:</span>
+                        <span className="font-medium text-xl">€{averageTipPerHour.toFixed(2)}</span>
+                      </div>
+                    </div>
+                    
                     <div className="space-y-2">
                       {distribution.map((member) => (
                         <div key={member.id} className="flex justify-between">
@@ -502,7 +553,6 @@ const Team = () => {
         </Card>
       )}
 
-      {/* Dialogs */}
       <Dialog open={showCsvDialog} onOpenChange={setShowCsvDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

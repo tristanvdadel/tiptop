@@ -69,7 +69,7 @@ type AppContextType = {
   endCurrentPeriod: () => void;
   calculateTipDistribution: (periodIds?: string[]) => TeamMember[];
   calculateAverageTipPerHour: (periodId?: string) => number;
-  markPeriodsAsPaid: (periodIds: string[]) => void;
+  markPeriodsAsPaid: (periodIds: string[], customDistribution?: PayoutData['distribution']) => void;
   hasReachedPeriodLimit: () => boolean;
   getUnpaidPeriodsCount: () => number;
   deletePaidPeriods: () => void;
@@ -352,22 +352,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
   
   // Mark periods as paid
-  const markPeriodsAsPaid = (periodIds: string[]) => {
+  const markPeriodsAsPaid = (periodIds: string[], customDistribution?: PayoutData['distribution']) => {
     if (!periodIds.length) return;
     
     // Create a distribution record for this payout
-    const distribution = calculateTipDistribution(periodIds);
+    let distribution;
     
+    if (customDistribution) {
+      // Use custom distribution if provided (for partial payouts)
+      distribution = customDistribution;
+    } else {
+      // Calculate standard distribution based on hours
+      distribution = calculateTipDistribution(periodIds).map(member => ({
+        memberId: member.id,
+        amount: member.tipAmount || 0,
+      }));
+    }
+    
+    // Add the payout record
     const newPayout: PayoutData = {
       periodIds,
       date: new Date().toISOString(),
-      distribution: distribution.map(member => ({
-        memberId: member.id,
-        amount: member.tipAmount || 0,
-      })),
+      distribution,
     };
     
-    // Add the payout record
     setPayouts(prev => [...prev, newPayout]);
     
     // Mark periods as paid

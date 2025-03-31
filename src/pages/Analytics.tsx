@@ -1,10 +1,8 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Crown, BarChart } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { 
-  Chart,
   ChartContainer, 
   ChartTooltip, 
   ChartTooltipContent 

@@ -1,5 +1,4 @@
-
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +9,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 const Team = () => {
   const { 
@@ -26,8 +33,37 @@ const Team = () => {
   const [newMemberName, setNewMemberName] = useState('');
   const [showPayout, setShowPayout] = useState(false);
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
+  const [showCsvDialog, setShowCsvDialog] = useState(false);
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
+  const [hourInputs, setHourInputs] = useState<Record<string, number>>({});
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  
+  useEffect(() => {
+    const initialHourInputs: Record<string, number> = {};
+    teamMembers.forEach(member => {
+      initialHourInputs[member.id] = 0;
+    });
+    setHourInputs(initialHourInputs);
+  }, [teamMembers.length]);
+  
+  useEffect(() => {
+    const handleResetHoursInput = (e: CustomEvent) => {
+      const { memberId } = e.detail;
+      setHourInputs(prev => ({
+        ...prev,
+        [memberId]: 0
+      }));
+    };
+    
+    window.addEventListener('reset-hours-input', handleResetHoursInput as EventListener);
+    
+    return () => {
+      window.removeEventListener('reset-hours-input', handleResetHoursInput as EventListener);
+    };
+  }, []);
   
   const handleAddMember = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +71,18 @@ const Team = () => {
       addTeamMember(newMemberName.trim());
       setNewMemberName('');
     }
+  };
+
+  const handleHoursChange = (id: string, value: string) => {
+    const hours = parseFloat(value) || 0;
+    setHourInputs(prev => ({
+      ...prev,
+      [id]: hours
+    }));
+  };
+  
+  const handleSubmitHours = (id: string) => {
+    updateTeamMemberHours(id, hourInputs[id] || 0);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,21 +97,40 @@ const Team = () => {
       return;
     }
 
-    // Here we'd process the CSV file in a real implementation
-    // For now, just show a success message
     toast({
       title: "CSV geïmporteerd",
       description: "De uren zijn succesvol geïmporteerd voor je teamleden.",
     });
     
-    // Reset the file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+    
+    setShowCsvDialog(false);
   };
   
   const triggerFileUpload = () => {
-    fileInputRef.current?.click();
+    if (tier === 'pro') {
+      setShowCsvDialog(true);
+    } else {
+      toast({
+        title: "PRO functie",
+        description: "CSV import is alleen beschikbaar in het PRO abonnement.",
+      });
+    }
+  };
+  
+  const confirmRemoveMember = (id: string) => {
+    setMemberToRemove(id);
+    setShowRemoveDialog(true);
+  };
+  
+  const handleRemoveMember = () => {
+    if (memberToRemove) {
+      removeTeamMember(memberToRemove);
+      setShowRemoveDialog(false);
+      setMemberToRemove(null);
+    }
   };
   
   const togglePeriodSelection = (periodId: string) => {
@@ -94,15 +161,12 @@ const Team = () => {
     setShowPayout(false);
   };
   
-  // Get completed and unpaid periods
   const completedPeriods = periods.filter(p => !p.isActive && !p.isPaid);
   
-  // Calculate distribution for selected periods
   const distribution = selectedPeriods.length > 0 
     ? calculateTipDistribution(selectedPeriods) 
     : [];
     
-  // Calculate total tip amount for selected periods
   const totalSelectedTip = selectedPeriods.length > 0
     ? periods
         .filter(p => selectedPeriods.includes(p.id))
@@ -111,6 +175,8 @@ const Team = () => {
           0
         )
     : 0;
+    
+  const tierMemberLimit = tier === 'free' ? 5 : tier === 'team' ? 10 : Infinity;
   
   return (
     <div className="space-y-6">
@@ -118,7 +184,7 @@ const Team = () => {
         <h1 className="text-2xl font-bold">Team</h1>
         <div className="flex gap-2">
           <Badge className="tier-free">
-            {teamMembers.length}/5 leden
+            {teamMembers.length}/{tierMemberLimit} leden
           </Badge>
           {completedPeriods.length > 0 && (
             <Button 
@@ -133,79 +199,7 @@ const Team = () => {
         </div>
       </div>
       
-      {showPayout ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex justify-between items-center">
-              <span>Uitbetaling</span>
-              <Badge variant="outline">
-                €{totalSelectedTip.toFixed(2)}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <h3 className="font-medium">Selecteer periodes:</h3>
-              {completedPeriods.length > 0 ? (
-                <div className="space-y-3">
-                  {completedPeriods.map(period => {
-                    const startDate = format(new Date(period.startDate), 'd MMMM', { locale: nl });
-                    const endDate = period.endDate 
-                      ? format(new Date(period.endDate), 'd MMMM', { locale: nl }) 
-                      : '';
-                    const totalTip = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
-                    
-                    return (
-                      <div 
-                        key={period.id} 
-                        className="flex items-center space-x-2 p-3 border rounded-lg"
-                      >
-                        <Checkbox 
-                          id={period.id}
-                          checked={selectedPeriods.includes(period.id)}
-                          onCheckedChange={() => togglePeriodSelection(period.id)}
-                        />
-                        <label 
-                          htmlFor={period.id} 
-                          className="flex-grow cursor-pointer flex justify-between"
-                        >
-                          <span>{startDate} - {endDate}</span>
-                          <span className="font-medium">€{totalTip.toFixed(2)}</span>
-                        </label>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-muted-foreground">Geen afgeronde periodes beschikbaar.</p>
-              )}
-            </div>
-            
-            {distribution.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="font-medium">Verdeling:</h3>
-                <div className="space-y-3">
-                  {distribution.map(member => (
-                    <div key={member.id} className="flex justify-between p-3 border rounded-lg">
-                      <span>{member.name}</span>
-                      <span className="font-medium">€{member.tipAmount?.toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
-                
-                <Button 
-                  className="w-full mt-4" 
-                  onClick={handlePayout}
-                  disabled={selectedPeriods.length === 0}
-                >
-                  <Check size={16} className="mr-2" />
-                  Uitbetaling bevestigen
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
+      {!showPayout && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle>Teamleden</CardTitle>
@@ -214,7 +208,6 @@ const Team = () => {
               size="sm"
               className="flex items-center gap-1"
               onClick={triggerFileUpload}
-              disabled={tier !== 'pro'}
             >
               <Upload size={16} />
               <span>CSV importeren</span>
@@ -240,17 +233,27 @@ const Team = () => {
                       <p className="font-medium">{member.name}</p>
                     </div>
                     <div className="flex items-center">
-                      <Input
-                        type="number"
-                        value={member.hours || ''}
-                        onChange={(e) => updateTeamMemberHours(member.id, parseFloat(e.target.value) || 0)}
-                        className="w-20 mr-2"
-                        placeholder="Uren"
-                      />
+                      <div className="flex items-center">
+                        <Input
+                          type="number"
+                          value={hourInputs[member.id] || ''}
+                          onChange={(e) => handleHoursChange(member.id, e.target.value)}
+                          className="w-20 mr-2"
+                          placeholder="Uren"
+                        />
+                        <Button 
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSubmitHours(member.id)}
+                          className="mr-2"
+                        >
+                          Opslaan
+                        </Button>
+                      </div>
                       <Button 
                         variant="ghost" 
                         size="icon"
-                        onClick={() => removeTeamMember(member.id)}
+                        onClick={() => confirmRemoveMember(member.id)}
                       >
                         <Trash2 size={16} />
                       </Button>
@@ -269,13 +272,58 @@ const Team = () => {
                 onChange={(e) => setNewMemberName(e.target.value)}
                 className="flex-grow"
               />
-              <Button type="submit" disabled={!newMemberName.trim() || (tier === 'free' && teamMembers.length >= 5)}>
+              <Button type="submit" disabled={!newMemberName.trim() || (teamMembers.length >= tierMemberLimit)}>
                 <Plus size={16} className="mr-1" /> Toevoegen
               </Button>
             </form>
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={showCsvDialog} onOpenChange={setShowCsvDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>CSV Importeren (PRO)</DialogTitle>
+            <DialogDescription>
+              Upload een CSV bestand met teamleden en uren.
+              Format: Naam,Uren (bijv. "Jan,8.5")
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex justify-center items-center gap-4">
+              <Input
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCsvDialog(false)}>
+              Annuleren
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Teamlid verwijderen</DialogTitle>
+            <DialogDescription>
+              Weet je zeker dat je dit teamlid wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRemoveDialog(false)}>
+              Annuleren
+            </Button>
+            <Button variant="destructive" onClick={handleRemoveMember}>
+              Verwijderen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {tier !== 'pro' && !showPayout && (
         <Card className="border-tier-pro">

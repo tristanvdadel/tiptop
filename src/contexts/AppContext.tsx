@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 // Define types
 export type TeamMember = {
@@ -36,6 +37,21 @@ export type PayoutData = {
   }[];
 };
 
+type TierLimits = {
+  free: {
+    periods: number;
+    teamMembers: number;
+  };
+  team: {
+    periods: number;
+    teamMembers: number;
+  };
+  pro: {
+    periods: number;
+    teamMembers: number;
+  };
+};
+
 type AppContextType = {
   // State
   currentPeriod: Period | null;
@@ -54,6 +70,24 @@ type AppContextType = {
   calculateTipDistribution: (periodIds?: string[]) => TeamMember[];
   calculateAverageTipPerHour: (periodId?: string) => number;
   markPeriodsAsPaid: (periodIds: string[]) => void;
+  hasReachedPeriodLimit: () => boolean;
+  getUnpaidPeriodsCount: () => number;
+};
+
+// Define tier limits
+const tierLimits: TierLimits = {
+  free: {
+    periods: 3,
+    teamMembers: 5,
+  },
+  team: {
+    periods: 7,
+    teamMembers: 10,
+  },
+  pro: {
+    periods: Infinity,
+    teamMembers: Infinity,
+  },
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -64,6 +98,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [tier] = useState<'free' | 'team' | 'pro'>('free');
   const [payouts, setPayouts] = useState<PayoutData[]>([]);
+  const { toast } = useToast();
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -112,6 +147,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // Add a new tip entry
   const addTip = (amount: number, note?: string) => {
     if (!currentPeriod) {
+      if (hasReachedPeriodLimit()) {
+        toast({
+          title: "Limiet bereikt",
+          description: `Je hebt het maximale aantal perioden (${tierLimits[tier].periods}) bereikt voor je huidige abonnement. Rond bestaande periodes af of upgrade.`,
+        });
+        return;
+      }
       startNewPeriod();
     }
     
@@ -138,9 +180,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // Add a new team member
   const addTeamMember = (name: string) => {
-    // Check if we're at the limit for free tier (5 members)
-    if (tier === 'free' && teamMembers.length >= 5) {
-      alert('Je hebt het maximale aantal teamleden bereikt voor de Free tier.');
+    // Check if we're at the limit for the current tier
+    if (teamMembers.length >= tierLimits[tier].teamMembers) {
+      toast({
+        title: "Limiet bereikt",
+        description: `Je hebt het maximale aantal teamleden (${tierLimits[tier].teamMembers}) bereikt voor je huidige abonnement.`,
+      });
       return;
     }
     
@@ -165,10 +210,34 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         member.id === id ? { ...member, hours } : member
       )
     );
+    
+    // Reset input field by dispatching a custom event
+    window.dispatchEvent(new CustomEvent('reset-hours-input', { detail: { memberId: id } }));
+  };
+
+  // Check if user has reached the period limit for their tier
+  const hasReachedPeriodLimit = () => {
+    const periodLimit = tierLimits[tier].periods;
+    const currentPeriodsCount = periods.length;
+    return currentPeriodsCount >= periodLimit;
+  };
+  
+  // Get count of unpaid periods
+  const getUnpaidPeriodsCount = () => {
+    return periods.filter(p => !p.isActive && !p.isPaid).length;
   };
 
   // Start a new period
   const startNewPeriod = () => {
+    // Check if we're at the limit for the current tier
+    if (hasReachedPeriodLimit()) {
+      toast({
+        title: "Limiet bereikt",
+        description: `Je hebt het maximale aantal perioden (${tierLimits[tier].periods}) bereikt voor je huidige abonnement. Rond bestaande periodes af of upgrade.`,
+      });
+      return;
+    }
+    
     // End the current period if there is one
     if (currentPeriod && currentPeriod.isActive) {
       endCurrentPeriod();
@@ -335,6 +404,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         calculateTipDistribution,
         calculateAverageTipPerHour,
         markPeriodsAsPaid,
+        hasReachedPeriodLimit,
+        getUnpaidPeriodsCount,
       }}
     >
       {children}

@@ -1,8 +1,9 @@
 
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Calendar, Users, User, BarChart, Plus } from 'lucide-react';
+import { Home, Calendar, Users, BarChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
 
 const Navbar = () => {
   const location = useLocation();
@@ -11,8 +12,7 @@ const Navbar = () => {
     { to: '/', icon: <Home size={20} />, label: 'Home' },
     { to: '/periods', icon: <Calendar size={20} />, label: 'Periodes' },
     { to: '/team', icon: <Users size={20} />, label: 'Team' },
-    { to: '/my-overview', icon: <User size={20} />, label: 'Mijn Overzicht' },
-    { to: '/analytics', icon: <BarChart size={20} />, label: 'Analytics', isPro: true },
+    { to: '/analytics', icon: <BarChart size={20} />, label: 'Analyse', isPro: true },
   ];
 
   return (

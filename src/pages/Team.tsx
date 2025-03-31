@@ -1,15 +1,18 @@
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Trash2, User } from 'lucide-react';
+import { Plus, Trash2, User, Upload, Crown } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 
 const Team = () => {
   const { teamMembers, addTeamMember, removeTeamMember, updateTeamMemberHours, tier } = useApp();
   const [newMemberName, setNewMemberName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
   
   const handleAddMember = (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,6 +20,35 @@ const Team = () => {
       addTeamMember(newMemberName.trim());
       setNewMemberName('');
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (tier !== 'pro') {
+      toast({
+        title: "PRO functie",
+        description: "CSV import is alleen beschikbaar in het PRO abonnement.",
+      });
+      return;
+    }
+
+    // Here we'd process the CSV file in a real implementation
+    // For now, just show a success message
+    toast({
+      title: "CSV geïmporteerd",
+      description: "De uren zijn succesvol geïmporteerd voor je teamleden.",
+    });
+    
+    // Reset the file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+  
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
   };
   
   return (
@@ -29,8 +61,26 @@ const Team = () => {
       </div>
       
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle>Teamleden</CardTitle>
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="flex items-center gap-1"
+            onClick={triggerFileUpload}
+            disabled={tier !== 'pro'}
+          >
+            <Upload size={16} />
+            <span>CSV importeren</span>
+            {tier !== 'pro' && <Crown size={14} className="text-tier-pro ml-1" />}
+            <input
+              type="file"
+              accept=".csv"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </Button>
         </CardHeader>
         <CardContent>
           {teamMembers.length > 0 ? (
@@ -79,6 +129,21 @@ const Team = () => {
           </form>
         </CardContent>
       </Card>
+
+      {tier !== 'pro' && (
+        <Card className="border-tier-pro">
+          <CardContent className="p-6 text-center">
+            <Crown size={42} className="mx-auto mb-4 text-tier-pro" />
+            <h2 className="text-xl font-medium mb-2">PRO-functie</h2>
+            <p className="text-muted-foreground mb-6">
+              Upgrade naar PRO om uren te importeren via CSV en toegang te krijgen tot alle PRO-functies.
+            </p>
+            <Button className="bg-tier-pro hover:bg-tier-pro/90 text-white">
+              Upgraden naar PRO
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

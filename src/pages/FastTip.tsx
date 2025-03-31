@@ -57,8 +57,8 @@ const FastTip = () => {
           </div>
         </div>
         
-        <div className="grid grid-cols-3 gap-3 w-full max-w-md mb-8">
-          {[1, 2, 5, 10, 20, 50].map((value) => (
+        <div className="grid grid-cols-2 gap-3 w-full max-w-md mb-8">
+          {[1, 2, 5, 10].map((value) => (
             <div key={value} className="flex space-x-2">
               <Button 
                 variant="outline" 

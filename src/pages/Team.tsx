@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Trash2, User, Upload, Crown, DollarSign, Check } from 'lucide-react';
+import { Plus, Trash2, User, Upload, Crown, DollarSign, Check, Clock, Edit } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +17,14 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 const Team = () => {
   const { 
@@ -37,6 +45,8 @@ const Team = () => {
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
   const [hourInputs, setHourInputs] = useState<Record<string, number>>({});
+  const [editingMember, setEditingMember] = useState<string | null>(null);
+  const [showHoursDialog, setShowHoursDialog] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -44,10 +54,10 @@ const Team = () => {
   useEffect(() => {
     const initialHourInputs: Record<string, number> = {};
     teamMembers.forEach(member => {
-      initialHourInputs[member.id] = 0;
+      initialHourInputs[member.id] = member.hours;
     });
     setHourInputs(initialHourInputs);
-  }, [teamMembers.length]);
+  }, [teamMembers]);
   
   useEffect(() => {
     const handleResetHoursInput = (e: CustomEvent) => {
@@ -83,8 +93,19 @@ const Team = () => {
   
   const handleSubmitHours = (id: string) => {
     updateTeamMemberHours(id, hourInputs[id] || 0);
+    setEditingMember(null);
+    setShowHoursDialog(false);
   };
 
+  const openHoursDialog = (member: typeof teamMembers[0]) => {
+    setEditingMember(member.id);
+    setHourInputs(prev => ({
+      ...prev,
+      [member.id]: member.hours
+    }));
+    setShowHoursDialog(true);
+  };
+  
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -223,44 +244,49 @@ const Team = () => {
           </CardHeader>
           <CardContent>
             {teamMembers.length > 0 ? (
-              <div className="space-y-4">
-                {teamMembers.map((member) => (
-                  <div key={member.id} className="flex items-center gap-3 p-3 border rounded-md">
-                    <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                      <User size={16} />
-                    </div>
-                    <div className="flex-grow">
-                      <p className="font-medium">{member.name}</p>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="flex items-center">
-                        <Input
-                          type="number"
-                          value={hourInputs[member.id] || ''}
-                          onChange={(e) => handleHoursChange(member.id, e.target.value)}
-                          className="w-20 mr-2"
-                          placeholder="Uren"
-                        />
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Naam</TableHead>
+                    <TableHead>Gewerkte uren</TableHead>
+                    <TableHead className="text-right">Acties</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {teamMembers.map((member) => (
+                    <TableRow key={member.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                            <User size={16} />
+                          </div>
+                          <span>{member.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <Button 
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSubmitHours(member.id)}
-                          className="mr-2"
+                          variant="ghost" 
+                          className="flex items-center gap-2"
+                          onClick={() => openHoursDialog(member)}
                         >
-                          Opslaan
+                          <Clock size={16} className="text-muted-foreground" />
+                          <span className="font-medium">{member.hours || 0} uren</span>
+                          <Edit size={14} className="text-muted-foreground" />
                         </Button>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => confirmRemoveMember(member.id)}
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => confirmRemoveMember(member.id)}
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             ) : (
               <p className="text-muted-foreground">Nog geen teamleden toegevoegd.</p>
             )}
@@ -321,6 +347,43 @@ const Team = () => {
             <Button variant="destructive" onClick={handleRemoveMember}>
               Verwijderen
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showHoursDialog} onOpenChange={setShowHoursDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Uren aanpassen</DialogTitle>
+            <DialogDescription>
+              Pas het aantal gewerkte uren aan voor dit teamlid.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {editingMember && (
+              <div className="flex flex-col gap-2">
+                <label htmlFor="hours" className="text-sm font-medium">
+                  Gewerkte uren
+                </label>
+                <Input
+                  id="hours"
+                  type="number"
+                  value={hourInputs[editingMember] || ''}
+                  onChange={(e) => handleHoursChange(editingMember, e.target.value)}
+                  className="col-span-3"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowHoursDialog(false)}>
+              Annuleren
+            </Button>
+            {editingMember && (
+              <Button onClick={() => handleSubmitHours(editingMember)}>
+                Opslaan
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

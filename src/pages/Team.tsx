@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +62,17 @@ const Team = () => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  
+  const handleAverageViewChange = (value: 'period' | 'day' | 'week' | 'month') => {
+    if (value !== 'period' && tier !== 'pro') {
+      toast({
+        title: "PRO functie",
+        description: `Deze weergave is alleen beschikbaar in het PRO abonnement.`,
+      });
+      return;
+    }
+    setAverageView(value);
+  };
   
   useEffect(() => {
     const initialHourInputs: Record<string, number> = {};

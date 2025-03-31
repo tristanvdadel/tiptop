@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Crown } from 'lucide-react';
+import { Plus, Crown, AlertTriangle } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -14,11 +14,24 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 const Periods = () => {
   const { periods, startNewPeriod, tier, currentPeriod, hasReachedPeriodLimit, getUnpaidPeriodsCount } = useApp();
   const [showLimitDialog, setShowLimitDialog] = useState(false);
+  const [showPaidPeriodsDialog, setShowPaidPeriodsDialog] = useState(false);
+  const { toast } = useToast();
   
   // Sort periods by start date, most recent first
   const sortedPeriods = [...periods].sort(
@@ -31,6 +44,7 @@ const Periods = () => {
   
   const tierPeriodLimit = tier === 'free' ? 3 : tier === 'team' ? 7 : Infinity;
   const unpaidPeriodsCount = getUnpaidPeriodsCount();
+  const paidPeriodsCount = periods.filter(p => p.isPaid).length;
   
   const handleStartNewPeriod = () => {
     if (currentPeriod) {
@@ -38,11 +52,26 @@ const Periods = () => {
     }
     
     if (hasReachedPeriodLimit()) {
-      setShowLimitDialog(true);
+      // If there are paid periods and we've reached the limit, show the paid periods dialog
+      if (paidPeriodsCount > 0) {
+        setShowPaidPeriodsDialog(true);
+      } else {
+        setShowLimitDialog(true);
+      }
       return;
     }
     
     startNewPeriod();
+  };
+  
+  const handleDeletePaidPeriods = () => {
+    // This would be implemented in AppContext
+    toast({
+      title: "Functie nog niet beschikbaar",
+      description: "Het verwijderen van uitbetaalde perioden is nog niet geïmplementeerd. Upgrade naar een hoger abonnement om meer perioden te gebruiken.",
+      variant: "destructive"
+    });
+    setShowPaidPeriodsDialog(false);
   };
 
   return (
@@ -55,7 +84,7 @@ const Periods = () => {
           </Badge>
           <Button 
             onClick={handleStartNewPeriod} 
-            disabled={!!currentPeriod || hasReachedPeriodLimit()}
+            disabled={!!currentPeriod}
             className="gold-button"
           >
             <Plus size={16} className="mr-1" /> Nieuwe periode
@@ -98,6 +127,51 @@ const Periods = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Paid Periods Dialog */}
+      <AlertDialog open={showPaidPeriodsDialog} onOpenChange={setShowPaidPeriodsDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Periodelimiet bereikt</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="flex items-start gap-2 mb-4">
+                <AlertTriangle className="text-amber-500 mt-0.5" size={18} />
+                <span>
+                  Je hebt het maximale aantal perioden ({tierPeriodLimit}) bereikt voor je {tier.toUpperCase()}-abonnement.
+                </span>
+              </div>
+              <p className="mb-2">
+                Je hebt {paidPeriodsCount} uitbetaalde perioden. Je kunt deze perioden verwijderen om ruimte te maken voor nieuwe perioden, of je kunt upgraden naar een hoger abonnement.
+              </p>
+              <p className="text-sm text-amber-500 font-medium">
+                Let op: Als je uitbetaalde perioden verwijdert, gaan alle gegevens van deze perioden verloren.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-tier-pro hover:bg-tier-pro/90 text-white"
+              onClick={() => {
+                setShowPaidPeriodsDialog(false);
+                // Navigate to upgrade page or show upgrade dialog
+                toast({
+                  title: "Upgraden naar " + (tier === 'free' ? 'TEAM' : 'PRO'),
+                  description: "Upgraden naar een hoger abonnement om meer perioden te gebruiken."
+                });
+              }}
+            >
+              <Crown size={16} className="mr-1" /> Upgraden
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={handleDeletePaidPeriods}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Verwijder uitbetaalde perioden
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       {sortedPeriods.length > 0 ? (
         <div className="space-y-4">

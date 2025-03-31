@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,12 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				gold: "#FFD700",
+				tier: {
+					free: "#2563EB", // Blue for Free tier
+					team: "#F97316", // Orange for Team tier
+					pro: "#10B981", // Green for Pro tier
 				}
 			},
 			borderRadius: {

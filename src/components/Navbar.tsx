@@ -12,7 +12,12 @@ const Navbar = () => {
     { to: '/', icon: <Home size={20} />, label: 'Home' },
     { to: '/periods', icon: <Calendar size={20} />, label: 'Periodes' },
     { to: '/team', icon: <Users size={20} />, label: 'Team' },
-    { to: '/analytics', icon: <BarChart size={20} />, label: 'Analyse', isPro: true },
+    { 
+      to: '/analytics', 
+      icon: <BarChart size={20} />, 
+      label: 'Analyse', 
+      isPro: true 
+    },
   ];
 
   return (
@@ -39,14 +44,11 @@ const Navbar = () => {
                 location.pathname === item.to
                   ? "text-foreground font-medium"
                   : "text-muted-foreground",
-                item.isPro && "opacity-50"
+                item.isPro && "opacity-50 border-gold border-2 rounded-lg"
               )}
             >
               {item.icon}
               <span className="mt-1">{item.label}</span>
-              {item.isPro && (
-                <span className="text-gold text-[10px]">👑 PRO</span>
-              )}
             </Link>
           ))}
         </div>

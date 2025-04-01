@@ -1,6 +1,7 @@
+
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Plus, Crown, AlertTriangle, ArrowRight, Trash2, TrendingUp } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
@@ -445,44 +446,45 @@ const Periods = () => {
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Einddatum</span>
                           <span>{formatPeriodDate(period.endDate)}</span>
-                      </div>
-                    )}
+                        </div>
+                      )}
                     
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Totaal fooi</span>
-                      <span className="font-medium">
-                        €{totalTips.toFixed(2)}
-                      </span>
-                    </div>
-                    
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Aantal invoeren</span>
-                      <span>{period.tips.length}</span>
-                    </div>
-                    
-                    {period.isPaid && periodAverageTipPerHour > 0 && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground flex items-center">
-                          <TrendingUp size={14} className="mr-1 text-[#9b87f5]" /> Gem. fooi per uur
-                        </span>
-                        <span className="text-[#9b87f5] font-medium">
-                          €{periodAverageTipPerHour.toFixed(2)}
+                        <span className="text-muted-foreground">Totaal fooi</span>
+                        <span className="font-medium">
+                          €{totalTips.toFixed(2)}
                         </span>
                       </div>
-                    )}
-                  </div>
-                  
-                  {isPeriodHidden && (
-                    <div className="mt-4 flex justify-center">
-                      <Button 
-                        variant="outline" 
-                        className="text-[#7E69AB] border-[#7E69AB]"
-                        onClick={handleUpgrade}
-                      >
-                        <Crown size={16} className="mr-1 text-[#7E69AB]" /> Upgraden naar {tier === 'free' ? 'TEAM' : 'PRO'}
-                      </Button>
+                    
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Aantal invoeren</span>
+                        <span>{period.tips.length}</span>
+                      </div>
+                    
+                      {period.isPaid && periodAverageTipPerHour > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground flex items-center">
+                            <TrendingUp size={14} className="mr-1 text-[#9b87f5]" /> Gem. fooi per uur
+                          </span>
+                          <span className="text-[#9b87f5] font-medium">
+                            €{periodAverageTipPerHour.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  
+                    {isPeriodHidden && (
+                      <div className="mt-4 flex justify-center">
+                        <Button 
+                          variant="outline" 
+                          className="text-[#7E69AB] border-[#7E69AB]"
+                          onClick={handleUpgrade}
+                        >
+                          <Crown size={16} className="mr-1 text-[#7E69AB]" /> Upgraden naar {tier === 'free' ? 'TEAM' : 'PRO'}
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
                 </Card>
               );
             })}

@@ -271,7 +271,7 @@ const Team = () => {
   }
 
   return (
-    <div>
+    <div className="pb-20 min-h-[calc(100vh-100px)]">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <div className="flex items-center gap-2">
           <Users size={20} />

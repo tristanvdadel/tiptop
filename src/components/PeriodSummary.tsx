@@ -91,6 +91,7 @@ const PeriodSummary = () => {
           <Button 
             onClick={handleStartNewPeriod} 
             className="w-full gold-button"
+            variant="goldGradient"
           >
             <Plus size={16} className="mr-1" /> Nieuwe periode starten
           </Button>
@@ -172,7 +173,7 @@ const PeriodSummary = () => {
           <DialogClose asChild>
             <Button variant="outline">Annuleren</Button>
           </DialogClose>
-          <Button onClick={handleSaveName}>Opslaan</Button>
+          <Button onClick={handleSaveName} variant="goldGradient">Opslaan</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

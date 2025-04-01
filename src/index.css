@@ -97,7 +97,7 @@
 
 @layer components {
   .gold-button {
-    @apply bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-500 hover:to-amber-400 text-black font-medium transition-colors shadow-md hover:shadow-amber-300/30;
+    @apply bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-500 hover:to-amber-400 text-black font-medium transition-colors shadow-md hover:shadow-amber-300/30 hover:scale-105 transition-all;
   }
   
   .tier-free {

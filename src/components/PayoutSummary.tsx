@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
           const existingBalance = member.balance || 0;
           const totalDue = calculatedAmount + existingBalance;
           
+          // Round down the actual payout to the nearest 5
           const roundedPayout = roundDownToNearest(totalDue);
           
           initialPayouts[item.memberId] = roundedPayout;
@@ -310,14 +312,13 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
             </Alert>
           )}
           
-          {hasChanges && (
-            <Button 
-              onClick={handleSaveBalancesAndClose}
-              className="w-full"
-            >
-              <Save size={16} className="mr-1" /> Saldi opslaan en afsluiten
-            </Button>
-          )}
+          {/* Changed this from hasChanges to always show the button */}
+          <Button 
+            onClick={handleSaveBalancesAndClose}
+            className="w-full"
+          >
+            <Save size={16} className="mr-1" /> Saldi opslaan en afsluiten
+          </Button>
         </CardContent>
         <CardFooter className="flex-col sm:flex-row gap-2">
           <Button 
@@ -360,3 +361,4 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     </div>
   );
 };
+

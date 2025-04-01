@@ -4,7 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { LogOut, Bell, Moon, User } from "lucide-react";
+import { LogOut, Bell, Moon, User, Edit } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
 const Settings = () => {
@@ -31,8 +31,9 @@ const Settings = () => {
                 <p className="text-sm text-muted-foreground">gebruiker@example.com</p>
               </div>
             </div>
-            <Button variant="outline" size="sm">
-              Profiel bewerken
+            <Button variant="outline" size="sm" className="flex items-center gap-1">
+              <Edit className="h-3.5 w-3.5" />
+              <span>Bewerken</span>
             </Button>
           </div>
           

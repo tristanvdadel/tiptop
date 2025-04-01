@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, KeyboardEvent } from 'react';
+
+import React, { useState, useEffect, useCallback, KeyboardEvent } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { TeamMember, Period, HourRegistration } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';

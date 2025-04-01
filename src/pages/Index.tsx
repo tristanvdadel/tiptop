@@ -29,7 +29,7 @@ const Index = () => {
                 .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                 .slice(0, 10)
                 .map((tip) => (
-                  <TipCard key={tip.id} tip={tip} />
+                  <TipCard key={tip.id} tip={tip} periodId={currentPeriod.id} />
                 ))}
             </div>
           ) : (

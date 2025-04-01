@@ -74,6 +74,8 @@ type AppContextType = {
   getUnpaidPeriodsCount: () => number;
   deletePaidPeriods: () => void;
   deletePeriod: (periodId: string) => void;
+  deleteTip: (periodId: string, tipId: string) => void;
+  updateTip: (periodId: string, tipId: string, amount: number, note?: string, date?: string) => void;
   
   // Add mostRecentPayout to the context
   mostRecentPayout: PayoutData | null;
@@ -441,6 +443,63 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     );
   };
 
+  const deleteTip = (periodId: string, tipId: string) => {
+    const periodToUpdate = periods.find(p => p.id === periodId);
+    
+    if (!periodToUpdate) return;
+    
+    const updatedPeriod = {
+      ...periodToUpdate,
+      tips: periodToUpdate.tips.filter(tip => tip.id !== tipId),
+    };
+    
+    setPeriods(prev => 
+      prev.map(p => p.id === periodId ? updatedPeriod : p)
+    );
+    
+    if (currentPeriod && currentPeriod.id === periodId) {
+      setCurrentPeriod(updatedPeriod);
+    }
+    
+    toast({
+      title: "Fooi verwijderd",
+      description: "De fooi is succesvol verwijderd.",
+    });
+  };
+  
+  const updateTip = (periodId: string, tipId: string, amount: number, note?: string, date?: string) => {
+    const periodToUpdate = periods.find(p => p.id === periodId);
+    
+    if (!periodToUpdate) return;
+    
+    const updatedPeriod = {
+      ...periodToUpdate,
+      tips: periodToUpdate.tips.map(tip => 
+        tip.id === tipId 
+          ? { 
+              ...tip, 
+              amount, 
+              note: note !== undefined ? note : tip.note,
+              date: date || tip.date,
+            } 
+          : tip
+      ),
+    };
+    
+    setPeriods(prev => 
+      prev.map(p => p.id === periodId ? updatedPeriod : p)
+    );
+    
+    if (currentPeriod && currentPeriod.id === periodId) {
+      setCurrentPeriod(updatedPeriod);
+    }
+    
+    toast({
+      title: "Fooi bijgewerkt",
+      description: "De fooi is succesvol bijgewerkt.",
+    });
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -464,6 +523,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         getUnpaidPeriodsCount,
         deletePaidPeriods,
         deletePeriod,
+        deleteTip,
+        updateTip,
       }}
     >
       {children}

@@ -1,15 +1,16 @@
-
 import { useState, useEffect, useCallback, KeyboardEvent } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { TeamMember, Period } from '@/contexts/AppContext';
+import { TeamMember, Period, HourRegistration } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Check } from 'lucide-react';
+import { Plus, Trash2, Check, Clock, Calendar } from 'lucide-react';
 import { PayoutSummary } from '@/components/PayoutSummary';
+import { format } from 'date-fns';
+import { nl } from 'date-fns/locale';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,7 +25,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 
 const Team = () => {
-  const { teamMembers, addTeamMember, removeTeamMember, updateTeamMemberHours, calculateTipDistribution, markPeriodsAsPaid, currentPeriod, periods, payouts } = useApp();
+  const { teamMembers, addTeamMember, removeTeamMember, updateTeamMemberHours, deleteHourRegistration, calculateTipDistribution, markPeriodsAsPaid, currentPeriod, periods, payouts } = useApp();
   const [newMemberName, setNewMemberName] = useState('');
   const [hoursInputs, setHoursInputs] = useState<{ [key: string]: string }>({});
   const [distribution, setDistribution] = useState<TeamMember[]>([]);
@@ -34,14 +35,12 @@ const Team = () => {
   const { toast } = useToast();
   
   useEffect(() => {
-    // Initialize with current period if any
     if (currentPeriod) {
       setSelectedPeriods([currentPeriod.id]);
     }
   }, [currentPeriod]);
   
   useEffect(() => {
-    // Initialize hours inputs with current values
     const initialHours: { [key: string]: string } = {};
     teamMembers.forEach(member => {
       initialHours[member.id] = member.hours > 0 ? member.hours.toString() : '';
@@ -70,6 +69,7 @@ const Team = () => {
       const hours = value === '' ? 0 : parseFloat(value);
       if (!isNaN(hours)) {
         updateTeamMemberHours(id, hours);
+        setHoursInputs(prev => ({ ...prev, [id]: '' }));
         toast({
           title: "Uren opgeslagen",
           description: `Uren succesvol opgeslagen voor teamlid.`,
@@ -91,6 +91,10 @@ const Team = () => {
     }
   };
   
+  const handleDeleteRegistration = (memberId: string, registrationId: string) => {
+    deleteHourRegistration(memberId, registrationId);
+  };
+  
   const togglePeriodSelection = (periodId: string) => {
     setSelectedPeriods(prev => {
       if (prev.includes(periodId)) {
@@ -101,7 +105,6 @@ const Team = () => {
     });
   };
   
-  // Calculate distribution based on selected periods
   const calculateDistributionForSelectedPeriods = useCallback(() => {
     if (selectedPeriods.length === 0 || teamMembers.length === 0) {
       setDistribution([]);
@@ -112,7 +115,6 @@ const Team = () => {
     setDistribution(calculatedDistribution);
   }, [selectedPeriods, calculateTipDistribution, teamMembers.length]);
 
-  // Recalculate distribution when selected periods change
   useEffect(() => {
     calculateDistributionForSelectedPeriods();
   }, [selectedPeriods, calculateDistributionForSelectedPeriods]);
@@ -129,16 +131,12 @@ const Team = () => {
     
     let customDistribution;
     
-    // If there's a valid distribution, use it
     if (distribution.length > 0) {
       customDistribution = distribution.map(member => ({
         memberId: member.id,
         amount: member.tipAmount || 0,
       }));
-    } 
-    // If there's no distribution but we have team members, create equal distribution
-    else if (teamMembers.length > 0) {
-      // Calculate total tips from selected periods
+    } else if (teamMembers.length > 0) {
       const totalTips = selectedPeriods.reduce((sum, periodId) => {
         const period = periods.find(p => p.id === periodId);
         if (period) {
@@ -167,13 +165,14 @@ const Team = () => {
     setShowPayoutSummary(true);
   };
 
-  // Get unpaid periods that can be selected for payout
+  const formatDate = (dateString: string): string => {
+    return format(new Date(dateString), 'd MMM yyyy HH:mm', { locale: nl });
+  };
+
   const unpaidPeriods = periods.filter(period => !period.isPaid && !period.isActive);
   
-  // Check if current period can be included (active but has tips)
   const canIncludeCurrentPeriod = currentPeriod && currentPeriod.tips.length > 0;
   
-  // All periods that can be selected for payout
   const availablePeriods = canIncludeCurrentPeriod 
     ? [...unpaidPeriods, currentPeriod] 
     : unpaidPeriods;
@@ -205,56 +204,96 @@ const Team = () => {
       <div className="grid gap-4 mb-8">
         {teamMembers.map((member) => (
           <Card key={member.id}>
-            <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <Label htmlFor={`hours-${member.id}`} className="block text-sm font-medium mb-1">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <Label htmlFor={`hours-${member.id}`} className="block text-lg font-medium">
                   {member.name}
                 </Label>
-                <div className="flex items-center">
-                  <Input
-                    type="number"
-                    name={`hours-${member.id}`}
-                    id={`hours-${member.id}`}
-                    className="block w-full pr-10 text-sm rounded-md"
-                    placeholder="Uren"
-                    value={hoursInputs[member.id] || ''}
-                    onChange={(e) => handleHoursChange(member.id, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(e, member.id)}
-                  />
-                  <Button 
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleHoursSubmit(member.id)}
-                    className="ml-2"
-                  >
-                    <Check className="h-4 w-4" />
-                  </Button>
-                </div>
-                {member.hours > 0 && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Huidige uren: {member.hours}
-                  </p>
-                )}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="icon">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Dit teamlid wordt permanent verwijderd.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleRemoveMember(member.id)}>Verwijderen</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="icon">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Dit teamlid wordt permanent verwijderd.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Annuleren</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleRemoveMember(member.id)}>Verwijderen</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              
+              <div className="flex items-end gap-2 mb-4">
+                <div className="flex-1">
+                  <Label htmlFor={`hours-${member.id}`} className="block text-sm font-medium mb-1">
+                    Uren toevoegen
+                  </Label>
+                  <div className="flex items-center">
+                    <Input
+                      type="number"
+                      name={`hours-${member.id}`}
+                      id={`hours-${member.id}`}
+                      className="block w-full pr-10 text-sm rounded-md"
+                      placeholder="Uren"
+                      value={hoursInputs[member.id] || ''}
+                      onChange={(e) => handleHoursChange(member.id, e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(e, member.id)}
+                    />
+                    <Button 
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleHoursSubmit(member.id)}
+                      className="ml-2"
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Totaal uren</p>
+                  <p className="text-xl font-semibold">{member.hours}</p>
+                </div>
+              </div>
+              
+              {member.hourRegistrations && member.hourRegistrations.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium mb-2">Uren geschiedenis</h3>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {member.hourRegistrations.map((registration: HourRegistration) => (
+                      <div 
+                        key={registration.id} 
+                        className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50"
+                      >
+                        <div className="flex items-center">
+                          <Clock className="h-4 w-4 mr-2 text-gray-500" />
+                          <span className="font-medium">{registration.hours} uren</span>
+                          <span className="mx-2 text-gray-400">•</span>
+                          <span className="text-xs text-gray-500 flex items-center">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {formatDate(registration.date)}
+                          </span>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleDeleteRegistration(member.id, registration.id)}
+                          className="h-7 w-7 text-gray-500 hover:text-red-500"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}

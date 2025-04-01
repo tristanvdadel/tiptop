@@ -8,6 +8,13 @@ export type TeamMember = {
   hours: number;
   tipAmount?: number;
   lastPayout?: string; // Date of last payout
+  hourRegistrations?: HourRegistration[]; // Added hour registrations
+};
+
+export type HourRegistration = {
+  id: string;
+  hours: number;
+  date: string;
 };
 
 export type TipEntry = {
@@ -78,7 +85,8 @@ type AppContextType = {
   deletePeriod: (periodId: string) => void;
   deleteTip: (periodId: string, tipId: string) => void;
   updateTip: (periodId: string, tipId: string, amount: number, note?: string, date?: string) => void;
-  updatePeriod: (periodId: string, updates: {name?: string, notes?: string}) => void; // New function
+  updatePeriod: (periodId: string, updates: {name?: string, notes?: string}) => void;
+  deleteHourRegistration: (memberId: string, registrationId: string) => void;
   
   // Add mostRecentPayout to the context
   mostRecentPayout: PayoutData | null;
@@ -207,12 +215,57 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const updateTeamMemberHours = (id: string, hours: number) => {
     setTeamMembers(prev => 
-      prev.map(member => 
-        member.id === id ? { ...member, hours } : member
-      )
+      prev.map(member => {
+        if (member.id === id) {
+          // Create a new hour registration
+          const newRegistration: HourRegistration = {
+            id: generateId(),
+            hours,
+            date: new Date().toISOString(),
+          };
+          
+          // Calculate new total hours
+          const existingRegistrations = member.hourRegistrations || [];
+          const newRegistrations = [...existingRegistrations, newRegistration];
+          const totalHours = newRegistrations.reduce((sum, reg) => sum + reg.hours, 0);
+          
+          return { 
+            ...member, 
+            hours: totalHours,
+            hourRegistrations: newRegistrations 
+          };
+        }
+        return member;
+      })
+    );
+  };
+  
+  const deleteHourRegistration = (memberId: string, registrationId: string) => {
+    setTeamMembers(prev => 
+      prev.map(member => {
+        if (member.id === memberId && member.hourRegistrations) {
+          // Filter out the registration to delete
+          const newRegistrations = member.hourRegistrations.filter(
+            reg => reg.id !== registrationId
+          );
+          
+          // Recalculate total hours
+          const totalHours = newRegistrations.reduce((sum, reg) => sum + reg.hours, 0);
+          
+          return { 
+            ...member, 
+            hours: totalHours,
+            hourRegistrations: newRegistrations 
+          };
+        }
+        return member;
+      })
     );
     
-    window.dispatchEvent(new CustomEvent('reset-hours-input', { detail: { memberId: id } }));
+    toast({
+      title: "Registratie verwijderd",
+      description: "De uren registratie is succesvol verwijderd.",
+    });
   };
 
   const hasReachedPeriodLimit = () => {

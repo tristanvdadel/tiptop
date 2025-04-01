@@ -88,6 +88,7 @@ type AppContextType = {
   deleteHourRegistration: (memberId: string, registrationId: string) => void;
   updateTeamMemberBalance: (memberId: string, balance: number) => void;
   clearTeamMemberHours: (memberId: string) => void;
+  updateTeamMemberName: (memberId: string, newName: string) => boolean;
   mostRecentPayout: PayoutData | null;
   setMostRecentPayout: (payout: PayoutData | null) => void;
 };
@@ -310,6 +311,49 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return member;
       })
     );
+  };
+
+  const updateTeamMemberName = (memberId: string, newName: string): boolean => {
+    // Validate input
+    if (!newName.trim()) {
+      toast({
+        title: "Ongeldige naam",
+        description: "Naam mag niet leeg zijn.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    // Check if name already exists (case insensitive)
+    const nameExists = teamMembers.some(
+      member => member.id !== memberId && 
+                member.name.toLowerCase() === newName.trim().toLowerCase()
+    );
+    
+    if (nameExists) {
+      toast({
+        title: "Naam bestaat al",
+        description: "Er is al een teamlid met deze naam.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    // Update the name
+    setTeamMembers(prev => 
+      prev.map(member => 
+        member.id === memberId 
+          ? { ...member, name: newName.trim() } 
+          : member
+      )
+    );
+    
+    toast({
+      title: "Naam bijgewerkt",
+      description: "De naam van het teamlid is bijgewerkt.",
+    });
+    
+    return true;
   };
 
   const hasReachedPeriodLimit = () => {
@@ -666,6 +710,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         deleteHourRegistration,
         updateTeamMemberBalance,
         clearTeamMemberHours,
+        updateTeamMemberName,
       }}
     >
       {children}

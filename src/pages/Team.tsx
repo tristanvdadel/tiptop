@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/table";
 
 const Team = () => {
-  const { teamMembers, addTeamMember, removeTeamMember, updateTeamMemberHours, deleteHourRegistration, calculateTipDistribution, markPeriodsAsPaid, currentPeriod, periods, payouts } = useApp();
+  const { teamMembers, addTeamMember, removeTeamMember, updateTeamMemberHours, deleteHourRegistration, calculateTipDistribution, markPeriodsAsPaid, currentPeriod, periods, payouts, updateTeamMemberName } = useApp();
   const [newMemberName, setNewMemberName] = useState('');
   const [hoursInputs, setHoursInputs] = useState<{ [key: string]: string }>({});
   const [distribution, setDistribution] = useState<TeamMember[]>([]);
@@ -157,44 +157,10 @@ const Team = () => {
   const handleUpdateMemberName = () => {
     if (!editingMember) return;
     
-    if (editMemberName.trim() === '') {
-      toast({
-        title: "Ongeldige naam",
-        description: "Naam mag niet leeg zijn.",
-        variant: "destructive",
-      });
-      return;
+    if (updateTeamMemberName(editingMember, editMemberName)) {
+      setEditingMember(null);
+      setEditMemberName('');
     }
-    
-    const nameExists = teamMembers.some(
-      member => member.id !== editingMember && 
-                member.name.toLowerCase() === editMemberName.trim().toLowerCase()
-    );
-    
-    if (nameExists) {
-      toast({
-        title: "Naam bestaat al",
-        description: "Er is al een teamlid met deze naam.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    const updatedTeamMembers = teamMembers.map(member => 
-      member.id === editingMember 
-        ? { ...member, name: editMemberName.trim() } 
-        : member
-    );
-    
-    setTeamMembers(updatedTeamMembers);
-    
-    toast({
-      title: "Naam bijgewerkt",
-      description: "De naam van het teamlid is bijgewerkt.",
-    });
-    
-    setEditingMember(null);
-    setEditMemberName('');
   };
 
   const setTeamMembers = (members: TeamMember[]) => {

@@ -1,4 +1,5 @@
 
+import React from 'react';
 import TipInput from '@/components/TipInput';
 import TipCard from '@/components/TipCard';
 import PeriodSummary from '@/components/PeriodSummary';
@@ -6,6 +7,7 @@ import TipChart from '@/components/TipChart';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
+import { Card, CardContent } from '@/components/ui/card'; // Added this import
 
 const Index = () => {
   const { currentPeriod, calculateAverageTipPerHour } = useApp();
@@ -76,4 +78,3 @@ const Index = () => {
 };
 
 export default Index;
-

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -34,7 +33,6 @@ const TipInput = () => {
     "bijvoorbeeld: Speciaal voor de cocktail"
   ];
   
-  // Select a random placeholder when the component mounts
   const [placeholder] = useState(
     placeholders[Math.floor(Math.random() * placeholders.length)]
   );
@@ -49,7 +47,6 @@ const TipInput = () => {
     
     addTip(parsedAmount, note.trim() || undefined, date.toISOString());
     
-    // Reset form
     setAmount('');
     setNote('');
     setShowNote(false);
@@ -66,7 +63,6 @@ const TipInput = () => {
     
     setDate(newDate);
     
-    // Check if date is outside current period
     if (currentPeriod && !currentPeriod.isActive && currentPeriod.endDate) {
       const periodEnd = new Date(currentPeriod.endDate);
       const periodStart = new Date(currentPeriod.startDate);
@@ -170,7 +166,7 @@ const TipInput = () => {
           )}
           
           <Button type="submit" className="w-full gold-button" disabled={!amount || isNaN(parseFloat(amount))}>
-            Fooi toevoegen
+            Top Tip
           </Button>
         </form>
       </CardContent>

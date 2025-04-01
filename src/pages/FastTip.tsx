@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -35,7 +34,6 @@ const FastTip = () => {
     "bijvoorbeeld: Speciaal voor de cocktail"
   ];
   
-  // Select a random placeholder on component mount
   const [placeholder] = useState(
     placeholders[Math.floor(Math.random() * placeholders.length)]
   );
@@ -49,7 +47,6 @@ const FastTip = () => {
     
     setDate(newDate);
     
-    // Check if date is outside current period
     if (currentPeriod && !currentPeriod.isActive && currentPeriod.endDate) {
       const periodEnd = new Date(currentPeriod.endDate);
       const periodStart = new Date(currentPeriod.startDate);
@@ -78,7 +75,6 @@ const FastTip = () => {
       if (!keepOpen) {
         navigate('/');
       } else {
-        // Reset form but stay on page
         setAmount(0);
         setNote('');
         setDate(new Date());
@@ -194,7 +190,7 @@ const FastTip = () => {
           >
             <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-amber-400 to-amber-300 opacity-0 group-hover:opacity-100 transition-opacity"></span>
             <Check size={20} className="mr-2 relative z-10" /> 
-            <span className="relative z-10">Fooi opslaan</span>
+            <span className="relative z-10">Top Tip</span>
           </Button>
         </div>
       </div>

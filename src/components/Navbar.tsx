@@ -29,7 +29,6 @@ const Navbar = () => {
         <Link to="/fast-tip">
           <Button 
             variant="goldGradient" 
-            className="transition-transform duration-200"
           >
             <Zap size={16} className="mr-1 text-amber-700" /> 
             <span>FastTip</span>

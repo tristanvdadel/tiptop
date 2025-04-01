@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,7 +39,6 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
           const existingBalance = member.balance || 0;
           const totalDue = calculatedAmount + existingBalance;
           
-          // Round down the actual payout to the nearest 5
           const roundedPayout = roundDownToNearest(totalDue);
           
           initialPayouts[item.memberId] = roundedPayout;
@@ -58,7 +56,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       <Card>
         <CardContent className="p-6 text-center">
           <p>Geen recente uitbetaling gevonden.</p>
-          <Button className="mt-4" onClick={onClose}>
+          <Button className="mt-4" onClick={onClose} variant="goldGradient">
             <ArrowLeft size={16} className="mr-1" /> Terug
           </Button>
         </CardContent>
@@ -312,10 +310,10 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
             </Alert>
           )}
           
-          {/* Changed this from hasChanges to always show the button */}
           <Button 
             onClick={handleSaveBalancesAndClose}
             className="w-full"
+            variant="goldGradient"
           >
             <Save size={16} className="mr-1" /> Saldi opslaan en afsluiten
           </Button>
@@ -352,7 +350,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
             Je kunt altijd oude uitbetalingen terugvinden in het geschiedenis-overzicht.
           </p>
           <div className="flex justify-center">
-            <Button onClick={onClose}>
+            <Button onClick={onClose} variant="goldGradient">
               <ArrowLeft size={16} className="mr-1" /> Terug naar team
             </Button>
           </div>
@@ -361,4 +359,3 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     </div>
   );
 };
-

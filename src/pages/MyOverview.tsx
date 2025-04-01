@@ -2,6 +2,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Crown } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
 const MyOverview = () => {
   const { teamMembers, periods, calculateTipDistribution, tier } = useApp();
@@ -57,14 +59,27 @@ const MyOverview = () => {
       
       <Card className="border-tier-pro">
         <CardContent className="p-4">
-          <div className="flex items-center">
-            <Crown size={20} className="text-tier-pro mr-2" />
-            <p className="text-sm">
-              Upgrade naar <span className="font-medium text-tier-pro">PRO</span> om je saldo bij te houden en meer gedetailleerde statistieken te zien.
-            </p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Crown size={20} className="text-tier-pro mr-2" />
+              <p className="text-sm">
+                Upgrade naar <span className="font-medium text-tier-pro">PRO</span> om je saldo bij te houden en meer gedetailleerde statistieken te zien.
+              </p>
+            </div>
+            <Button variant="goldGradient" size="sm">
+              Upgraden
+            </Button>
           </div>
         </CardContent>
       </Card>
+      
+      <div className="mt-6">
+        <Link to="/analytics">
+          <Button variant="goldGradient" className="w-full">
+            <BarChart size={16} className="mr-2" /> Bekijk Analyse
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -11,9 +10,6 @@ import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 
 const Settings = () => {
@@ -22,7 +18,6 @@ const Settings = () => {
   const [language, setLanguage] = useState("nl");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   
-  // Voorbeeld profielfoto upload functie
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -40,7 +35,6 @@ const Settings = () => {
     }
   };
 
-  // Wachtwoord wijzigen form
   const passwordForm = useForm({
     defaultValues: {
       currentPassword: "",
@@ -63,7 +57,6 @@ const Settings = () => {
       return;
     }
     
-    // Hier zou je normaal gesproken een API-aanroep doen om het wachtwoord te wijzigen
     console.log("Wachtwoord wijzigen:", data);
     
     toast({
@@ -109,7 +102,7 @@ const Settings = () => {
                   <span>Foto wijzigen</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
+              <DialogContent className="w-[90%] max-w-md">
                 <DialogHeader>
                   <DialogTitle>Profielfoto wijzigen</DialogTitle>
                   <DialogDescription>
@@ -124,13 +117,13 @@ const Settings = () => {
                       type="file" 
                       accept="image/*"
                       onChange={handleImageUpload}
+                      className="w-full" 
                     />
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => document.querySelector('dialog')?.close()}>
-                    Annuleren
-                  </Button>
+                  <Button type="button" variant="outline">Annuleren</Button>
+                  <Button type="submit">Opslaan</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

@@ -1,4 +1,3 @@
-
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -129,6 +128,46 @@ const Periods = () => {
           </Button>
         </div>
       </div>
+      
+      {/* Current Period Card */}
+      {currentPeriod && (
+        <Card className="border-[#9b87f5]/30 bg-[#9b87f5]/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex justify-between items-center text-base">
+              <span className="flex items-center">
+                <span className="text-xs px-2 py-0.5 bg-tier-free/10 text-tier-free rounded-full mr-2">
+                  Actief
+                </span>
+                Huidige periode
+              </span>
+              <span className="text-sm font-normal text-muted-foreground">
+                Gestart: {formatPeriodDate(currentPeriod.startDate)}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 mb-4">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Totaal fooi</span>
+                <span className="font-medium">
+                  €{currentPeriod.tips.reduce((sum, tip) => sum + tip.amount, 0).toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Aantal invoeren</span>
+                <span>{currentPeriod.tips.length}</span>
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              className="w-full border-[#9b87f5]/30 text-[#9b87f5] hover:bg-[#9b87f5]/10" 
+              onClick={endCurrentPeriod}
+            >
+              Periode afronden
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       
       {/* Average tip per hour info card */}
       {averageTipPerHour > 0 && (
@@ -375,48 +414,43 @@ const Periods = () => {
             </Card>
           )}
           
-          {sortedPeriods.map((period, index) => {
-            const isPeriodHidden = (tier === 'free' && index >= 3) || (tier === 'team' && index >= 7);
-            const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
-            const periodAverageTipPerHour = period.isPaid ? calculateAverageTipPerHour(period.id) : 0;
-            
-            return (
-              <Card 
-                key={period.id} 
-                className={isPeriodHidden ? 'opacity-40' : ''}
-              >
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex justify-between items-center text-base">
-                    <span>
-                      {period.isActive 
-                        ? 'Actieve periode' 
-                        : `Periode ${formatPeriodDate(period.startDate)}`}
-                    </span>
-                    <div className="flex gap-2">
-                      {period.isActive && (
-                        <span className="text-xs px-2 py-0.5 bg-tier-free/10 text-tier-free rounded-full">
-                          Actief
-                        </span>
-                      )}
-                      {period.isPaid && (
-                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                          Uitbetaald
-                        </span>
-                      )}
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Startdatum</span>
-                      <span>{formatPeriodDate(period.startDate)}</span>
-                    </div>
-                    
-                    {period.endDate && (
+          {sortedPeriods
+            .filter(period => !period.isActive) // Filter out active period since we show it separately at the top
+            .map((period, index) => {
+              const isPeriodHidden = (tier === 'free' && index >= 3) || (tier === 'team' && index >= 7);
+              const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
+              const periodAverageTipPerHour = period.isPaid ? calculateAverageTipPerHour(period.id) : 0;
+              
+              return (
+                <Card 
+                  key={period.id} 
+                  className={isPeriodHidden ? 'opacity-40' : ''}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex justify-between items-center text-base">
+                      <span>
+                        Periode {formatPeriodDate(period.startDate)}
+                      </span>
+                      <div className="flex gap-2">
+                        {period.isPaid && (
+                          <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                            Uitbetaald
+                          </span>
+                        )}
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Einddatum</span>
-                        <span>{formatPeriodDate(period.endDate)}</span>
+                        <span className="text-muted-foreground">Startdatum</span>
+                        <span>{formatPeriodDate(period.startDate)}</span>
+                      </div>
+                      
+                      {period.endDate && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Einddatum</span>
+                          <span>{formatPeriodDate(period.endDate)}</span>
                       </div>
                     )}
                     

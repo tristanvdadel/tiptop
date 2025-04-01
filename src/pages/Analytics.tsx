@@ -40,28 +40,34 @@ const Analytics = () => {
     });
   }, [periods, calculateAverageTipPerHour]);
 
-  // Create the average tip per hour card component
+  // Create the average tip per hour card component with empty state
   const AverageTipCard = () => (
     <Card className="mb-4">
       <CardContent className="p-4">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-medium">Gemiddelde fooi per uur</h3>
-            <TooltipProvider>
-              <UITooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                    <Info size={16} className="text-muted-foreground" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Gemiddelde berekend over alle periodes</p>
-                </TooltipContent>
-              </UITooltip>
-            </TooltipProvider>
+        {averageTipPerHour > 0 ? (
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-medium">Gemiddelde fooi per uur</h3>
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6">
+                      <Info size={16} className="text-muted-foreground" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Gemiddelde berekend over alle periodes</p>
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            </div>
+            <span className="font-medium">€{averageTipPerHour.toFixed(2)} / uur</span>
           </div>
-          <span className="font-medium">€{averageTipPerHour.toFixed(2)} / uur</span>
-        </div>
+        ) : (
+          <div className="text-center py-2 text-muted-foreground">
+            <p>Voer fooi en uren in om een gemiddelde te zien</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -70,8 +76,8 @@ const Analytics = () => {
     return <div className="space-y-4">
         <h1 className="text-xl font-bold">Analytics</h1>
         
-        {/* Always display the average tip per hour at the top */}
-        {averageTipPerHour > 0 && <AverageTipCard />}
+        {/* Always display the average tip per hour at the top, even for empty state */}
+        <AverageTipCard />
         
         {/* Basic analytics available to all users */}
         <TipChart />
@@ -122,8 +128,8 @@ const Analytics = () => {
   return <div className="space-y-4">
       <h1 className="text-xl font-bold">Analytics</h1>
       
-      {/* Always display the average tip per hour at the top */}
-      {averageTipPerHour > 0 && <AverageTipCard />}
+      {/* Always display the average tip per hour at the top, even for empty state */}
+      <AverageTipCard />
       
       <TipChart />
       

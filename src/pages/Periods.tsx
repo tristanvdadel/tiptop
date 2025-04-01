@@ -545,7 +545,7 @@ const Periods = () => {
           {sortedPeriods
             .filter(period => !period.isActive) // Filter out active period since we show it separately at the top
             .map((period, index) => {
-              const isPeriodHidden = (tier === 'basic' && index >= 3) || (tier === 'team' && index >= 7);
+              const isPeriodHidden = (tier === 'basic' && index >= 3);
               const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
               const periodAverageTipPerHour = period.isPaid ? calculateAverageTipPerHour(period.id) : 0;
               

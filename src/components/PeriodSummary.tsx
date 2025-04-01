@@ -9,18 +9,13 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
 const PeriodSummary = () => {
-  const { currentPeriod, calculateAverageTipPerHour } = useApp();
+  const { currentPeriod } = useApp();
   const navigate = useNavigate();
   
   const totalTip = useMemo(() => {
     if (!currentPeriod) return 0;
     return currentPeriod.tips.reduce((sum, tip) => sum + tip.amount, 0);
   }, [currentPeriod]);
-  
-  const averageTipPerHour = useMemo(() => {
-    // Calculate average tip per hour for all periods
-    return calculateAverageTipPerHour();
-  }, [calculateAverageTipPerHour]);
   
   const handleAnalyticsClick = () => {
     navigate('/analytics');
@@ -55,7 +50,7 @@ const PeriodSummary = () => {
           
           <div className="mt-4">
             <div className="flex justify-between items-center mb-2">
-              <h4 className="text-sm font-medium">Gemiddelde fooi per uur (all-time)</h4>
+              <h4 className="text-sm font-medium">Gemiddelde fooi per uur</h4>
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -66,7 +61,7 @@ const PeriodSummary = () => {
               </Button>
             </div>
             <div className="bg-muted/50 p-3 rounded-md">
-              <span className="font-medium text-xl">€{averageTipPerHour.toFixed(2)}</span>
+              <span className="font-medium text-xl">€{0.00.toFixed(2)}</span>
               <span className="text-muted-foreground text-sm"> / uur</span>
             </div>
           </div>

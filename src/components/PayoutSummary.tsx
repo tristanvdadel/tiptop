@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +23,10 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   const [hasChanges, setHasChanges] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   
+  const roundDownToNearest = (value: number, nearest: number = 5): number => {
+    return Math.floor(value / nearest) * nearest;
+  };
+  
   useEffect(() => {
     if (mostRecentPayout) {
       const initialPayouts: {[key: string]: number} = {};
@@ -32,11 +35,14 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       mostRecentPayout.distribution.forEach(item => {
         const member = teamMembers.find(m => m.id === item.memberId);
         if (member) {
-          initialPayouts[item.memberId] = item.amount;
-          // Calculate initial balance based on member's calculated tip amount minus the actual payout
-          // Use the tipAmount or 0 if it doesn't exist
           const calculatedAmount = member.tipAmount || 0;
-          initialBalances[item.memberId] = calculatedAmount - item.amount;
+          const existingBalance = member.balance || 0;
+          const totalDue = calculatedAmount + existingBalance;
+          
+          const roundedPayout = roundDownToNearest(totalDue);
+          
+          initialPayouts[item.memberId] = roundedPayout;
+          initialBalances[item.memberId] = totalDue - roundedPayout;
         }
       });
       
@@ -144,7 +150,6 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
         const newActualPayouts = { ...actualPayouts, [memberId]: amount };
         setActualPayouts(newActualPayouts);
         
-        // Calculate new balance based on total amount due minus actual payout
         const existingBalance = member.existingBalance || 0;
         const calculatedAmount = member.amount || 0;
         const totalDue = calculatedAmount + existingBalance;
@@ -157,12 +162,10 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   };
   
   const handleSaveBalancesAndClose = () => {
-    // Save all balances to team members
     Object.entries(balances).forEach(([memberId, balance]) => {
       updateTeamMemberBalance(memberId, balance);
     });
     
-    // Clear hours for all team members while preserving data for calculations
     memberPayouts.forEach(member => {
       clearTeamMemberHours(member.id);
     });
@@ -173,10 +176,9 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     });
     
     setHasChanges(false);
-    onClose(); // Close the payout summary and return to the team view
+    onClose();
   };
   
-  // Function to get proper display for the balance text
   const getBalanceText = (balance: number) => {
     if (balance === 0) return "";
     

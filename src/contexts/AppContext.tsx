@@ -9,6 +9,7 @@ export type TeamMember = {
   tipAmount?: number;
   lastPayout?: string; // Date of last payout
   hourRegistrations?: HourRegistration[]; // Added hour registrations
+  balance?: number; // Added balance field for carrying forward unpaid tips
 };
 
 export type HourRegistration = {
@@ -87,6 +88,7 @@ type AppContextType = {
   updateTip: (periodId: string, tipId: string, amount: number, note?: string, date?: string) => void;
   updatePeriod: (periodId: string, updates: {name?: string, notes?: string}) => void;
   deleteHourRegistration: (memberId: string, registrationId: string) => void;
+  updateTeamMemberBalance: (memberId: string, balance: number) => void; // Added function
   
   // Add mostRecentPayout to the context
   mostRecentPayout: PayoutData | null;
@@ -217,14 +219,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setTeamMembers(prev => 
       prev.map(member => {
         if (member.id === id) {
-          // Create a new hour registration
           const newRegistration: HourRegistration = {
             id: generateId(),
             hours,
             date: new Date().toISOString(),
           };
           
-          // Calculate new total hours
           const existingRegistrations = member.hourRegistrations || [];
           const newRegistrations = [...existingRegistrations, newRegistration];
           const totalHours = newRegistrations.reduce((sum, reg) => sum + reg.hours, 0);
@@ -244,12 +244,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setTeamMembers(prev => 
       prev.map(member => {
         if (member.id === memberId && member.hourRegistrations) {
-          // Filter out the registration to delete
           const newRegistrations = member.hourRegistrations.filter(
             reg => reg.id !== registrationId
           );
           
-          // Recalculate total hours
           const totalHours = newRegistrations.reduce((sum, reg) => sum + reg.hours, 0);
           
           return { 
@@ -265,6 +263,25 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     toast({
       title: "Registratie verwijderd",
       description: "De uren registratie is succesvol verwijderd.",
+    });
+  };
+
+  const updateTeamMemberBalance = (memberId: string, balance: number) => {
+    setTeamMembers(prev => 
+      prev.map(member => {
+        if (member.id === memberId) {
+          return { 
+            ...member, 
+            balance: balance
+          };
+        }
+        return member;
+      })
+    );
+    
+    toast({
+      title: "Saldo bijgewerkt",
+      description: "Het saldo van het teamlid is bijgewerkt.",
     });
   };
 
@@ -350,10 +367,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const tipShare = totalHours > 0 
           ? (member.hours / totalHours) * totalTip 
           : 0;
+        
+        const existingBalance = member.balance || 0;
           
         return {
           ...member,
-          tipAmount: parseFloat(tipShare.toFixed(2)),
+          tipAmount: parseFloat((tipShare + existingBalance).toFixed(2)),
         };
       });
     }
@@ -380,10 +399,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (member.hours > 10) {
         tipShare = tipShare * adjustmentFactor;
       }
+      
+      const existingBalance = member.balance || 0;
         
       return {
         ...member,
-        tipAmount: parseFloat(tipShare.toFixed(2)),
+        tipAmount: parseFloat((tipShare + existingBalance).toFixed(2)),
       };
     });
   };
@@ -608,6 +629,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         updateTip,
         updatePeriod,
         deleteHourRegistration,
+        updateTeamMemberBalance,
       }}
     >
       {children}

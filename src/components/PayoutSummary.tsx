@@ -1,19 +1,43 @@
 
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { PrinterIcon, ClipboardList, FileCheck, ArrowLeft, Download } from 'lucide-react';
+import { PrinterIcon, ClipboardList, FileCheck, ArrowLeft, Download, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 type PayoutSummaryProps = {
   onClose: () => void;
 };
 
 export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
-  const { mostRecentPayout, teamMembers, periods } = useApp();
+  const { mostRecentPayout, teamMembers, periods, updateTeamMemberBalance } = useApp();
   const { toast } = useToast();
+  const [actualPayouts, setActualPayouts] = useState<{[key: string]: number}>({});
+  const [balances, setBalances] = useState<{[key: string]: number}>({});
+  const [hasChanges, setHasChanges] = useState(false);
+  
+  useEffect(() => {
+    if (mostRecentPayout) {
+      const initialPayouts: {[key: string]: number} = {};
+      const initialBalances: {[key: string]: number} = {};
+      
+      mostRecentPayout.distribution.forEach(item => {
+        const member = teamMembers.find(m => m.id === item.memberId);
+        const existingBalance = member?.balance || 0;
+        initialPayouts[item.memberId] = item.amount;
+        initialBalances[item.memberId] = 0; // Initialize carried balance to 0
+      });
+      
+      setActualPayouts(initialPayouts);
+      setBalances(initialBalances);
+    }
+  }, [mostRecentPayout, teamMembers]);
   
   if (!mostRecentPayout) {
     return (
@@ -50,10 +74,13 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   
   const memberPayouts = mostRecentPayout.distribution.map(item => {
     const member = teamMembers.find(m => m.id === item.memberId);
+    const existingBalance = member?.balance || 0;
     return {
       id: item.memberId,
       name: member?.name || 'Onbekend lid',
       amount: item.amount,
+      existingBalance,
+      totalDue: item.amount + existingBalance,
     };
   });
   
@@ -63,8 +90,12 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   
   const handleCopyToClipboard = () => {
     const payoutText = `Uitbetaling fooi: ${payoutDate}\n\n` + 
-      memberPayouts.map(member => `${member.name}: €${member.amount.toFixed(2)}`).join('\n') +
-      `\n\nTotaal: €${totalPayout.toFixed(2)}`;
+      memberPayouts.map(member => {
+        const actualAmount = actualPayouts[member.id] || member.amount;
+        const carriedBalance = member.totalDue - actualAmount;
+        return `${member.name}: €${actualAmount.toFixed(2)}${carriedBalance > 0 ? ` (€${carriedBalance.toFixed(2)} meegenomen)` : ''}`;
+      }).join('\n') +
+      `\n\nTotaal: €${Object.values(actualPayouts).reduce((sum, amount) => sum + amount, 0).toFixed(2)}`;
     
     navigator.clipboard.writeText(payoutText).then(() => {
       toast({
@@ -75,8 +106,12 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   };
   
   const handleDownloadCSV = () => {
-    const headers = "Naam,Bedrag\n";
-    const rows = memberPayouts.map(member => `${member.name},${member.amount.toFixed(2)}`).join('\n');
+    const headers = "Naam,Bedrag,Meegenomen saldo\n";
+    const rows = memberPayouts.map(member => {
+      const actualAmount = actualPayouts[member.id] || member.amount;
+      const carriedBalance = member.totalDue - actualAmount;
+      return `${member.name},${actualAmount.toFixed(2)},${carriedBalance.toFixed(2)}`;
+    }).join('\n');
     const csv = headers + rows;
     
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -93,6 +128,38 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       title: "CSV gedownload",
       description: "De uitbetalingsgegevens zijn gedownload als CSV-bestand.",
     });
+  };
+  
+  const handleActualPayoutChange = (memberId: string, value: string) => {
+    const amount = parseFloat(value);
+    if (!isNaN(amount)) {
+      const member = memberPayouts.find(m => m.id === memberId);
+      if (member) {
+        const newActualPayouts = { ...actualPayouts, [memberId]: amount };
+        setActualPayouts(newActualPayouts);
+        
+        // Calculate new balance (totalDue - actualPayout)
+        const totalDue = member.totalDue;
+        const newBalance = totalDue - amount;
+        
+        setBalances({ ...balances, [memberId]: newBalance });
+        setHasChanges(true);
+      }
+    }
+  };
+  
+  const handleSaveBalances = () => {
+    // Save all balances to team members
+    Object.entries(balances).forEach(([memberId, balance]) => {
+      updateTeamMemberBalance(memberId, balance);
+    });
+    
+    toast({
+      title: "Saldi opgeslagen",
+      description: "De aangepaste uitbetaling en meegenomen saldi zijn opgeslagen.",
+    });
+    
+    setHasChanges(false);
   };
   
   return (
@@ -141,15 +208,82 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
           
           <div className="mt-6">
             <h3 className="text-sm font-medium mb-2">Verdeling per teamlid</h3>
-            <div className="space-y-2">
-              {memberPayouts.map(member => (
-                <div key={member.id} className="flex justify-between">
-                  <span>{member.name}</span>
-                  <span className="font-medium">€{member.amount.toFixed(2)}</span>
-                </div>
-              ))}
+            <div className="space-y-4">
+              {memberPayouts.map(member => {
+                const actualPayout = actualPayouts[member.id] || member.amount;
+                const carriedBalance = balances[member.id] || 0;
+                
+                return (
+                  <div key={member.id} className="p-3 border rounded-md">
+                    <div className="flex justify-between font-medium mb-2">
+                      <span>{member.name}</span>
+                      <span>Te betalen: €{member.totalDue.toFixed(2)}</span>
+                    </div>
+                    
+                    {member.existingBalance > 0 && (
+                      <div className="flex justify-between text-sm mb-2 text-gray-600">
+                        <span>Vorig saldo</span>
+                        <span>€{member.existingBalance.toFixed(2)}</span>
+                      </div>
+                    )}
+                    
+                    <div className="flex justify-between text-sm mb-2 text-gray-600">
+                      <span>Huidige berekening</span>
+                      <span>€{member.amount.toFixed(2)}</span>
+                    </div>
+                    
+                    <div className="flex items-center mt-3 space-x-2">
+                      <div className="flex-1">
+                        <Label htmlFor={`actual-${member.id}`} className="text-sm">
+                          Daadwerkelijk uitbetaald
+                        </Label>
+                        <Input
+                          id={`actual-${member.id}`}
+                          type="number"
+                          value={actualPayout}
+                          onChange={(e) => handleActualPayoutChange(member.id, e.target.value)}
+                          step="0.01"
+                          min="0"
+                          max={member.totalDue}
+                          className="mt-1"
+                        />
+                      </div>
+                      
+                      <div className="flex-1">
+                        <Label htmlFor={`carried-${member.id}`} className="text-sm">
+                          Meegenomen saldo
+                        </Label>
+                        <Input
+                          id={`carried-${member.id}`}
+                          type="number"
+                          value={carriedBalance}
+                          readOnly
+                          className="mt-1 bg-gray-50"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
+          
+          {hasChanges && (
+            <Alert className="mt-4 bg-amber-50">
+              <AlertDescription>
+                Je hebt aanpassingen gemaakt in de uitbetaling. Klik op 'Saldi opslaan' om deze op te slaan.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {hasChanges && (
+            <Button 
+              onClick={handleSaveBalances}
+              className="w-full"
+            >
+              <Save size={16} className="mr-1" /> Saldi opslaan
+            </Button>
+          )}
         </CardContent>
         <CardFooter className="flex-col sm:flex-row gap-2">
           <Button 

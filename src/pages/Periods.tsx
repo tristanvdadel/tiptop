@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
@@ -241,9 +240,7 @@ const Periods = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={cancelDeletePaidPeriods}>Annuleren</AlertDialogCancel>
-            <Button variant="destructive" onClick={confirmDeletePaidPeriods}>
-              Verwijderen
-            </Button>
+            <AlertDialogAction onClick={confirmDeletePaidPeriods} variant="destructive">Verwijderen</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -258,9 +255,7 @@ const Periods = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={cancelDeletePeriod}>Annuleren</AlertDialogCancel>
-            <Button variant="destructive" onClick={confirmDeletePeriod}>
-              Verwijderen
-            </Button>
+            <AlertDialogAction onClick={confirmDeletePeriod} variant="destructive">Verwijderen</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

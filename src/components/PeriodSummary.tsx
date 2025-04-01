@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Pencil } from 'lucide-react';
+import { Pencil, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
   Tooltip, 
@@ -22,14 +22,17 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 const PeriodSummary = () => {
   const {
     currentPeriod,
-    updatePeriod
+    updatePeriod,
+    startNewPeriod
   } = useApp();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [periodName, setPeriodName] = useState('');
+  const { toast } = useToast();
 
   const totalTip = useMemo(() => {
     if (!currentPeriod) return 0;
@@ -50,12 +53,28 @@ const PeriodSummary = () => {
     }
   };
 
+  const handleStartNewPeriod = () => {
+    startNewPeriod();
+    toast({
+      title: "Nieuwe periode gestart",
+      description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode.",
+    });
+  };
+
   if (!currentPeriod) {
-    return <Card>
+    return (
+      <Card>
         <CardContent className="p-6 text-center">
-          <p>Geen actieve periode</p>
+          <p className="text-muted-foreground mb-4">Geen actieve periode</p>
+          <Button 
+            onClick={handleStartNewPeriod} 
+            className="w-full gold-button"
+          >
+            <Plus size={16} className="mr-1" /> Nieuwe periode starten
+          </Button>
         </CardContent>
-      </Card>;
+      </Card>
+    );
   }
 
   const startDate = format(new Date(currentPeriod.startDate), 'd MMMM yyyy', {

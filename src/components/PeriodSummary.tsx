@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
 const PeriodSummary = () => {
-  const { currentPeriod } = useApp();
+  const { currentPeriod, calculateAverageTipPerHour } = useApp();
   const navigate = useNavigate();
   
   const totalTip = useMemo(() => {
@@ -32,6 +32,7 @@ const PeriodSummary = () => {
   }
 
   const startDate = format(new Date(currentPeriod.startDate), 'd MMMM yyyy', { locale: nl });
+  const avgTipPerHour = calculateAverageTipPerHour(currentPeriod.id);
   
   return (
     <Card>
@@ -50,18 +51,20 @@ const PeriodSummary = () => {
           
           <div className="mt-4">
             <div className="flex justify-between items-center mb-2">
-              <h4 className="text-sm font-medium">Gemiddelde fooi per uur</h4>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-6 w-6" 
-                onClick={handleAnalyticsClick}
-              >
-                <BarChart2 size={16} />
-              </Button>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-medium">Gemiddelde fooi per uur</h4>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6" 
+                  onClick={handleAnalyticsClick}
+                >
+                  <BarChart2 size={16} />
+                </Button>
+              </div>
             </div>
             <div className="bg-muted/50 p-3 rounded-md">
-              <span className="font-medium text-xl">€{0.00.toFixed(2)}</span>
+              <span className="font-medium text-xl">€{avgTipPerHour.toFixed(2)}</span>
               <span className="text-muted-foreground text-sm"> / uur</span>
             </div>
           </div>

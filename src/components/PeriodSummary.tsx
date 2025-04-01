@@ -24,8 +24,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Period } from "@/contexts/AppContext";
 
-const PeriodSummary = () => {
+interface PeriodSummaryProps {
+  period?: Period;
+}
+
+const PeriodSummary: React.FC<PeriodSummaryProps> = ({ period }) => {
   const {
     currentPeriod,
     updatePeriod,
@@ -35,22 +40,25 @@ const PeriodSummary = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [periodName, setPeriodName] = useState('');
   const { toast } = useToast();
+  
+  // Use the passed period prop if available, otherwise use the currentPeriod from context
+  const activePeriod = period || currentPeriod;
 
   const totalTip = useMemo(() => {
-    if (!currentPeriod) return 0;
-    return currentPeriod.tips.reduce((sum, tip) => sum + tip.amount, 0);
-  }, [currentPeriod]);
+    if (!activePeriod) return 0;
+    return activePeriod.tips.reduce((sum, tip) => sum + tip.amount, 0);
+  }, [activePeriod]);
 
   const handleEditClick = () => {
-    if (currentPeriod) {
-      setPeriodName(currentPeriod.name || '');
+    if (activePeriod) {
+      setPeriodName(activePeriod.name || '');
       setIsEditDialogOpen(true);
     }
   };
 
   const handleSaveName = () => {
-    if (currentPeriod) {
-      updatePeriod(currentPeriod.id, { name: periodName });
+    if (activePeriod) {
+      updatePeriod(activePeriod.id, { name: periodName });
       setIsEditDialogOpen(false);
       
       toast({
@@ -77,7 +85,7 @@ const PeriodSummary = () => {
     });
   };
 
-  if (!currentPeriod) {
+  if (!activePeriod) {
     return (
       <Card>
         <CardContent className="p-6">
@@ -100,7 +108,7 @@ const PeriodSummary = () => {
     );
   }
 
-  const startDate = format(new Date(currentPeriod.startDate), 'd MMMM yyyy', {
+  const startDate = format(new Date(activePeriod.startDate), 'd MMMM yyyy', {
     locale: nl
   });
 
@@ -109,8 +117,8 @@ const PeriodSummary = () => {
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <span>{currentPeriod.name || "Huidige periode"}</span>
-            {currentPeriod && (
+            <span>{activePeriod.name || "Huidige periode"}</span>
+            {activePeriod && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -137,12 +145,12 @@ const PeriodSummary = () => {
         <div>
           <h3 className="text-lg font-medium mb-2">Totaal fooi: €{totalTip.toFixed(2)}</h3>
           <p className="text-sm text-muted-foreground mb-3">
-            {currentPeriod.tips.length > 0 
-              ? `${currentPeriod.tips.length} fooi invoer(en) in deze periode` 
+            {activePeriod.tips.length > 0 
+              ? `${activePeriod.tips.length} fooi invoer(en) in deze periode` 
               : "Nog geen fooien in deze periode. Voeg fooien toe om ze hier te zien."}
           </p>
           
-          {currentPeriod.tips.length === 0 && (
+          {activePeriod.tips.length === 0 && (
             <Alert className="mt-2 bg-muted/50 border-muted">
               <Info className="h-4 w-4" />
               <AlertDescription>

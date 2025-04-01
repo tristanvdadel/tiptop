@@ -607,6 +607,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         deleteTip,
         updateTip,
         updatePeriod,
+        deleteHourRegistration,
       }}
     >
       {children}

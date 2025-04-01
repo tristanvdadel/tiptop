@@ -1,10 +1,9 @@
-
 import { useState, useEffect, useCallback, KeyboardEvent } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { TeamMember, Period, HourRegistration } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +23,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 const Team = () => {
   const { teamMembers, addTeamMember, removeTeamMember, updateTeamMemberHours, deleteHourRegistration, calculateTipDistribution, markPeriodsAsPaid, currentPeriod, periods, payouts } = useApp();
@@ -33,6 +34,7 @@ const Team = () => {
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
   const [showPayoutSummary, setShowPayoutSummary] = useState(false);
+  const [openMemberDetails, setOpenMemberDetails] = useState<{ [key: string]: boolean }>({});
   const { toast } = useToast();
   
   useEffect(() => {
@@ -120,6 +122,13 @@ const Team = () => {
     calculateDistributionForSelectedPeriods();
   }, [selectedPeriods, calculateDistributionForSelectedPeriods]);
 
+  const toggleMemberDetails = (memberId: string) => {
+    setOpenMemberDetails(prev => ({
+      ...prev,
+      [memberId]: !prev[memberId]
+    }));
+  };
+
   const handlePayout = () => {
     if (selectedPeriods.length === 0) {
       toast({
@@ -178,7 +187,6 @@ const Team = () => {
     ? [...unpaidPeriods, currentPeriod] 
     : unpaidPeriods;
 
-  // Format balance display with + or - sign
   const formatBalance = (balance?: number): string => {
     if (balance === undefined || balance === 0) return '';
     
@@ -187,7 +195,6 @@ const Team = () => {
       : `-€${Math.abs(balance).toFixed(2)}`;
   };
 
-  // Get CSS class for balance display
   const getBalanceClass = (balance?: number): string => {
     if (balance === undefined || balance === 0) return '';
     
@@ -222,116 +229,131 @@ const Team = () => {
 
       <div className="grid gap-4 mb-8">
         {teamMembers.map((member) => (
-          <Card key={member.id}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center">
-                  <Label htmlFor={`hours-${member.id}`} className="block text-lg font-medium">
-                    {member.name}
-                  </Label>
-                  {member.balance !== undefined && member.balance !== 0 && (
-                    <span className={`ml-2 text-sm font-medium ${getBalanceClass(member.balance)}`}>
-                      {member.balance > 0 ? (
-                        <span className="flex items-center">
-                          <PlusCircle size={14} className="mr-1" />
-                          €{member.balance.toFixed(2)}
-                        </span>
-                      ) : (
-                        <span className="flex items-center">
-                          <MinusCircle size={14} className="mr-1" />
-                          €{Math.abs(member.balance).toFixed(2)}
-                        </span>
-                      )}
-                    </span>
-                  )}
-                </div>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="icon">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Dit teamlid wordt permanent verwijderd inclusief urenregistraties en saldo.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Annuleren</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleRemoveMember(member.id)}>Verwijderen</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-              
-              <div className="flex items-end gap-2 mb-4">
-                <div className="flex-1">
-                  <Label htmlFor={`hours-${member.id}`} className="block text-sm font-medium mb-1">
-                    Uren toevoegen
-                  </Label>
+          <Collapsible 
+            key={member.id} 
+            open={openMemberDetails[member.id]} 
+            onOpenChange={() => toggleMemberDetails(member.id)}
+          >
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center">
-                    <Input
-                      type="number"
-                      name={`hours-${member.id}`}
-                      id={`hours-${member.id}`}
-                      className="block w-full pr-10 text-sm rounded-md"
-                      placeholder="Uren"
-                      value={hoursInputs[member.id] || ''}
-                      onChange={(e) => handleHoursChange(member.id, e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(e, member.id)}
-                    />
-                    <Button 
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleHoursSubmit(member.id)}
-                      className="ml-2"
-                    >
-                      <Check className="h-4 w-4" />
-                    </Button>
+                    <Label className="block text-lg font-medium mr-2">
+                      {member.name}
+                    </Label>
+                    {member.balance !== undefined && member.balance !== 0 && (
+                      <span className={`text-sm font-medium ${getBalanceClass(member.balance)}`}>
+                        {member.balance > 0 ? (
+                          <span className="flex items-center">
+                            <PlusCircle size={14} className="mr-1" />
+                            €{member.balance.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="flex items-center">
+                            <MinusCircle size={14} className="mr-1" />
+                            €{Math.abs(member.balance).toFixed(2)}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        {openMemberDetails[member.id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </Button>
+                    </CollapsibleTrigger>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="icon">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Dit teamlid wordt permanent verwijderd inclusief urenregistraties en saldo.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleRemoveMember(member.id)}>Verwijderen</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
                 
-                <div className="text-right">
-                  <p className="text-sm text-muted-foreground">Totaal uren</p>
-                  <p className="text-xl font-semibold">{member.hours}</p>
-                </div>
-              </div>
-              
-              {member.hourRegistrations && member.hourRegistrations.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="text-sm font-medium mb-2">Uren geschiedenis</h3>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {member.hourRegistrations.map((registration: HourRegistration) => (
-                      <div 
-                        key={registration.id} 
-                        className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50"
+                <div className="flex items-end gap-2 mb-2">
+                  <div className="flex-1">
+                    <Label className="block text-sm font-medium mb-1">
+                      Uren toevoegen
+                    </Label>
+                    <div className="flex items-center">
+                      <Input
+                        type="number"
+                        name={`hours-${member.id}`}
+                        id={`hours-${member.id}`}
+                        className="block w-full pr-10 text-sm rounded-md"
+                        placeholder="Uren"
+                        value={hoursInputs[member.id] || ''}
+                        onChange={(e) => handleHoursChange(member.id, e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(e, member.id)}
+                      />
+                      <Button 
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleHoursSubmit(member.id)}
+                        className="ml-2"
                       >
-                        <div className="flex items-center">
-                          <Clock className="h-4 w-4 mr-2 text-gray-500" />
-                          <span className="font-medium">{registration.hours} uren</span>
-                          <span className="mx-2 text-gray-400">•</span>
-                          <span className="text-xs text-gray-500 flex items-center">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            {formatDate(registration.date)}
-                          </span>
-                        </div>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleDeleteRegistration(member.id, registration.id)}
-                          className="h-7 w-7 text-gray-500 hover:text-red-500"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
+                        <Check className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Totaal uren</p>
+                    <p className="text-xl font-semibold">{member.hours}</p>
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                
+                <CollapsibleContent>
+                  {member.hourRegistrations && member.hourRegistrations.length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="text-sm font-medium mb-2">Uren geschiedenis</h3>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {member.hourRegistrations.map((registration: HourRegistration) => (
+                          <div 
+                            key={registration.id} 
+                            className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50"
+                          >
+                            <div className="flex items-center">
+                              <Clock className="h-4 w-4 mr-2 text-gray-500" />
+                              <span className="font-medium">{registration.hours} uren</span>
+                              <span className="mx-2 text-gray-400">•</span>
+                              <span className="text-xs text-gray-500 flex items-center">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                {formatDate(registration.date)}
+                              </span>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handleDeleteRegistration(member.id, registration.id)}
+                              className="h-7 w-7 text-gray-500 hover:text-red-500"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </CardContent>
+            </Card>
+          </Collapsible>
         ))}
       </div>
       

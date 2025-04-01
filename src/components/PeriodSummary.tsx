@@ -27,7 +27,6 @@ import { Label } from '@/components/ui/label';
 const PeriodSummary = () => {
   const {
     currentPeriod,
-    calculateAverageTipPerHour,
     updatePeriod
   } = useApp();
   const navigate = useNavigate();
@@ -38,10 +37,6 @@ const PeriodSummary = () => {
     if (!currentPeriod) return 0;
     return currentPeriod.tips.reduce((sum, tip) => sum + tip.amount, 0);
   }, [currentPeriod]);
-
-  const handleAnalyticsClick = () => {
-    navigate('/analytics');
-  };
 
   const handleEditClick = () => {
     if (currentPeriod) {
@@ -68,8 +63,6 @@ const PeriodSummary = () => {
   const startDate = format(new Date(currentPeriod.startDate), 'd MMMM yyyy', {
     locale: nl
   });
-
-  const avgTipPerHour = calculateAverageTipPerHour(currentPeriod.id);
 
   return <>
     <Card>
@@ -106,31 +99,6 @@ const PeriodSummary = () => {
           <p className="text-sm text-muted-foreground mb-3">
             {currentPeriod.tips.length} fooi invoer(en) in deze periode
           </p>
-          
-          <div className="mt-4">
-            <div className="flex justify-between items-center mb-2">
-              <div className="flex items-center gap-2">
-                <span>Gemiddelde fooi per uur: €{avgTipPerHour.toFixed(2)}/uur</span>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-6 w-6"
-                        onClick={handleAnalyticsClick}
-                      >
-                        <Info size={16} className="text-muted-foreground" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Bekijk gedetailleerde analytische gegevens</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            </div>
-          </div>
         </div>
       </CardContent>
     </Card>

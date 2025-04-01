@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, KeyboardEvent } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { TeamMember, Period } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 const Team = () => {
   const { teamMembers, addTeamMember, removeTeamMember, updateTeamMemberHours, calculateTipDistribution, markPeriodsAsPaid, currentPeriod, periods, payouts } = useApp();
   const [newMemberName, setNewMemberName] = useState('');
-  const [hours, setHours] = useState<{ [key: string]: number }>({});
+  const [hoursInputs, setHoursInputs] = useState<{ [key: string]: string }>({});
   const [distribution, setDistribution] = useState<TeamMember[]>([]);
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
@@ -40,6 +40,15 @@ const Team = () => {
     }
   }, [currentPeriod]);
   
+  useEffect(() => {
+    // Initialize hours inputs with current values
+    const initialHours: { [key: string]: string } = {};
+    teamMembers.forEach(member => {
+      initialHours[member.id] = member.hours > 0 ? member.hours.toString() : '';
+    });
+    setHoursInputs(initialHours);
+  }, [teamMembers]);
+  
   const handleAddMember = () => {
     if (newMemberName.trim() !== '') {
       addTeamMember(newMemberName);
@@ -51,12 +60,35 @@ const Team = () => {
     removeTeamMember(id);
   };
 
-  const handleHoursChange = (id: string, value: number) => {
-    setHours(prev => ({ ...prev, [id]: value }));
+  const handleHoursChange = (id: string, value: string) => {
+    setHoursInputs(prev => ({ ...prev, [id]: value }));
   };
 
-  const handleBlur = (id: string, value: number) => {
-    updateTeamMemberHours(id, value);
+  const handleHoursSubmit = (id: string) => {
+    const value = hoursInputs[id];
+    if (value !== undefined) {
+      const hours = value === '' ? 0 : parseFloat(value);
+      if (!isNaN(hours)) {
+        updateTeamMemberHours(id, hours);
+        toast({
+          title: "Uren opgeslagen",
+          description: `Uren succesvol opgeslagen voor teamlid.`,
+        });
+      } else {
+        toast({
+          title: "Ongeldige invoer",
+          description: "Voer een geldig aantal uren in.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>, id: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleHoursSubmit(id);
+    }
   };
   
   const togglePeriodSelection = (periodId: string) => {
@@ -175,21 +207,34 @@ const Team = () => {
           <Card key={member.id}>
             <CardContent className="flex items-center justify-between p-4">
               <div>
-                <Label htmlFor={`hours-${member.id}`} className="block text-sm font-medium text-gray-700">
+                <Label htmlFor={`hours-${member.id}`} className="block text-sm font-medium mb-1">
                   {member.name}
                 </Label>
-                <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="flex items-center">
                   <Input
                     type="number"
                     name={`hours-${member.id}`}
                     id={`hours-${member.id}`}
                     className="block w-full pr-10 text-sm rounded-md"
                     placeholder="Uren"
-                    defaultValue={member.hours}
-                    onChange={(e) => handleHoursChange(member.id, parseFloat(e.target.value))}
-                    onBlur={(e) => handleBlur(member.id, parseFloat(e.target.value))}
+                    value={hoursInputs[member.id] || ''}
+                    onChange={(e) => handleHoursChange(member.id, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e, member.id)}
                   />
+                  <Button 
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleHoursSubmit(member.id)}
+                    className="ml-2"
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
                 </div>
+                {member.hours > 0 && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Huidige uren: {member.hours}
+                  </p>
+                )}
               </div>
               <AlertDialog>
                 <AlertDialogTrigger asChild>

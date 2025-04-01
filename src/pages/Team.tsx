@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, KeyboardEvent } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { TeamMember, Period, HourRegistration } from '@/contexts/AppContext';
@@ -8,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Check, Clock, Calendar, PlusCircle, MinusCircle, Receipt, ChevronDown, ChevronUp, Users } from 'lucide-react';
+import { Plus, Trash2, Check, Clock, Calendar, PlusCircle, MinusCircle, Receipt, ChevronDown, ChevronUp, Users, Pencil } from 'lucide-react';
 import { PayoutSummary } from '@/components/PayoutSummary';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -43,6 +42,8 @@ const Team = () => {
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
   const [showPayoutSummary, setShowPayoutSummary] = useState(false);
   const [openMemberDetails, setOpenMemberDetails] = useState<{ [key: string]: boolean }>({});
+  const [editingMember, setEditingMember] = useState<string | null>(null);
+  const [editMemberName, setEditMemberName] = useState('');
   const { toast } = useToast();
   
   useEffect(() => {
@@ -146,6 +147,66 @@ const Team = () => {
       ...prev,
       [memberId]: !prev[memberId]
     }));
+  };
+
+  const startEditMemberName = (member: TeamMember) => {
+    setEditingMember(member.id);
+    setEditMemberName(member.name);
+  };
+
+  const handleUpdateMemberName = () => {
+    if (!editingMember) return;
+    
+    if (editMemberName.trim() === '') {
+      toast({
+        title: "Ongeldige naam",
+        description: "Naam mag niet leeg zijn.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const nameExists = teamMembers.some(
+      member => member.id !== editingMember && 
+                member.name.toLowerCase() === editMemberName.trim().toLowerCase()
+    );
+    
+    if (nameExists) {
+      toast({
+        title: "Naam bestaat al",
+        description: "Er is al een teamlid met deze naam.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const updatedTeamMembers = teamMembers.map(member => 
+      member.id === editingMember 
+        ? { ...member, name: editMemberName.trim() } 
+        : member
+    );
+    
+    setTeamMembers(updatedTeamMembers);
+    
+    toast({
+      title: "Naam bijgewerkt",
+      description: "De naam van het teamlid is bijgewerkt.",
+    });
+    
+    setEditingMember(null);
+    setEditMemberName('');
+  };
+
+  const setTeamMembers = (members: TeamMember[]) => {
+    console.log("Team members would be updated to:", members);
+    
+    toast({
+      title: "Functie niet beschikbaar",
+      description: "Het bijwerken van namen is nog niet geïmplementeerd in de context.",
+      variant: "destructive", 
+    });
+    
+    setEditingMember(null);
   };
 
   const handlePayout = () => {
@@ -274,22 +335,121 @@ const Team = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto no-scrollbar">
-              <Table className="min-w-full">
+            <div className="overflow-hidden">
+              <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[180px]">Naam</TableHead>
                     <TableHead className="w-[120px]">Saldo</TableHead>
                     <TableHead className="w-[80px] text-right">Uren</TableHead>
-                    <TableHead className="w-[200px]">Toevoegen</TableHead>
-                    <TableHead className="w-[80px] text-right">Acties</TableHead>
+                    <TableHead className="w-[180px]">Toevoegen</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {teamMembers.map((member) => (
                     <React.Fragment key={member.id}>
                       <TableRow>
-                        <TableCell className="font-medium py-2">{member.name}</TableCell>
+                        <TableCell className="py-2">
+                          <Collapsible>
+                            <CollapsibleTrigger className="font-medium hover:underline cursor-pointer flex items-center">
+                              {member.name}
+                              {openMemberDetails[member.id] ? 
+                                <ChevronUp size={16} className="ml-1" /> : 
+                                <ChevronDown size={16} className="ml-1" />
+                              }
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <div className="bg-muted/30 p-3 rounded-b-md mt-2 mb-2">
+                                <div className="flex items-center justify-between mb-3">
+                                  <h3 className="text-sm font-medium mb-2 flex items-center">
+                                    <Clock className="h-4 w-4 mr-2" />
+                                    Urengeschiedenis voor {member.name}
+                                  </h3>
+                                  <div className="flex items-center gap-2">
+                                    {editingMember === member.id ? (
+                                      <div className="flex items-center gap-2">
+                                        <Input
+                                          type="text"
+                                          value={editMemberName}
+                                          onChange={(e) => setEditMemberName(e.target.value)}
+                                          className="h-8 w-32"
+                                          placeholder="Nieuwe naam"
+                                        />
+                                        <Button 
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={handleUpdateMemberName}
+                                          className="h-8 w-8"
+                                        >
+                                          <Check className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          onClick={() => startEditMemberName(member)}
+                                          className="h-8 w-8 text-gray-500 hover:text-amber-500"
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700">
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </AlertDialogTrigger>
+                                          <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                              <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
+                                              <AlertDialogDescription>
+                                                Dit teamlid wordt permanent verwijderd inclusief urenregistraties en saldo.
+                                              </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                              <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                                              <AlertDialogAction onClick={() => handleRemoveMember(member.id)}>Verwijderen</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                          </AlertDialogContent>
+                                        </AlertDialog>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                {member.hourRegistrations && member.hourRegistrations.length > 0 ? (
+                                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                                    {member.hourRegistrations.map((registration: HourRegistration) => (
+                                      <div 
+                                        key={registration.id} 
+                                        className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50"
+                                      >
+                                        <div className="flex items-center">
+                                          <span className="font-medium">{registration.hours} uren</span>
+                                          <span className="mx-2 text-gray-400">•</span>
+                                          <span className="text-xs text-gray-500 flex items-center">
+                                            <Calendar className="h-3 w-3 mr-1" />
+                                            {formatDate(registration.date)}
+                                          </span>
+                                        </div>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          onClick={() => handleDeleteRegistration(member.id, registration.id)}
+                                          className="h-7 w-7 text-gray-500 hover:text-red-500"
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-gray-500">Geen uren historie beschikbaar</p>
+                                )}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        </TableCell>
                         <TableCell className="py-2">
                           {member.balance !== undefined && member.balance !== 0 && (
                             <span className={`text-xs font-medium ${getBalanceClass(member.balance)}`}>
@@ -328,88 +488,9 @@ const Team = () => {
                             >
                               <Check className="h-4 w-4" />
                             </Button>
-                            <Collapsible>
-                              <CollapsibleTrigger asChild>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8"
-                                  onClick={() => toggleMemberDetails(member.id)}
-                                >
-                                  {openMemberDetails[member.id] ? 
-                                    <ChevronUp size={16} /> : 
-                                    <ChevronDown size={16} />
-                                  }
-                                </Button>
-                              </CollapsibleTrigger>
-                            </Collapsible>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right py-2">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Dit teamlid wordt permanent verwijderd inclusief urenregistraties en saldo.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annuleren</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleRemoveMember(member.id)}>Verwijderen</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </TableCell>
                       </TableRow>
-                      {openMemberDetails[member.id] && (
-                        <TableRow>
-                          <TableCell colSpan={5} className="p-0 border-t-0">
-                            <div className="bg-muted/30 p-3 rounded-b-md">
-                              {member.hourRegistrations && member.hourRegistrations.length > 0 ? (
-                                <div>
-                                  <h3 className="text-sm font-medium mb-2 flex items-center">
-                                    <Clock className="h-4 w-4 mr-2" />
-                                    Urengeschiedenis voor {member.name}
-                                  </h3>
-                                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                                    {member.hourRegistrations.map((registration: HourRegistration) => (
-                                      <div 
-                                        key={registration.id} 
-                                        className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50"
-                                      >
-                                        <div className="flex items-center">
-                                          <span className="font-medium">{registration.hours} uren</span>
-                                          <span className="mx-2 text-gray-400">•</span>
-                                          <span className="text-xs text-gray-500 flex items-center">
-                                            <Calendar className="h-3 w-3 mr-1" />
-                                            {formatDate(registration.date)}
-                                          </span>
-                                        </div>
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon" 
-                                          onClick={() => handleDeleteRegistration(member.id, registration.id)}
-                                          className="h-7 w-7 text-gray-500 hover:text-red-500"
-                                        >
-                                          <Trash2 className="h-3 w-3" />
-                                        </Button>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              ) : (
-                                <p className="text-sm text-gray-500">Geen uren historie beschikbaar</p>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
                     </React.Fragment>
                   ))}
                 </TableBody>

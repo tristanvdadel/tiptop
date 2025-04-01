@@ -6,47 +6,28 @@ import { Plus, Crown, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileT
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
-
 const Periods = () => {
-  const { 
-    periods, 
-    startNewPeriod, 
+  const {
+    periods,
+    startNewPeriod,
     endCurrentPeriod,
-    tier, 
-    currentPeriod, 
-    hasReachedPeriodLimit, 
+    tier,
+    currentPeriod,
+    hasReachedPeriodLimit,
     getUnpaidPeriodsCount,
     calculateAverageTipPerHour,
     deletePaidPeriods,
     deletePeriod,
     updatePeriod
   } = useApp();
-  
   const navigate = useNavigate();
   const [showLimitDialog, setShowLimitDialog] = useState(false);
   const [showPaidPeriodesDialog, setShowPaidPeriodesDialog] = useState(false);
@@ -58,26 +39,23 @@ const Periods = () => {
   const [periodToEdit, setPeriodToEdit] = useState<string | null>(null);
   const [editPeriodName, setEditPeriodName] = useState('');
   const [editPeriodNotes, setEditPeriodNotes] = useState('');
-  const { toast } = useToast();
-  
-  const sortedPeriods = [...periods].sort(
-    (a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
-  );
-
+  const {
+    toast
+  } = useToast();
+  const sortedPeriods = [...periods].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   const formatPeriodDate = (date: string) => {
-    return format(new Date(date), 'd MMMM yyyy', { locale: nl });
+    return format(new Date(date), 'd MMMM yyyy', {
+      locale: nl
+    });
   };
-  
   const tierPeriodLimit = tier === 'basic' ? 7 : Infinity;
   const unpaidPeriodesCount = getUnpaidPeriodsCount();
   const paidPeriodesCount = periods.filter(p => p.isPaid).length;
   const averageTipPerHour = calculateAverageTipPerHour();
-  
   const handleStartNewPeriod = () => {
     if (currentPeriod) {
       return; // Already have an active period
     }
-    
     if (hasReachedPeriodLimit()) {
       // If there are paid periodes and we've reached the limit, show the paid periodes dialog
       if (paidPeriodesCount > 0) {
@@ -87,19 +65,16 @@ const Periods = () => {
       }
       return;
     }
-    
     startNewPeriod();
     toast({
       title: "Nieuwe periode gestart",
-      description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode.",
+      description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode."
     });
   };
-  
   const handleDeletePaidPeriods = () => {
     setShowPaidPeriodesDialog(false);
     setShowDeleteConfirmDialog(true);
   };
-  
   const confirmDeletePaidPeriods = () => {
     deletePaidPeriods();
     setShowDeleteConfirmDialog(false);
@@ -109,13 +84,11 @@ const Periods = () => {
       variant: "default"
     });
   };
-  
   const handleUpgrade = () => {
     setShowUpgradeDialog(true);
     setShowPaidPeriodesDialog(false);
     setShowLimitDialog(false);
   };
-  
   const doUpgrade = (newTier: 'pro') => {
     toast({
       title: `Upgraden naar ${newTier.toUpperCase()}`,
@@ -125,12 +98,10 @@ const Periods = () => {
     setShowUpgradeDialog(false);
     // In a real app, this would trigger a subscription change
   };
-
   const handleDeletePeriod = (periodId: string) => {
     setPeriodToDelete(periodId);
     setShowDeletePeriodDialog(true);
   };
-  
   const confirmDeletePeriod = () => {
     if (periodToDelete) {
       deletePeriod(periodToDelete);
@@ -143,7 +114,6 @@ const Periods = () => {
       });
     }
   };
-
   const handleEditPeriod = (periodId: string) => {
     const period = periods.find(p => p.id === periodId);
     if (period) {
@@ -153,7 +123,6 @@ const Periods = () => {
       setShowEditPeriodDialog(true);
     }
   };
-  
   const confirmEditPeriod = () => {
     if (periodToEdit) {
       updatePeriod(periodToEdit, {
@@ -169,35 +138,27 @@ const Periods = () => {
       });
     }
   };
-
   const goToTeamPayouts = () => {
     navigate('/team');
     toast({
       title: "Ga naar uitbetalen",
-      description: "Selecteer perioden en teamleden om de fooi uit te betalen.",
+      description: "Selecteer perioden en teamleden om de fooi uit te betalen."
     });
   };
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Periodes</h1>
         <div className="flex items-center gap-2">
           <Badge className="tier-free">
             {periods.length}/{tier === 'basic' ? '7' : 'totaal'}
           </Badge>
-          <Button 
-            onClick={handleStartNewPeriod} 
-            disabled={!!currentPeriod}
-            className="gold-button"
-          >
+          <Button onClick={handleStartNewPeriod} disabled={!!currentPeriod} className="gold-button">
             <Plus size={16} className="mr-1" /> Nieuwe periode
           </Button>
         </div>
       </div>
       
-      {currentPeriod && (
-        <Card className="border-[#9b87f5]/30 bg-[#9b87f5]/5">
+      {currentPeriod && <Card className="border-[#9b87f5]/30 bg-[#9b87f5]/5">
           <CardHeader className="pb-2">
             <CardTitle className="flex justify-between items-center text-base">
               <span className="flex items-center">
@@ -224,19 +185,13 @@ const Periods = () => {
                 <span>{currentPeriod.tips.length}</span>
               </div>
             </div>
-            <Button 
-              variant="outline" 
-              className="w-full border-[#9b87f5]/30 text-[#9b87f5] hover:bg-[#9b87f5]/10" 
-              onClick={endCurrentPeriod}
-            >
+            <Button variant="outline" className="w-full border-[#9b87f5]/30 text-[#9b87f5] hover:bg-[#9b87f5]/10" onClick={endCurrentPeriod}>
               Periode afronden
             </Button>
           </CardContent>
-        </Card>
-      )}
+        </Card>}
       
-      {averageTipPerHour > 0 && (
-        <Card className="bg-gradient-to-r from-[#9b87f5]/10 to-[#7E69AB]/5 border-[#9b87f5]/20">
+      {averageTipPerHour > 0 && <Card className="bg-gradient-to-r from-[#9b87f5]/10 to-[#7E69AB]/5 border-[#9b87f5]/20">
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center">
               <TrendingUp size={20} className="text-[#9b87f5] mr-2" />
@@ -249,11 +204,9 @@ const Periods = () => {
               Bekijk analyse <ArrowRight size={14} className="ml-1" />
             </Button>
           </CardContent>
-        </Card>
-      )}
+        </Card>}
       
-      {unpaidPeriodesCount > 0 && (
-        <Card className="bg-gradient-to-r from-green-50 to-green-100/30 border-green-200 dark:bg-green-900/20">
+      {unpaidPeriodesCount > 0 && <Card className="bg-gradient-to-r from-green-50 to-green-100/30 border-green-200 dark:bg-green-900/20">
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center">
               <DollarSign size={20} className="text-green-600 dark:text-green-400 mr-2" />
@@ -264,20 +217,16 @@ const Periods = () => {
                 </p>
               </div>
             </div>
-            <Button 
-              onClick={goToTeamPayouts}
-              className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600"
-            >
+            <Button onClick={goToTeamPayouts} className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600">
               Ga naar uitbetalen <ArrowRight size={14} className="ml-1" />
             </Button>
           </CardContent>
-        </Card>
-      )}
+        </Card>}
       
       <Dialog open={showLimitDialog} onOpenChange={setShowLimitDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-center text-xl">Periodeslimiet bereikt</DialogTitle>
+            <DialogTitle className="text-center text-xl">Periode limiet bereikt</DialogTitle>
             <DialogDescription className="text-center pt-2">
               <div className="flex items-center justify-center mb-4">
                 <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
@@ -285,32 +234,20 @@ const Periods = () => {
                 </div>
               </div>
               Je hebt het maximale aantal periodes ({tierPeriodLimit}) bereikt voor je {tier.toUpperCase()}-abonnement.
-              {unpaidPeriodesCount > 0 && (
-                <p className="mt-2 font-medium">
+              {unpaidPeriodesCount > 0 && <p className="mt-2 font-medium">
                   Je hebt {unpaidPeriodesCount} onbetaalde periodes. Betaal deze uit om ruimte te maken voor nieuwe periodes.
-                </p>
-              )}
+                </p>}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-center gap-2 flex-col sm:flex-row">
-            {unpaidPeriodesCount > 0 ? (
-              <Button 
-                onClick={() => {
-                  setShowLimitDialog(false);
-                  window.location.href = '/team'; // Navigate to team page for payout
-                }}
-                className="w-full sm:w-auto"
-              >
+            {unpaidPeriodesCount > 0 ? <Button onClick={() => {
+            setShowLimitDialog(false);
+            window.location.href = '/team'; // Navigate to team page for payout
+          }} className="w-full sm:w-auto">
                 Ga naar uitbetalen
-              </Button>
-            ) : (
-              <Button 
-                className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white w-full sm:w-auto"
-                onClick={handleUpgrade}
-              >
+              </Button> : <Button className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white w-full sm:w-auto" onClick={handleUpgrade}>
                 <Crown size={16} className="mr-1" /> Upgraden naar PRO
-              </Button>
-            )}
+              </Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -342,16 +279,10 @@ const Periods = () => {
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel>Annuleren</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white"
-              onClick={handleUpgrade}
-            >
+            <AlertDialogAction className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white" onClick={handleUpgrade}>
               <Crown size={16} className="mr-1" /> Upgraden
             </AlertDialogAction>
-            <AlertDialogAction
-              onClick={handleDeletePaidPeriods}
-              className="bg-destructive hover:bg-destructive/90"
-            >
+            <AlertDialogAction onClick={handleDeletePaidPeriods} className="bg-destructive hover:bg-destructive/90">
               <Trash2 size={16} className="mr-1" /> Perioden verwijderen
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -381,10 +312,7 @@ const Periods = () => {
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel>Annuleren</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDeletePaidPeriods}
-              className="bg-destructive hover:bg-destructive/90"
-            >
+            <AlertDialogAction onClick={confirmDeletePaidPeriods} className="bg-destructive hover:bg-destructive/90">
               Ja, verwijder uitbetaalde perioden
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -430,18 +358,11 @@ const Periods = () => {
                     <span className="text-green-500 mr-2">✓</span> Prioriteit support
                   </li>
                 </ul>
-                {tier !== 'pro' ? (
-                  <Button 
-                    onClick={() => doUpgrade('pro')} 
-                    className="w-full bg-[#9b87f5] hover:bg-[#8B5CF6]"
-                  >
+                {tier !== 'pro' ? <Button onClick={() => doUpgrade('pro')} className="w-full bg-[#9b87f5] hover:bg-[#8B5CF6]">
                     Upgrade naar PRO
-                  </Button>
-                ) : (
-                  <Button disabled className="w-full bg-[#9b87f5]/50">
+                  </Button> : <Button disabled className="w-full bg-[#9b87f5]/50">
                     Huidige Abonnement
-                  </Button>
-                )}
+                  </Button>}
               </CardContent>
             </Card>
           </div>
@@ -471,10 +392,7 @@ const Periods = () => {
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel>Annuleren</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDeletePeriod}
-              className="bg-destructive hover:bg-destructive/90"
-            >
+            <AlertDialogAction onClick={confirmDeletePeriod} className="bg-destructive hover:bg-destructive/90">
               Ja, verwijder deze periode
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -497,91 +415,53 @@ const Periods = () => {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="period-name">Naam</Label>
-              <Input 
-                id="period-name" 
-                placeholder="Zomer 2023" 
-                value={editPeriodName}
-                onChange={(e) => setEditPeriodName(e.target.value)}
-              />
+              <Input id="period-name" placeholder="Zomer 2023" value={editPeriodName} onChange={e => setEditPeriodName(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="period-notes">Notities</Label>
-              <Textarea 
-                id="period-notes" 
-                placeholder="Voeg relevante notities toe over deze periode..." 
-                value={editPeriodNotes}
-                onChange={(e) => setEditPeriodNotes(e.target.value)}
-                className="min-h-[120px]"
-              />
+              <Textarea id="period-notes" placeholder="Voeg relevante notities toe over deze periode..." value={editPeriodNotes} onChange={e => setEditPeriodNotes(e.target.value)} className="min-h-[120px]" />
             </div>
           </div>
           <DialogFooter className="sm:justify-center gap-2 flex-col sm:flex-row mt-4">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowEditPeriodDialog(false)}
-            >
+            <Button variant="outline" onClick={() => setShowEditPeriodDialog(false)}>
               Annuleren
             </Button>
-            <Button 
-              onClick={confirmEditPeriod}
-              className="bg-[#9b87f5] hover:bg-[#7E69AB]"
-            >
+            <Button onClick={confirmEditPeriod} className="bg-[#9b87f5] hover:bg-[#7E69AB]">
               Opslaan
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
       
-      {sortedPeriods.length > 0 ? (
-        <div className="space-y-4">
-          {tier === 'basic' && sortedPeriods.length > 3 && (
-            <Card className="border-[#7E69AB]">
+      {sortedPeriods.length > 0 ? <div className="space-y-4">
+          {tier === 'basic' && sortedPeriods.length > 3 && <Card className="border-[#7E69AB]">
               <CardContent className="p-4 flex items-center">
                 <Crown size={20} className="text-[#7E69AB] mr-2" />
                 <p className="text-sm">
                   Upgrade naar <span className="font-medium text-[#7E69AB]">PRO</span> om toegang te krijgen tot meer historische periodes.
                 </p>
               </CardContent>
-            </Card>
-          )}
+            </Card>}
           
-          {sortedPeriods
-            .filter(period => !period.isActive) // Filter out active period since we show it separately at the top
-            .map((period, index) => {
-              const isPeriodHidden = (tier === 'basic' && index >= 3);
-              const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
-              const periodAverageTipPerHour = period.isPaid ? calculateAverageTipPerHour(period.id) : 0;
-              
-              return (
-                <Card 
-                  key={period.id} 
-                  className={isPeriodHidden ? 'opacity-40' : ''}
-                >
+          {sortedPeriods.filter(period => !period.isActive) // Filter out active period since we show it separately at the top
+      .map((period, index) => {
+        const isPeriodHidden = tier === 'basic' && index >= 3;
+        const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
+        const periodAverageTipPerHour = period.isPaid ? calculateAverageTipPerHour(period.id) : 0;
+        return <Card key={period.id} className={isPeriodHidden ? 'opacity-40' : ''}>
                   <CardHeader className="pb-2">
                     <CardTitle className="flex justify-between items-center text-base">
                       <span>
                         {period.name || `Periode ${formatPeriodDate(period.startDate)}`}
                       </span>
                       <div className="flex gap-2">
-                        {period.isPaid && (
-                          <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                        {period.isPaid && <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
                             Uitbetaald
-                          </span>
-                        )}
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-6 w-6 text-muted-foreground hover:text-[#9b87f5]"
-                          onClick={() => handleEditPeriod(period.id)}
-                        >
+                          </span>}
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-[#9b87f5]" onClick={() => handleEditPeriod(period.id)}>
                           <Edit className="h-3.5 w-3.5" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDeletePeriod(period.id)}
-                        >
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => handleDeletePeriod(period.id)}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -594,12 +474,10 @@ const Periods = () => {
                         <span>{formatPeriodDate(period.startDate)}</span>
                       </div>
                       
-                      {period.endDate && (
-                        <div className="flex justify-between">
+                      {period.endDate && <div className="flex justify-between">
                           <span className="text-muted-foreground">Einddatum</span>
                           <span>{formatPeriodDate(period.endDate)}</span>
-                        </div>
-                      )}
+                        </div>}
                     
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Totaal fooi</span>
@@ -613,46 +491,33 @@ const Periods = () => {
                         <span>{period.tips.length}</span>
                       </div>
                     
-                      {period.isPaid && periodAverageTipPerHour > 0 && (
-                        <div className="flex justify-between">
+                      {period.isPaid && periodAverageTipPerHour > 0 && <div className="flex justify-between">
                           <span className="text-muted-foreground flex items-center">
                             <TrendingUp size={14} className="mr-1 text-[#9b87f5]" /> Gem. fooi per uur
                           </span>
                           <span className="text-[#9b87f5] font-medium">
                             €{periodAverageTipPerHour.toFixed(2)}
                           </span>
-                        </div>
-                      )}
+                        </div>}
                       
-                      {period.notes && (
-                        <div className="mt-3 pt-3 border-t">
+                      {period.notes && <div className="mt-3 pt-3 border-t">
                           <div className="flex items-start gap-2">
                             <FileText size={16} className="shrink-0 mt-0.5 text-muted-foreground" />
                             <p className="text-sm text-muted-foreground">{period.notes}</p>
                           </div>
-                        </div>
-                      )}
+                        </div>}
                     </div>
                   </CardContent>
-                </Card>
-              );
-            })}
-        </div>
-      ) : (
-        <Card>
+                </Card>;
+      })}
+        </div> : <Card>
           <CardContent className="p-6 text-center">
             <p className="text-muted-foreground">Nog geen periodes gestart.</p>
-            <Button 
-              onClick={startNewPeriod} 
-              className="mt-4 gold-button"
-            >
+            <Button onClick={startNewPeriod} className="mt-4 gold-button">
               <Plus size={16} className="mr-1" /> Start eerste periode
             </Button>
           </CardContent>
-        </Card>
-      )}
-    </div>
-  );
+        </Card>}
+    </div>;
 };
-
 export default Periods;

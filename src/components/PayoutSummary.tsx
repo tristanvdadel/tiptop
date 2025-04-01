@@ -29,8 +29,10 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       
       mostRecentPayout.distribution.forEach(item => {
         const member = teamMembers.find(m => m.id === item.memberId);
-        initialPayouts[item.memberId] = item.amount;
-        initialBalances[item.memberId] = 0; // Initialize carried balance to 0
+        if (member) {
+          initialPayouts[item.memberId] = item.amount;
+          initialBalances[item.memberId] = member.totalDue ? member.totalDue - item.amount : 0;
+        }
       });
       
       setActualPayouts(initialPayouts);
@@ -91,7 +93,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     const payoutText = `Uitbetaling fooi: ${payoutDate}\n\n` + 
       memberPayouts.map(member => {
         const actualAmount = actualPayouts[member.id] || member.amount;
-        const carriedBalance = member.totalDue - actualAmount;
+        const carriedBalance = balances[member.id] || 0;
         return `${member.name}: €${actualAmount.toFixed(2)}${carriedBalance !== 0 ? ` (€${Math.abs(carriedBalance).toFixed(2)} ${carriedBalance > 0 ? 'meegenomen' : 'teveel betaald'})` : ''}`;
       }).join('\n') +
       `\n\nTotaal: €${Object.values(actualPayouts).reduce((sum, amount) => sum + amount, 0).toFixed(2)}`;
@@ -108,7 +110,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     const headers = "Naam,Bedrag,Saldo\n";
     const rows = memberPayouts.map(member => {
       const actualAmount = actualPayouts[member.id] || member.amount;
-      const carriedBalance = member.totalDue - actualAmount;
+      const carriedBalance = balances[member.id] || 0;
       return `${member.name},${actualAmount.toFixed(2)},${carriedBalance.toFixed(2)}`;
     }).join('\n');
     const csv = headers + rows;
@@ -138,7 +140,6 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
         setActualPayouts(newActualPayouts);
         
         // Calculate new balance (totalDue - actualPayout)
-        // This allows for negative balances if actualPayout > totalDue
         const totalDue = member.totalDue;
         const newBalance = totalDue - amount;
         
@@ -155,7 +156,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     });
     
     // Clear hours for all team members while preserving data for calculations
-    teamMembers.forEach(member => {
+    memberPayouts.forEach(member => {
       clearTeamMemberHours(member.id);
     });
     

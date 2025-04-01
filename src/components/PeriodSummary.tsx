@@ -4,9 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
+import { BarChart2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 const PeriodSummary = () => {
   const { currentPeriod, calculateAverageTipPerHour } = useApp();
+  const navigate = useNavigate();
   
   const totalTip = useMemo(() => {
     if (!currentPeriod) return 0;
@@ -17,6 +21,10 @@ const PeriodSummary = () => {
     // Calculate average tip per hour for all periods
     return calculateAverageTipPerHour();
   }, [calculateAverageTipPerHour]);
+  
+  const handleAnalyticsClick = () => {
+    navigate('/analytics');
+  };
   
   if (!currentPeriod) {
     return (
@@ -48,6 +56,14 @@ const PeriodSummary = () => {
           <div className="mt-4">
             <div className="flex justify-between items-center mb-2">
               <h4 className="text-sm font-medium">Gemiddelde fooi per uur (all-time)</h4>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-6 w-6" 
+                onClick={handleAnalyticsClick}
+              >
+                <BarChart2 size={16} />
+              </Button>
             </div>
             <div className="bg-muted/50 p-3 rounded-md">
               <span className="font-medium text-xl">€{averageTipPerHour.toFixed(2)}</span>

@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -48,17 +49,15 @@ export type PayoutData = {
 };
 
 type TierLimits = {
-  free: {
+  basic: {
     periods: number;
     teamMembers: number;
-  };
-  team: {
-    periods: number;
-    teamMembers: number;
+    hourRegistrationsPerMember: number;
   };
   pro: {
     periods: number;
     teamMembers: number;
+    hourRegistrationsPerMember: number;
   };
 };
 
@@ -67,7 +66,7 @@ type AppContextType = {
   currentPeriod: Period | null;
   periods: Period[];
   teamMembers: TeamMember[];
-  tier: 'free' | 'team' | 'pro';
+  tier: 'basic' | 'pro';
   payouts: PayoutData[];
   
   // Actions
@@ -96,17 +95,15 @@ type AppContextType = {
 };
 
 const tierLimits: TierLimits = {
-  free: {
-    periods: 3,
-    teamMembers: 5,
-  },
-  team: {
+  basic: {
     periods: 7,
     teamMembers: 10,
+    hourRegistrationsPerMember: 7,
   },
   pro: {
     periods: Infinity,
     teamMembers: Infinity,
+    hourRegistrationsPerMember: Infinity,
   },
 };
 
@@ -116,7 +113,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [periods, setPeriods] = useState<Period[]>([]);
   const [currentPeriod, setCurrentPeriod] = useState<Period | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [tier] = useState<'free' | 'team' | 'pro'>('free');
+  const [tier] = useState<'basic' | 'pro'>('basic');
   const [payouts, setPayouts] = useState<PayoutData[]>([]);
   const [mostRecentPayout, setMostRecentPayout] = useState<PayoutData | null>(null);
   const { toast } = useToast();
@@ -219,13 +216,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setTeamMembers(prev => 
       prev.map(member => {
         if (member.id === id) {
+          const existingRegistrations = member.hourRegistrations || [];
+          
+          // Check if member has reached the hourRegistrations limit based on tier
+          if (existingRegistrations.length >= tierLimits[tier].hourRegistrationsPerMember) {
+            toast({
+              title: "Limiet bereikt",
+              description: `Je hebt het maximale aantal urenregistraties (${tierLimits[tier].hourRegistrationsPerMember}) bereikt voor dit teamlid in je huidige abonnement.`,
+            });
+            return member;
+          }
+          
           const newRegistration: HourRegistration = {
             id: generateId(),
             hours,
             date: new Date().toISOString(),
           };
           
-          const existingRegistrations = member.hourRegistrations || [];
           const newRegistrations = [...existingRegistrations, newRegistration];
           const totalHours = newRegistrations.reduce((sum, reg) => sum + reg.hours, 0);
           

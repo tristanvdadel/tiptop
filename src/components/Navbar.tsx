@@ -25,7 +25,7 @@ const Navbar = () => {
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <div className="flex items-center">
           <h1 className="text-2xl font-bold mr-2">TipTop</h1>
-          <span className="badge tier-free text-xs px-2 py-0.5 rounded border">FREE</span>
+          <span className="badge tier-free text-xs px-2 py-0.5 rounded border">BASIC</span>
         </div>
         <Link to="/fast-tip">
           <Button className="gold-button">

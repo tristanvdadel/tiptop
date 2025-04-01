@@ -1,14 +1,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { TeamMember } from '@/contexts/AppContext';
+import { TeamMember, Period } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Separator } from "@/components/ui/separator"
-import { useToast } from "@/hooks/use-toast"
-import { Plus, Trash2 } from 'lucide-react';
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { Plus, Trash2, Check } from 'lucide-react';
 import { PayoutSummary } from '@/components/PayoutSummary';
 import {
   AlertDialog,
@@ -20,56 +20,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const Team = () => {
-  const { teamMembers, addTeamMember, removeTeamMember, updateTeamMemberHours, calculateTipDistribution, markPeriodsAsPaid, currentPeriod, payouts } = useApp();
+  const { teamMembers, addTeamMember, removeTeamMember, updateTeamMemberHours, calculateTipDistribution, markPeriodsAsPaid, currentPeriod, periods, payouts } = useApp();
   const [newMemberName, setNewMemberName] = useState('');
   const [hours, setHours] = useState<{ [key: string]: number }>({});
   const [distribution, setDistribution] = useState<TeamMember[]>([]);
-  const [isCalculating, setIsCalculating] = useState(false);
+  const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
-  const [customDistribution, setCustomDistribution] = useState<{ memberId: string; amount: number; }[]>([]);
   const [showPayoutSummary, setShowPayoutSummary] = useState(false);
-  const { toast } = useToast()
+  const { toast } = useToast();
   
-  const calculateDistribution = useCallback(async () => {
-    setIsCalculating(true);
-    
-    // Delay the calculation to show the loading state
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const calculatedDistribution = calculateTipDistribution();
-    setDistribution(calculatedDistribution);
-    
-    // Initialize custom distribution state
-    // If there's no distribution (possibly because no hours were set), 
-    // create an even distribution among team members
-    let initialCustomDistribution;
-    
-    if (calculatedDistribution.length === 0 && teamMembers.length > 0 && currentPeriod) {
-      const totalTips = currentPeriod.tips.reduce((sum, tip) => sum + tip.amount, 0);
-      const equalShare = teamMembers.length > 0 ? totalTips / teamMembers.length : 0;
-      
-      initialCustomDistribution = teamMembers.map(member => ({
-        memberId: member.id,
-        amount: parseFloat(equalShare.toFixed(2)),
-      }));
-    } else {
-      initialCustomDistribution = calculatedDistribution.map(member => ({
-        memberId: member.id,
-        amount: member.tipAmount || 0,
-      }));
-    }
-    
-    setCustomDistribution(initialCustomDistribution);
-    setIsCalculating(false);
-  }, [calculateTipDistribution, teamMembers, currentPeriod]);
-
   useEffect(() => {
-    calculateDistribution();
-  }, [teamMembers, currentPeriod, calculateDistribution]);
-
+    // Initialize with current period if any
+    if (currentPeriod) {
+      setSelectedPeriods([currentPeriod.id]);
+    }
+  }, [currentPeriod]);
+  
   const handleAddMember = () => {
     if (newMemberName.trim() !== '') {
       addTeamMember(newMemberName);
@@ -89,35 +59,92 @@ const Team = () => {
     updateTeamMemberHours(id, value);
   };
   
-  const handlePartialAmountChange = (memberId: string, amount: number) => {
-    const updatedDistribution = [...customDistribution];
-    const index = updatedDistribution.findIndex(item => item.memberId === memberId);
-    
-    if (index !== -1) {
-      updatedDistribution[index].amount = amount;
-      setCustomDistribution(updatedDistribution);
-    }
+  const togglePeriodSelection = (periodId: string) => {
+    setSelectedPeriods(prev => {
+      if (prev.includes(periodId)) {
+        return prev.filter(id => id !== periodId);
+      } else {
+        return [...prev, periodId];
+      }
+    });
   };
+  
+  // Calculate distribution based on selected periods
+  const calculateDistributionForSelectedPeriods = useCallback(() => {
+    if (selectedPeriods.length === 0 || teamMembers.length === 0) {
+      setDistribution([]);
+      return;
+    }
+    
+    const calculatedDistribution = calculateTipDistribution(selectedPeriods);
+    setDistribution(calculatedDistribution);
+  }, [selectedPeriods, calculateTipDistribution, teamMembers.length]);
+
+  // Recalculate distribution when selected periods change
+  useEffect(() => {
+    calculateDistributionForSelectedPeriods();
+  }, [selectedPeriods, calculateDistributionForSelectedPeriods]);
 
   const handlePayout = () => {
-    if (currentPeriod) {
-      const totalDistributedAmount = customDistribution.reduce((sum, item) => sum + item.amount, 0);
-      const totalTipAmount = currentPeriod.tips.reduce((sum, tip) => sum + tip.amount, 0);
-      
-      if (totalDistributedAmount > totalTipAmount) {
-        toast({
-          title: "Fout",
-          description: "Het totale uit te betalen bedrag is hoger dan de totale fooi.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      markPeriodsAsPaid([currentPeriod.id], customDistribution);
-      setIsPayoutModalOpen(false);
-      setShowPayoutSummary(true);
+    if (selectedPeriods.length === 0) {
+      toast({
+        title: "Selecteer perioden",
+        description: "Selecteer minimaal één periode voor uitbetaling.",
+        variant: "destructive",
+      });
+      return;
     }
+    
+    let customDistribution;
+    
+    // If there's a valid distribution, use it
+    if (distribution.length > 0) {
+      customDistribution = distribution.map(member => ({
+        memberId: member.id,
+        amount: member.tipAmount || 0,
+      }));
+    } 
+    // If there's no distribution but we have team members, create equal distribution
+    else if (teamMembers.length > 0) {
+      // Calculate total tips from selected periods
+      const totalTips = selectedPeriods.reduce((sum, periodId) => {
+        const period = periods.find(p => p.id === periodId);
+        if (period) {
+          return sum + period.tips.reduce((s, tip) => s + tip.amount, 0);
+        }
+        return sum;
+      }, 0);
+      
+      const equalShare = teamMembers.length > 0 ? totalTips / teamMembers.length : 0;
+      
+      customDistribution = teamMembers.map(member => ({
+        memberId: member.id,
+        amount: parseFloat(equalShare.toFixed(2)),
+      }));
+    } else {
+      toast({
+        title: "Geen teamleden",
+        description: "Er zijn geen teamleden om aan uit te betalen.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    markPeriodsAsPaid(selectedPeriods, customDistribution);
+    setIsPayoutModalOpen(false);
+    setShowPayoutSummary(true);
   };
+
+  // Get unpaid periods that can be selected for payout
+  const unpaidPeriods = periods.filter(period => !period.isPaid && !period.isActive);
+  
+  // Check if current period can be included (active but has tips)
+  const canIncludeCurrentPeriod = currentPeriod && currentPeriod.tips.length > 0;
+  
+  // All periods that can be selected for payout
+  const availablePeriods = canIncludeCurrentPeriod 
+    ? [...unpaidPeriods, currentPeriod] 
+    : unpaidPeriods;
 
   if (showPayoutSummary) {
     return <PayoutSummary onClose={() => setShowPayoutSummary(false)} />;
@@ -188,44 +215,75 @@ const Team = () => {
         ))}
       </div>
       
-      <div className="mb-6">
-        <h2 className="text-lg font-medium mb-2">Fooi verdeling</h2>
-        {isCalculating ? (
-          <p>Bezig met berekenen...</p>
-        ) : (
-          <>
-            {teamMembers.length > 0 && currentPeriod ? (
-              <Card>
-                <CardContent className="p-4">
-                  <ul>
-                    {teamMembers.map((member) => (
-                      <li key={member.id} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-b-0">
-                        <div>
-                          {member.name}
-                        </div>
-                        <div className="flex items-center">
-                          <div className="mr-2">€</div>
-                          <Input
-                            type="number"
-                            className="w-24 text-right"
-                            value={customDistribution.find(item => item.memberId === member.id)?.amount || 0}
-                            onChange={(e) => handlePartialAmountChange(member.id, parseFloat(e.target.value))}
-                          />
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            ) : (
-              <p>Geen teamleden of actieve periode gevonden.</p>
-            )}
-          </>
-        )}
-      </div>
+      {availablePeriods.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-medium mb-2">Selecteer perioden om uit te betalen</h2>
+          <Card>
+            <CardContent className="p-4">
+              <ul className="space-y-2">
+                {availablePeriods.map((period) => {
+                  const periodName = period.name || (period.isActive ? "Huidige periode" : `Periode ${new Date(period.startDate).toLocaleDateString()}`);
+                  const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
+                  
+                  return (
+                    <li key={period.id} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`period-${period.id}`} 
+                        checked={selectedPeriods.includes(period.id)}
+                        onCheckedChange={() => togglePeriodSelection(period.id)}
+                      />
+                      <Label 
+                        htmlFor={`period-${period.id}`}
+                        className="flex-1 cursor-pointer flex justify-between"
+                      >
+                        <span>{periodName}</span>
+                        <span className="font-medium">€{totalTips.toFixed(2)}</span>
+                      </Label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       
-      {currentPeriod && !currentPeriod.isPaid && (
-        <Button className="gold-button" onClick={() => setIsPayoutModalOpen(true)}>
+      {selectedPeriods.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-medium mb-2">Fooi verdeling</h2>
+          <Card>
+            <CardContent className="p-4">
+              {distribution.length > 0 ? (
+                <ul>
+                  {distribution.map((member) => (
+                    <li key={member.id} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-b-0">
+                      <div>
+                        {member.name}
+                      </div>
+                      <div className="font-medium">
+                        €{member.tipAmount?.toFixed(2) || '0.00'}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>
+                  {teamMembers.length === 0 
+                    ? "Geen teamleden gevonden." 
+                    : "Geen uren ingesteld om verdeling te berekenen. Een gelijke verdeling zal worden toegepast."}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      
+      {availablePeriods.length > 0 && (
+        <Button 
+          className="gold-button" 
+          onClick={() => setIsPayoutModalOpen(true)}
+          disabled={selectedPeriods.length === 0}
+        >
           Markeer als uitbetaald
         </Button>
       )}
@@ -235,7 +293,7 @@ const Team = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
             <AlertDialogDescription>
-              De huidige periode wordt gemarkeerd als uitbetaald.
+              De geselecteerde perioden worden gemarkeerd als uitbetaald.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

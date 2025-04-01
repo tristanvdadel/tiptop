@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { PrinterIcon, ClipboardList, FileCheck, ArrowLeft, Download, Save } from 'lucide-react';
+import { PrinterIcon, ClipboardList, FileCheck, ArrowLeft, Download, Save, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Link } from 'react-router-dom';
 
 type PayoutSummaryProps = {
   onClose: () => void;
@@ -21,6 +22,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   const [actualPayouts, setActualPayouts] = useState<{[key: string]: number}>({});
   const [balances, setBalances] = useState<{[key: string]: number}>({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
   
   useEffect(() => {
     if (mostRecentPayout) {
@@ -31,7 +33,10 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
         const member = teamMembers.find(m => m.id === item.memberId);
         if (member) {
           initialPayouts[item.memberId] = item.amount;
-          initialBalances[item.memberId] = member.totalDue ? member.totalDue - item.amount : 0;
+          // Calculate initial balance based on member's calculated tip amount minus the actual payout
+          // Use the tipAmount or 0 if it doesn't exist
+          const calculatedAmount = member.tipAmount || 0;
+          initialBalances[item.memberId] = calculatedAmount - item.amount;
         }
       });
       
@@ -139,8 +144,10 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
         const newActualPayouts = { ...actualPayouts, [memberId]: amount };
         setActualPayouts(newActualPayouts);
         
-        // Calculate new balance (totalDue - actualPayout)
-        const totalDue = member.totalDue;
+        // Calculate new balance based on total amount due minus actual payout
+        const existingBalance = member.existingBalance || 0;
+        const calculatedAmount = member.amount || 0;
+        const totalDue = calculatedAmount + existingBalance;
         const newBalance = totalDue - amount;
         
         setBalances({ ...balances, [memberId]: newBalance });

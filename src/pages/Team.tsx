@@ -3,11 +3,11 @@ import { useApp } from '@/contexts/AppContext';
 import { TeamMember, Period, HourRegistration } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Check, Clock, Calendar, PlusCircle, MinusCircle } from 'lucide-react';
+import { Plus, Trash2, Check, Clock, Calendar, PlusCircle, MinusCircle, Receipt } from 'lucide-react';
 import { PayoutSummary } from '@/components/PayoutSummary';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -203,6 +203,26 @@ const Team = () => {
       : 'text-red-600';
   };
 
+  const calculateTotalTipsAndHours = useCallback(() => {
+    if (selectedPeriods.length === 0) {
+      return { totalTips: 0, totalHours: 0 };
+    }
+
+    const totalTips = selectedPeriods.reduce((sum, periodId) => {
+      const period = periods.find(p => p.id === periodId);
+      if (period) {
+        return sum + period.tips.reduce((s, tip) => s + tip.amount, 0);
+      }
+      return sum;
+    }, 0);
+
+    const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+
+    return { totalTips, totalHours };
+  }, [selectedPeriods, periods, teamMembers]);
+
+  const { totalTips, totalHours } = calculateTotalTipsAndHours();
+
   if (showPayoutSummary) {
     return <PayoutSummary onClose={() => setShowPayoutSummary(false)} />;
   }
@@ -392,27 +412,59 @@ const Team = () => {
       
       {selectedPeriods.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-lg font-medium mb-2">Fooi verdeling</h2>
+          <h2 className="text-lg font-medium mb-2 flex items-center">
+            <Receipt className="h-5 w-5 mr-2" />
+            Fooi verdeling
+          </h2>
           <Card>
+            <CardHeader className="pb-2 border-b">
+              <CardTitle className="flex justify-between text-sm font-medium text-muted-foreground">
+                <span>Overzicht</span>
+                <span>Totaal: €{totalTips.toFixed(2)} | Uren: {totalHours}</span>
+              </CardTitle>
+            </CardHeader>
             <CardContent className="p-4">
               {distribution.length > 0 ? (
-                <ul>
-                  {distribution.map((member) => (
-                    <li key={member.id} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-b-0">
-                      <div className="flex items-center">
-                        <span>{member.name}</span>
-                        {member.balance !== undefined && member.balance !== 0 && (
-                          <span className={`ml-2 text-sm ${getBalanceClass(member.balance)}`}>
-                            {formatBalance(member.balance)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="font-medium">
-                        €{member.tipAmount?.toFixed(2) || '0.00'}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <div className="space-y-4">
+                  <div className="flex justify-between text-xs text-muted-foreground border-b pb-2">
+                    <div>Teamlid</div>
+                    <div className="flex space-x-6">
+                      <div className="w-16 text-right">Uren</div>
+                      <div className="w-16 text-right">Saldo</div>
+                      <div className="w-20 text-right">Uitbetaling</div>
+                    </div>
+                  </div>
+                  
+                  <ul className="space-y-2">
+                    {distribution.map((member) => (
+                      <li key={member.id} className="flex justify-between items-center py-1">
+                        <div className="font-medium">{member.name}</div>
+                        <div className="flex space-x-6">
+                          <div className="w-16 text-right text-gray-600">{member.hours}</div>
+                          <div className={`w-16 text-right ${getBalanceClass(member.balance)}`}>
+                            {member.balance !== undefined && member.balance !== 0 ? 
+                              formatBalance(member.balance) : 
+                              '€0.00'}
+                          </div>
+                          <div className="w-20 text-right font-medium">
+                            €{member.tipAmount?.toFixed(2) || '0.00'}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  
+                  <div className="border-t pt-3 mt-3">
+                    <div className="flex justify-between font-medium">
+                      <span>Fooi per uur</span>
+                      <span>€{totalHours > 0 ? (totalTips / totalHours).toFixed(2) : '0.00'}</span>
+                    </div>
+                    <div className="flex justify-between font-medium text-lg mt-2">
+                      <span>Totaal</span>
+                      <span>€{distribution.reduce((sum, member) => sum + (member.tipAmount || 0), 0).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <p>
                   {teamMembers.length === 0 

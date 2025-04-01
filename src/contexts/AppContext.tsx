@@ -460,8 +460,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const totalHours = teamMembers.reduce((sum, member) => {
       const currentHours = member.hours;
       
-      const savedHours = member.savedHourRegistrations 
-        ? member.savedHourRegistrations.reduce((s, reg) => s + reg.hours, 0) 
+      const savedHours = member.hourRegistrations 
+        ? member.hourRegistrations.reduce((s, reg) => s + reg.hours, 0) 
         : 0;
       
       return sum + currentHours + savedHours;

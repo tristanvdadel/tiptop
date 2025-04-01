@@ -16,7 +16,7 @@ const Navbar = () => {
       to: '/analytics', 
       icon: <BarChart size={20} />, 
       label: 'Analyse', 
-      isPro: true 
+      isPro: false  // Changed from true to false to make it appear as regular item
     },
   ];
 
@@ -43,8 +43,8 @@ const Navbar = () => {
                 "flex flex-col items-center py-2 px-4 text-xs",
                 location.pathname === item.to
                   ? "text-foreground font-medium"
-                  : "text-muted-foreground",
-                item.isPro && "opacity-50 text-tier-pro"
+                  : "text-muted-foreground"
+                // Removed the conditional styling for Pro items
               )}
             >
               {item.icon}

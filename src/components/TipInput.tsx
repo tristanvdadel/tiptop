@@ -103,6 +103,20 @@ const TipInput = () => {
             />
           </div>
           
+          <div className="flex space-x-2 mb-4 overflow-x-auto py-1">
+            {presets.map((preset) => (
+              <Button
+                key={preset}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handlePresetClick(preset)}
+              >
+                €{preset}
+              </Button>
+            ))}
+          </div>
+          
           <div className="mb-4">
             <Popover>
               <PopoverTrigger asChild>
@@ -133,20 +147,6 @@ const TipInput = () => {
                 Deze datum valt buiten de huidige periode.
               </p>
             )}
-          </div>
-          
-          <div className="flex space-x-2 mb-4 overflow-x-auto py-1">
-            {presets.map((preset) => (
-              <Button
-                key={preset}
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handlePresetClick(preset)}
-              >
-                €{preset}
-              </Button>
-            ))}
           </div>
           
           {showNote ? (

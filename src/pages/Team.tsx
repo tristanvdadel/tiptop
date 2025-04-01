@@ -38,10 +38,8 @@ const Team = () => {
   const { toast } = useToast();
   
   useEffect(() => {
-    if (currentPeriod) {
-      setSelectedPeriods([currentPeriod.id]);
-    }
-  }, [currentPeriod]);
+    setSelectedPeriods([]);
+  }, []);
   
   useEffect(() => {
     const initialHours: { [key: string]: string } = {};
@@ -181,11 +179,7 @@ const Team = () => {
 
   const unpaidPeriods = periods.filter(period => !period.isPaid && !period.isActive);
   
-  const canIncludeCurrentPeriod = currentPeriod && currentPeriod.tips.length > 0;
-  
-  const availablePeriods = canIncludeCurrentPeriod 
-    ? [...unpaidPeriods, currentPeriod] 
-    : unpaidPeriods;
+  const availablePeriods = unpaidPeriods;
 
   const formatBalance = (balance?: number): string => {
     if (balance === undefined || balance === 0) return '';
@@ -379,7 +373,7 @@ const Team = () => {
       
       {availablePeriods.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-lg font-medium mb-2">Selecteer perioden om uit te betalen</h2>
+          <h2 className="text-lg font-medium mb-2">Selecteer afgeronde perioden om uit te betalen</h2>
           <Card>
             <CardContent className="p-4">
               <ul className="space-y-2">

@@ -1,13 +1,7 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Crown, BarChart } from 'lucide-react';
+import { Crown } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
-import { 
-  ChartContainer, 
-  ChartTooltip, 
-  ChartTooltipContent 
-} from '@/components/ui/chart';
 import {
   BarChart as RechartsBarChart,
   Bar,
@@ -42,21 +36,6 @@ const Analytics = () => {
     });
   }, [periods, calculateAverageTipPerHour]);
 
-  const renderProOverlay = () => (
-    <div className="absolute inset-0 flex items-center justify-center z-10 bg-background/60 backdrop-blur-sm rounded-lg">
-      <div className="text-center p-4">
-        <Crown size={36} className="mx-auto mb-2 text-tier-pro" />
-        <h2 className="text-lg font-medium mb-1">PRO-functie</h2>
-        <p className="text-muted-foreground mb-3 text-sm max-w-md">
-          Upgrade om toegang te krijgen tot geavanceerde statistieken en grafieken.
-        </p>
-        <Button className="bg-tier-pro hover:bg-tier-pro/90 text-white text-sm h-8 px-3">
-          Upgraden naar PRO
-        </Button>
-      </div>
-    </div>
-  );
-  
   if (tier !== 'pro') {
     return (
       <div className="space-y-4">
@@ -91,9 +70,20 @@ const Analytics = () => {
               </div>
             </CardContent>
           </Card>
-          {renderProOverlay()}
+          <div className="absolute inset-0 flex items-center justify-center z-10 bg-background/60 backdrop-blur-sm rounded-lg">
+            <div className="text-center p-4">
+              <Crown size={36} className="mx-auto mb-2 text-tier-pro" />
+              <h2 className="text-lg font-medium mb-1">PRO-functie</h2>
+              <p className="text-muted-foreground mb-3 text-sm max-w-md">
+                Upgrade om toegang te krijgen tot geavanceerde statistieken en grafieken.
+              </p>
+              <Button className="bg-tier-pro hover:bg-tier-pro/90 text-white text-sm h-8 px-3">
+                Upgraden naar PRO
+              </Button>
+            </div>
+          </div>
         </div>
-        
+
         <div className="relative">
           <Card className="filter blur-[2px]">
             <CardHeader className="pb-2 pt-4">
@@ -119,7 +109,6 @@ const Analytics = () => {
               </div>
             </CardContent>
           </Card>
-          {renderProOverlay()}
         </div>
       </div>
     );

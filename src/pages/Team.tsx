@@ -43,14 +43,28 @@ const Team = () => {
     setDistribution(calculatedDistribution);
     
     // Initialize custom distribution state
-    const initialCustomDistribution = calculatedDistribution.map(member => ({
-      memberId: member.id,
-      amount: member.tipAmount || 0,
-    }));
-    setCustomDistribution(initialCustomDistribution);
+    // If there's no distribution (possibly because no hours were set), 
+    // create an even distribution among team members
+    let initialCustomDistribution;
     
+    if (calculatedDistribution.length === 0 && teamMembers.length > 0 && currentPeriod) {
+      const totalTips = currentPeriod.tips.reduce((sum, tip) => sum + tip.amount, 0);
+      const equalShare = teamMembers.length > 0 ? totalTips / teamMembers.length : 0;
+      
+      initialCustomDistribution = teamMembers.map(member => ({
+        memberId: member.id,
+        amount: parseFloat(equalShare.toFixed(2)),
+      }));
+    } else {
+      initialCustomDistribution = calculatedDistribution.map(member => ({
+        memberId: member.id,
+        amount: member.tipAmount || 0,
+      }));
+    }
+    
+    setCustomDistribution(initialCustomDistribution);
     setIsCalculating(false);
-  }, [calculateTipDistribution]);
+  }, [calculateTipDistribution, teamMembers, currentPeriod]);
 
   useEffect(() => {
     calculateDistribution();
@@ -180,11 +194,11 @@ const Team = () => {
           <p>Bezig met berekenen...</p>
         ) : (
           <>
-            {distribution.length > 0 ? (
+            {teamMembers.length > 0 && currentPeriod ? (
               <Card>
                 <CardContent className="p-4">
                   <ul>
-                    {distribution.map((member) => (
+                    {teamMembers.map((member) => (
                       <li key={member.id} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-b-0">
                         <div>
                           {member.name}

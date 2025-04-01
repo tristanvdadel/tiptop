@@ -67,7 +67,7 @@ const Periods = () => {
     return format(new Date(date), 'd MMMM yyyy', { locale: nl });
   };
   
-  const tierPeriodLimit = tier === 'free' ? 3 : tier === 'team' ? 7 : Infinity;
+  const tierPeriodLimit = tier === 'basic' ? 7 : Infinity;
   const unpaidPeriodsCount = getUnpaidPeriodsCount();
   const paidPeriodsCount = periods.filter(p => p.isPaid).length;
   const averageTipPerHour = calculateAverageTipPerHour();
@@ -115,7 +115,7 @@ const Periods = () => {
     setShowLimitDialog(false);
   };
   
-  const doUpgrade = (newTier: 'team' | 'pro') => {
+  const doUpgrade = (newTier: 'pro') => {
     toast({
       title: `Upgraden naar ${newTier.toUpperCase()}`,
       description: `Je account is succesvol geüpgraded naar ${newTier.toUpperCase()}.`,
@@ -183,7 +183,7 @@ const Periods = () => {
         <h1 className="text-2xl font-bold">Periodes</h1>
         <div className="flex items-center gap-2">
           <Badge className="tier-free">
-            {periods.length}/{tierPeriodLimit} perioden
+            {periods.length}/{tier === 'basic' ? '7' : 'totaal'}
           </Badge>
           <Button 
             onClick={handleStartNewPeriod} 
@@ -305,7 +305,7 @@ const Periods = () => {
                 className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white w-full sm:w-auto"
                 onClick={handleUpgrade}
               >
-                <Crown size={16} className="mr-1" /> Upgraden naar {tier === 'free' ? 'TEAM' : 'PRO'}
+                <Crown size={16} className="mr-1" /> Upgraden naar PRO
               </Button>
             )}
           </DialogFooter>
@@ -403,43 +403,7 @@ const Periods = () => {
           </DialogHeader>
           
           <div className="space-y-4">
-            <Card className={`border-[#7E69AB] ${tier === 'free' ? 'bg-[#9b87f5]/5' : ''}`}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex justify-between items-center">
-                  <span className="flex items-center">
-                    <Crown size={18} className="text-[#7E69AB] mr-2" /> TEAM
-                  </span>
-                  <span className="text-base font-normal">€9,99/maand</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm mb-4">
-                  <li className="flex items-start">
-                    <span className="text-green-500 mr-2">✓</span> 7 perioden opslaan
-                  </li>
-                  <li className="flex items-start">
-                    <span className="text-green-500 mr-2">✓</span> 10 teamleden
-                  </li>
-                  <li className="flex items-start">
-                    <span className="text-green-500 mr-2">✓</span> Meer statistieken
-                  </li>
-                </ul>
-                {tier === 'free' ? (
-                  <Button 
-                    onClick={() => doUpgrade('team')} 
-                    className="w-full bg-[#7E69AB] hover:bg-[#6E59A5]"
-                  >
-                    Upgrade naar TEAM
-                  </Button>
-                ) : (
-                  <Button disabled className="w-full bg-[#7E69AB]/50">
-                    Huidige Abonnement
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-            
-            <Card className={`border-[#9b87f5] ${tier === 'team' ? 'bg-[#9b87f5]/5' : ''}`}>
+            <Card className={`border-[#9b87f5] ${tier !== 'pro' ? 'bg-[#9b87f5]/5' : ''}`}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex justify-between items-center">
                   <span className="flex items-center">
@@ -567,12 +531,12 @@ const Periods = () => {
       
       {sortedPeriods.length > 0 ? (
         <div className="space-y-4">
-          {tier === 'free' && sortedPeriods.length > 3 && (
+          {tier === 'basic' && sortedPeriods.length > 3 && (
             <Card className="border-[#7E69AB]">
               <CardContent className="p-4 flex items-center">
                 <Crown size={20} className="text-[#7E69AB] mr-2" />
                 <p className="text-sm">
-                  Upgrade naar <span className="font-medium text-[#7E69AB]">TEAM</span> om toegang te krijgen tot meer historische periodes.
+                  Upgrade naar <span className="font-medium text-[#7E69AB]">PRO</span> om toegang te krijgen tot meer historische periodes.
                 </p>
               </CardContent>
             </Card>
@@ -581,7 +545,7 @@ const Periods = () => {
           {sortedPeriods
             .filter(period => !period.isActive) // Filter out active period since we show it separately at the top
             .map((period, index) => {
-              const isPeriodHidden = (tier === 'free' && index >= 3) || (tier === 'team' && index >= 7);
+              const isPeriodHidden = (tier === 'basic' && index >= 3) || (tier === 'team' && index >= 7);
               const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
               const periodAverageTipPerHour = period.isPaid ? calculateAverageTipPerHour(period.id) : 0;
               

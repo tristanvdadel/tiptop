@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { TeamMember } from '@/contexts/AppContext';
@@ -8,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { Plus, Trash2 } from 'lucide-react';
+import { PayoutSummary } from '@/components/PayoutSummary';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +30,7 @@ const Team = () => {
   const [isCalculating, setIsCalculating] = useState(false);
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
   const [customDistribution, setCustomDistribution] = useState<{ memberId: string; amount: number; }[]>([]);
+  const [showPayoutSummary, setShowPayoutSummary] = useState(false);
   const { toast } = useToast()
   
   const calculateDistribution = useCallback(async () => {
@@ -98,8 +101,13 @@ const Team = () => {
       
       markPeriodsAsPaid([currentPeriod.id], customDistribution);
       setIsPayoutModalOpen(false);
+      setShowPayoutSummary(true);
     }
   };
+
+  if (showPayoutSummary) {
+    return <PayoutSummary onClose={() => setShowPayoutSummary(false)} />;
+  }
 
   return (
     <div>

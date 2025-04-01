@@ -314,7 +314,12 @@ const Team = () => {
                         </Button>
                         <Collapsible className="flex-1">
                           <CollapsibleTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={() => toggleMemberDetails(member.id)}
+                            >
                               {openMemberDetails[member.id] ? 
                                 <ChevronUp size={16} /> : 
                                 <ChevronDown size={16} />
@@ -360,47 +365,49 @@ const Team = () => {
       )}
 
       {teamMembers.map((member) => (
-        <CollapsibleContent key={`content-${member.id}`} open={openMemberDetails[member.id]}>
-          <Card className="mb-4 border-t-0 rounded-t-none">
-            <CardContent className="p-4">
-              {member.hourRegistrations && member.hourRegistrations.length > 0 ? (
-                <div>
-                  <h3 className="text-sm font-medium mb-2 flex items-center">
-                    <Clock className="h-4 w-4 mr-2" />
-                    Uren geschiedenis voor {member.name}
-                  </h3>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {member.hourRegistrations.map((registration: HourRegistration) => (
-                      <div 
-                        key={registration.id} 
-                        className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50"
-                      >
-                        <div className="flex items-center">
-                          <span className="font-medium">{registration.hours} uren</span>
-                          <span className="mx-2 text-gray-400">•</span>
-                          <span className="text-xs text-gray-500 flex items-center">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            {formatDate(registration.date)}
-                          </span>
-                        </div>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleDeleteRegistration(member.id, registration.id)}
-                          className="h-7 w-7 text-gray-500 hover:text-red-500"
+        <Collapsible key={`collapsible-${member.id}`} open={openMemberDetails[member.id]}>
+          <CollapsibleContent>
+            <Card className="mb-4 border-t-0 rounded-t-none">
+              <CardContent className="p-4">
+                {member.hourRegistrations && member.hourRegistrations.length > 0 ? (
+                  <div>
+                    <h3 className="text-sm font-medium mb-2 flex items-center">
+                      <Clock className="h-4 w-4 mr-2" />
+                      Uren geschiedenis voor {member.name}
+                    </h3>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {member.hourRegistrations.map((registration: HourRegistration) => (
+                        <div 
+                          key={registration.id} 
+                          className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50"
                         >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
+                          <div className="flex items-center">
+                            <span className="font-medium">{registration.hours} uren</span>
+                            <span className="mx-2 text-gray-400">•</span>
+                            <span className="text-xs text-gray-500 flex items-center">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {formatDate(registration.date)}
+                            </span>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDeleteRegistration(member.id, registration.id)}
+                            className="h-7 w-7 text-gray-500 hover:text-red-500"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">Geen uren historie beschikbaar</p>
-              )}
-            </CardContent>
-          </Card>
-        </CollapsibleContent>
+                ) : (
+                  <p className="text-sm text-gray-500">Geen uren historie beschikbaar</p>
+                )}
+              </CardContent>
+            </Card>
+          </CollapsibleContent>
+        </Collapsible>
       ))}
       
       {availablePeriods.length > 0 && (

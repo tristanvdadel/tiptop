@@ -6,82 +6,82 @@
 @layer base {
   :root {
     --background: 0 0% 98%;
-    --foreground: 250 10% 15%;
+    --foreground: 0 0% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 250 10% 15%;
+    --card-foreground: 0 0% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 250 10% 15%;
+    --popover-foreground: 0 0% 10%;
 
-    --primary: 250 60% 45%;
+    --primary: 0 0% 10%;
     --primary-foreground: 0 0% 98%;
 
-    --secondary: 15 80% 95%;
-    --secondary-foreground: 15 80% 40%;
+    --secondary: 0 0% 93%;
+    --secondary-foreground: 0 0% 10%;
 
-    --muted: 250 10% 93%;
-    --muted-foreground: 250 10% 40%;
+    --muted: 0 0% 93%;
+    --muted-foreground: 0 0% 40%;
 
-    --accent: 35 90% 65%;
-    --accent-foreground: 35 80% 20%;
+    --accent: 0 0% 93%;
+    --accent-foreground: 0 0% 10%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 250 10% 90%;
-    --input: 250 10% 90%;
-    --ring: 250 10% 70%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 0% 70%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 250 60% 97%;
-    --sidebar-foreground: 250 30% 30%;
-    --sidebar-primary: 250 60% 45%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 0 0% 30%;
+    --sidebar-primary: 0 0% 10%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 250 60% 95%;
-    --sidebar-accent-foreground: 250 60% 25%;
-    --sidebar-border: 250 10% 90%;
-    --sidebar-ring: 250 10% 70%;
+    --sidebar-accent: 0 0% 95%;
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-border: 0 0% 90%;
+    --sidebar-ring: 0 0% 70%;
   }
 
   .dark {
-    --background: 250 20% 10%;
+    --background: 0 0% 10%;
     --foreground: 0 0% 98%;
 
-    --card: 250 20% 15%;
+    --card: 0 0% 15%;
     --card-foreground: 0 0% 98%;
 
-    --popover: 250 20% 15%;
+    --popover: 0 0% 15%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 250 60% 60%;
+    --primary: 0 0% 98%;
     --primary-foreground: 0 0% 10%;
 
-    --secondary: 15 60% 20%;
-    --secondary-foreground: 15 70% 90%;
+    --secondary: 0 0% 20%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 250 20% 20%;
-    --muted-foreground: 250 10% 60%;
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 60%;
 
-    --accent: 35 80% 50%;
+    --accent: 0 0% 20%;
     --accent-foreground: 0 0% 98%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 250 20% 20%;
-    --input: 250 20% 20%;
-    --ring: 250 20% 30%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 0% 30%;
 
-    --sidebar-background: 250 20% 15%;
-    --sidebar-foreground: 250 10% 80%;
-    --sidebar-primary: 250 60% 60%;
+    --sidebar-background: 0 0% 15%;
+    --sidebar-foreground: 0 0% 80%;
+    --sidebar-primary: 0 0% 98%;
     --sidebar-primary-foreground: 0 0% 10%;
-    --sidebar-accent: 250 20% 20%;
+    --sidebar-accent: 0 0% 20%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 250 20% 20%;
-    --sidebar-ring: 250 20% 30%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 0 0% 30%;
   }
 }
 
@@ -101,23 +101,15 @@
   }
   
   .tier-free {
-    @apply text-blue-600 border-blue-600;
+    @apply text-tier-free border-tier-free;
   }
   
   .tier-team {
-    @apply text-orange-500 border-orange-500;
+    @apply text-tier-team border-tier-team;
   }
   
   .tier-pro {
-    @apply text-emerald-500 border-emerald-500;
-  }
-  
-  .glass-card {
-    @apply bg-white/80 backdrop-blur-sm border border-white/20 shadow-lg;
-  }
-  
-  .vibrant-gradient {
-    @apply bg-gradient-to-r from-primary/90 via-purple-500/80 to-pink-500/90 text-white shadow-lg hover:shadow-primary/20 transition-all;
+    @apply text-tier-pro border-tier-pro;
   }
 }
 
@@ -132,24 +124,4 @@
 
 .animate-pulse-subtle {
   animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes shine {
-  to {
-    background-position: 200% center;
-  }
-}
-
-.animate-shine {
-  background: linear-gradient(90deg, 
-    rgba(255,255,255,0) 0%, 
-    rgba(255,255,255,0.8) 50%, 
-    rgba(255,255,255,0) 100%
-  );
-  background-size: 200% 100%;
-  animation: shine 3s infinite;
-}
-
-.card-hover {
-  @apply transition duration-300 hover:shadow-lg hover:-translate-y-1;
 }

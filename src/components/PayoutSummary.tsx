@@ -29,7 +29,6 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       
       mostRecentPayout.distribution.forEach(item => {
         const member = teamMembers.find(m => m.id === item.memberId);
-        const existingBalance = member?.balance || 0;
         initialPayouts[item.memberId] = item.amount;
         initialBalances[item.memberId] = 0; // Initialize carried balance to 0
       });
@@ -93,7 +92,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       memberPayouts.map(member => {
         const actualAmount = actualPayouts[member.id] || member.amount;
         const carriedBalance = member.totalDue - actualAmount;
-        return `${member.name}: €${actualAmount.toFixed(2)}${carriedBalance > 0 ? ` (€${carriedBalance.toFixed(2)} meegenomen)` : ''}`;
+        return `${member.name}: €${actualAmount.toFixed(2)}${carriedBalance !== 0 ? ` (€${Math.abs(carriedBalance).toFixed(2)} ${carriedBalance > 0 ? 'meegenomen' : 'teveel betaald'})` : ''}`;
       }).join('\n') +
       `\n\nTotaal: €${Object.values(actualPayouts).reduce((sum, amount) => sum + amount, 0).toFixed(2)}`;
     
@@ -106,7 +105,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   };
   
   const handleDownloadCSV = () => {
-    const headers = "Naam,Bedrag,Meegenomen saldo\n";
+    const headers = "Naam,Bedrag,Saldo\n";
     const rows = memberPayouts.map(member => {
       const actualAmount = actualPayouts[member.id] || member.amount;
       const carriedBalance = member.totalDue - actualAmount;
@@ -139,6 +138,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
         setActualPayouts(newActualPayouts);
         
         // Calculate new balance (totalDue - actualPayout)
+        // This allows for negative balances if actualPayout > totalDue
         const totalDue = member.totalDue;
         const newBalance = totalDue - amount;
         
@@ -156,10 +156,21 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     
     toast({
       title: "Saldi opgeslagen",
-      description: "De aangepaste uitbetaling en meegenomen saldi zijn opgeslagen.",
+      description: "De aangepaste uitbetaling en saldi zijn opgeslagen.",
     });
     
     setHasChanges(false);
+  };
+  
+  // Function to get proper display for the balance text
+  const getBalanceText = (balance: number) => {
+    if (balance === 0) return "";
+    
+    if (balance > 0) {
+      return `€${balance.toFixed(2)} meegenomen`;
+    } else {
+      return `€${Math.abs(balance).toFixed(2)} teveel betaald`;
+    }
   };
   
   return (
@@ -220,7 +231,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
                       <span>Te betalen: €{member.totalDue.toFixed(2)}</span>
                     </div>
                     
-                    {member.existingBalance > 0 && (
+                    {member.existingBalance !== 0 && (
                       <div className="flex justify-between text-sm mb-2 text-gray-600">
                         <span>Vorig saldo</span>
                         <span>€{member.existingBalance.toFixed(2)}</span>
@@ -244,22 +255,28 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
                           onChange={(e) => handleActualPayoutChange(member.id, e.target.value)}
                           step="0.01"
                           min="0"
-                          max={member.totalDue}
                           className="mt-1"
                         />
                       </div>
                       
                       <div className="flex-1">
                         <Label htmlFor={`carried-${member.id}`} className="text-sm">
-                          Meegenomen saldo
+                          Saldo
                         </Label>
-                        <Input
-                          id={`carried-${member.id}`}
-                          type="number"
-                          value={carriedBalance}
-                          readOnly
-                          className="mt-1 bg-gray-50"
-                        />
+                        <div className="mt-1 flex items-center">
+                          <Input
+                            id={`carried-${member.id}`}
+                            type="number"
+                            value={carriedBalance}
+                            readOnly
+                            className={`bg-gray-50 ${carriedBalance < 0 ? 'text-red-600' : carriedBalance > 0 ? 'text-green-600' : ''}`}
+                          />
+                          {carriedBalance !== 0 && (
+                            <span className={`ml-2 text-xs ${carriedBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              {getBalanceText(carriedBalance)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -331,7 +331,7 @@ const Team = () => {
                                   <div className="flex items-center justify-between mb-3">
                                     <h3 className="text-sm font-medium mb-2 flex items-center">
                                       <Clock className="h-4 w-4 mr-2" />
-                                      Urengeschiedenis voor {member.name}
+                                      Urenoverzicht voor {member.name}
                                     </h3>
                                     <div className="flex items-center gap-2">
                                       {editingMember === member.id ? (

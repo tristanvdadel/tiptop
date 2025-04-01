@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -73,10 +72,11 @@ const FastTip = () => {
         description: `€${amount.toFixed(2)} is toegevoegd aan de huidige periode.`,
       });
       
+      setAmount(0);
+      
       if (!keepOpen) {
         navigate('/');
       } else {
-        setAmount(0);
         setNote('');
         setDate(new Date());
       }

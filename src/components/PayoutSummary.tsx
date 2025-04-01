@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,7 +23,6 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   const [hasChanges, setHasChanges] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   
-  // Round down to the nearest multiple (default 5)
   const roundDownToNearest = (value: number, nearest: number = 5): number => {
     return Math.floor(value / nearest) * nearest;
   };
@@ -37,19 +35,13 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       mostRecentPayout.distribution.forEach(item => {
         const member = teamMembers.find(m => m.id === item.memberId);
         if (member) {
-          // Get the calculated tip amount for this period
-          const calculatedAmount = member.tipAmount || 0;
-          // Get any existing balance from previous periods
+          const calculatedAmount = item.amount || 0;
           const existingBalance = member.balance || 0;
-          // Calculate total amount due by adding the calculated amount and existing balance
           const totalDue = calculatedAmount + existingBalance;
           
-          // Round down the total due amount to the nearest 5
           const roundedPayout = roundDownToNearest(totalDue);
           
-          // Set the actual payout to the rounded amount
           initialPayouts[item.memberId] = roundedPayout;
-          // Calculate the new balance by subtracting the rounded payout from the total due
           initialBalances[item.memberId] = totalDue - roundedPayout;
         }
       });
@@ -158,12 +150,9 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
         const newActualPayouts = { ...actualPayouts, [memberId]: amount };
         setActualPayouts(newActualPayouts);
         
-        // Get values needed for calculation
         const existingBalance = member.existingBalance || 0;
         const calculatedAmount = member.amount || 0;
-        // Calculate total due (calculated amount + existing balance)
         const totalDue = calculatedAmount + existingBalance;
-        // New balance is the total due minus what was actually paid
         const newBalance = totalDue - amount;
         
         setBalances({ ...balances, [memberId]: newBalance });
@@ -248,14 +237,15 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
             <h3 className="text-sm font-medium mb-2">Verdeling per teamlid</h3>
             <div className="space-y-4">
               {memberPayouts.map(member => {
-                const actualPayout = actualPayouts[member.id] || member.amount;
-                const carriedBalance = balances[member.id] || 0;
+                const totalDue = member.amount + (member.existingBalance || 0);
+                const actualPayout = actualPayouts[member.id] || roundDownToNearest(totalDue);
+                const carriedBalance = balances[member.id] || (totalDue - actualPayout);
                 
                 return (
                   <div key={member.id} className="p-3 border rounded-md">
                     <div className="flex justify-between font-medium mb-2">
                       <span>{member.name}</span>
-                      <span>Te betalen: €{member.totalDue.toFixed(2)}</span>
+                      <span>Te betalen: €{totalDue.toFixed(2)}</span>
                     </div>
                     
                     {member.existingBalance !== 0 && (

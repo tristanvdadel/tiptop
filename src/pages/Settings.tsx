@@ -5,8 +5,11 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { LogOut, Bell, Moon, User } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const Settings = () => {
+  const { theme, toggleTheme } = useTheme();
+  
   return (
     <div className="space-y-6">
       <div>
@@ -68,7 +71,11 @@ const Settings = () => {
               <Moon className="h-4 w-4" />
               <Label htmlFor="darkMode">Donkere modus</Label>
             </div>
-            <Switch id="darkMode" />
+            <Switch 
+              id="darkMode" 
+              checked={theme === "dark"}
+              onCheckedChange={toggleTheme}
+            />
           </div>
         </CardContent>
       </Card>

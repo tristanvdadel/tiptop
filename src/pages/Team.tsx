@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, KeyboardEvent } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { TeamMember, Period, HourRegistration } from '@/contexts/AppContext';
@@ -7,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Check, Clock, Calendar } from 'lucide-react';
+import { Plus, Trash2, Check, Clock, Calendar, PlusCircle, MinusCircle } from 'lucide-react';
 import { PayoutSummary } from '@/components/PayoutSummary';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -177,6 +178,24 @@ const Team = () => {
     ? [...unpaidPeriods, currentPeriod] 
     : unpaidPeriods;
 
+  // Format balance display with + or - sign
+  const formatBalance = (balance?: number): string => {
+    if (balance === undefined || balance === 0) return '';
+    
+    return balance > 0 
+      ? `+€${balance.toFixed(2)}` 
+      : `-€${Math.abs(balance).toFixed(2)}`;
+  };
+
+  // Get CSS class for balance display
+  const getBalanceClass = (balance?: number): string => {
+    if (balance === undefined || balance === 0) return '';
+    
+    return balance > 0 
+      ? 'text-green-600' 
+      : 'text-red-600';
+  };
+
   if (showPayoutSummary) {
     return <PayoutSummary onClose={() => setShowPayoutSummary(false)} />;
   }
@@ -206,9 +225,26 @@ const Team = () => {
           <Card key={member.id}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-4">
-                <Label htmlFor={`hours-${member.id}`} className="block text-lg font-medium">
-                  {member.name}
-                </Label>
+                <div className="flex items-center">
+                  <Label htmlFor={`hours-${member.id}`} className="block text-lg font-medium">
+                    {member.name}
+                  </Label>
+                  {member.balance !== undefined && member.balance !== 0 && (
+                    <span className={`ml-2 text-sm font-medium ${getBalanceClass(member.balance)}`}>
+                      {member.balance > 0 ? (
+                        <span className="flex items-center">
+                          <PlusCircle size={14} className="mr-1" />
+                          €{member.balance.toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="flex items-center">
+                          <MinusCircle size={14} className="mr-1" />
+                          €{Math.abs(member.balance).toFixed(2)}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </div>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" size="icon">
@@ -219,7 +255,7 @@ const Team = () => {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Dit teamlid wordt permanent verwijderd.
+                        Dit teamlid wordt permanent verwijderd inclusief urenregistraties en saldo.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -341,8 +377,13 @@ const Team = () => {
                 <ul>
                   {distribution.map((member) => (
                     <li key={member.id} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-b-0">
-                      <div>
-                        {member.name}
+                      <div className="flex items-center">
+                        <span>{member.name}</span>
+                        {member.balance !== undefined && member.balance !== 0 && (
+                          <span className={`ml-2 text-sm ${getBalanceClass(member.balance)}`}>
+                            {formatBalance(member.balance)}
+                          </span>
+                        )}
                       </div>
                       <div className="font-medium">
                         €{member.tipAmount?.toFixed(2) || '0.00'}

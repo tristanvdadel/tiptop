@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
@@ -28,7 +29,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 const Team = () => {
-  const { teamMembers, addTeamMember, removeTeamMember, updateTeamMember } = useApp();
+  const { teamMembers, addTeamMember, removeTeamMember, updateTeamMemberName } = useApp();
   const { toast } = useToast();
 
   const [sortColumn, setSortColumn] = useState<keyof (typeof teamMembers)[0] | null>(null);
@@ -85,13 +86,11 @@ const Team = () => {
 
   const handleEditMember = () => {
     if (editingMember && editMemberName.trim() !== '') {
-      updateTeamMember(editingMember, editMemberName);
-      setEditingMember(null);
-      setEditMemberName('');
-      toast({
-        title: "Team member updated.",
-        description: "Successfully updated the team member's name.",
-      })
+      const success = updateTeamMemberName(editingMember, editMemberName);
+      if (success) {
+        setEditingMember(null);
+        setEditMemberName('');
+      }
     }
   };
 
@@ -122,7 +121,7 @@ const Team = () => {
               <TableRow key={member.id}>
                 <TableCell>{member.name}</TableCell>
                 <TableCell>{member.hours}</TableCell>
-                <TableCell>{member.balance.toFixed(2)}</TableCell>
+                <TableCell>{member.balance?.toFixed(2) || "0.00"}</TableCell>
                 <TableCell className="text-right">
                   <Button 
                     variant="ghost" 
@@ -163,7 +162,7 @@ const Team = () => {
 
       {/* Mobile View */}
       <div className="md:hidden space-y-2">
-        {teamMembers.map((member) => (
+        {sortedTeamMembers.map((member) => (
           <Card key={member.id} className="w-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">{member.name}</CardTitle>
@@ -205,7 +204,7 @@ const Team = () => {
                 <div className="text-muted-foreground">Uren</div>
                 <div>{member.hours}</div>
                 <div className="text-muted-foreground">Balans</div>
-                <div>{member.balance.toFixed(2)}</div>
+                <div>{member.balance?.toFixed(2) || "0.00"}</div>
               </div>
             </CardContent>
           </Card>

@@ -1,4 +1,3 @@
-
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
@@ -6,7 +5,6 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Legend } from 'rech
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
-
 const TipChart = () => {
   const {
     periods,
@@ -49,12 +47,11 @@ const TipChart = () => {
     }
     return data;
   }, [periods]);
-  
+
   // Calculate all-time average tip per hour
   const averageTipPerHour = useMemo(() => {
     return calculateAverageTipPerHour();
   }, [calculateAverageTipPerHour]);
-  
   const chartColors = ['#9b87f5', '#F97316', '#0EA5E9', '#D946EF', '#8B5CF6'];
 
   // Create bar components for each period
@@ -69,18 +66,14 @@ const TipChart = () => {
     });
     return bars;
   }, [chartData, periods, chartColors]);
-  
   const handleAverageClick = () => {
     navigate('/analytics');
   };
-  
   if (chartData.every(day => Object.keys(day).length <= 2)) {
     // Only has name and date props
     return null;
   }
-  
-  return (
-    <div className="space-y-4">
+  return <div className="space-y-4">
       <Card className="mb-6">
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Afgelopen 7 dagen</CardTitle>
@@ -99,21 +92,14 @@ const TipChart = () => {
         </CardContent>
       </Card>
       
-      {averageTipPerHour > 0 && (
-        <Card 
-          className="cursor-pointer hover:bg-muted/50 transition-colors" 
-          onClick={handleAverageClick}
-        >
+      {averageTipPerHour > 0 && <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={handleAverageClick}>
           <CardContent className="p-4">
             <div className="flex justify-between items-center">
-              <h3 className="text-sm font-medium">Gemiddelde fooi per uur (alle periodes)</h3>
+              <h3 className="text-sm font-medium">Gemiddelde fooi per uur</h3>
               <span className="font-medium">€{averageTipPerHour.toFixed(2)} / uur</span>
             </div>
           </CardContent>
-        </Card>
-      )}
-    </div>
-  );
+        </Card>}
+    </div>;
 };
-
 export default TipChart;

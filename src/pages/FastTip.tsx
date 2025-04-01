@@ -82,6 +82,12 @@ const FastTip = () => {
       }
     }
   };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    }
+  };
   
   return (
     <div className="h-screen flex flex-col bg-gradient-to-b from-background to-amber-50/20">
@@ -112,6 +118,7 @@ const FastTip = () => {
                   type="number"
                   value={amount === 0 ? '' : amount}
                   onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
+                  onKeyDown={handleKeyDown}
                   placeholder="0.00"
                   className="text-center text-3xl h-16 w-48 pl-10 pr-4 border-amber-200 focus:border-amber-400 focus:ring-amber-400"
                 />
@@ -169,6 +176,7 @@ const FastTip = () => {
               <Textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder={placeholder}
                 className="w-full placeholder:italic border-amber-200 focus:border-amber-400 focus:ring-amber-400"
                 rows={3}

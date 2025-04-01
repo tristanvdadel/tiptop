@@ -48,7 +48,7 @@ const Periods = () => {
   
   const navigate = useNavigate();
   const [showLimitDialog, setShowLimitDialog] = useState(false);
-  const [showPaidPeriodsDialog, setShowPaidPeriodsDialog] = useState(false);
+  const [showPaidPeriodesDialog, setShowPaidPeriodesDialog] = useState(false);
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [periodToDelete, setPeriodToDelete] = useState<string | null>(null);
@@ -68,8 +68,8 @@ const Periods = () => {
   };
   
   const tierPeriodLimit = tier === 'basic' ? 7 : Infinity;
-  const unpaidPeriodsCount = getUnpaidPeriodsCount();
-  const paidPeriodsCount = periods.filter(p => p.isPaid).length;
+  const unpaidPeriodesCount = getUnpaidPeriodsCount();
+  const paidPeriodesCount = periods.filter(p => p.isPaid).length;
   const averageTipPerHour = calculateAverageTipPerHour();
   
   const handleStartNewPeriod = () => {
@@ -78,9 +78,9 @@ const Periods = () => {
     }
     
     if (hasReachedPeriodLimit()) {
-      // If there are paid periods and we've reached the limit, show the paid periods dialog
-      if (paidPeriodsCount > 0) {
-        setShowPaidPeriodsDialog(true);
+      // If there are paid periodes and we've reached the limit, show the paid periodes dialog
+      if (paidPeriodesCount > 0) {
+        setShowPaidPeriodesDialog(true);
       } else {
         setShowLimitDialog(true);
       }
@@ -95,7 +95,7 @@ const Periods = () => {
   };
   
   const handleDeletePaidPeriods = () => {
-    setShowPaidPeriodsDialog(false);
+    setShowPaidPeriodesDialog(false);
     setShowDeleteConfirmDialog(true);
   };
   
@@ -103,15 +103,15 @@ const Periods = () => {
     deletePaidPeriods();
     setShowDeleteConfirmDialog(false);
     toast({
-      title: "Uitbetaalde perioden verwijderd",
-      description: "Alle uitbetaalde perioden zijn verwijderd. Je kunt nu nieuwe perioden starten.",
+      title: "Uitbetaalde periodes verwijderd",
+      description: "Alle uitbetaalde periodes zijn verwijderd. Je kunt nu nieuwe periodes starten.",
       variant: "default"
     });
   };
   
   const handleUpgrade = () => {
     setShowUpgradeDialog(true);
-    setShowPaidPeriodsDialog(false);
+    setShowPaidPeriodesDialog(false);
     setShowLimitDialog(false);
   };
   
@@ -251,14 +251,14 @@ const Periods = () => {
         </Card>
       )}
       
-      {unpaidPeriodsCount > 0 && (
+      {unpaidPeriodesCount > 0 && (
         <Card className="bg-gradient-to-r from-green-50 to-green-100/30 border-green-200">
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center">
               <DollarSign size={20} className="text-green-600 mr-2" />
               <div>
                 <p className="text-sm font-medium">Onuitbetaalde periodes</p>
-                <p className="text-lg font-bold">{unpaidPeriodsCount} {unpaidPeriodsCount === 1 ? 'periode' : 'periodes'}</p>
+                <p className="text-lg font-bold">{unpaidPeriodesCount} {unpaidPeriodesCount === 1 ? 'periode' : 'periodes'}</p>
               </div>
             </div>
             <Button 
@@ -274,23 +274,23 @@ const Periods = () => {
       <Dialog open={showLimitDialog} onOpenChange={setShowLimitDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-center text-xl">Periodelimiet bereikt</DialogTitle>
+            <DialogTitle className="text-center text-xl">Periodeslimiet bereikt</DialogTitle>
             <DialogDescription className="text-center pt-2">
               <div className="flex items-center justify-center mb-4">
                 <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
                   <AlertTriangle className="text-amber-500" size={24} />
                 </div>
               </div>
-              Je hebt het maximale aantal perioden ({tierPeriodLimit}) bereikt voor je {tier.toUpperCase()}-abonnement.
-              {unpaidPeriodsCount > 0 && (
+              Je hebt het maximale aantal periodes ({tierPeriodLimit}) bereikt voor je {tier.toUpperCase()}-abonnement.
+              {unpaidPeriodesCount > 0 && (
                 <p className="mt-2 font-medium">
-                  Je hebt {unpaidPeriodsCount} onbetaalde periodes. Betaal deze uit om ruimte te maken voor nieuwe perioden.
+                  Je hebt {unpaidPeriodesCount} onbetaalde periodes. Betaal deze uit om ruimte te maken voor nieuwe periodes.
                 </p>
               )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-center gap-2 flex-col sm:flex-row">
-            {unpaidPeriodsCount > 0 ? (
+            {unpaidPeriodesCount > 0 ? (
               <Button 
                 onClick={() => {
                   setShowLimitDialog(false);
@@ -312,10 +312,10 @@ const Periods = () => {
         </DialogContent>
       </Dialog>
       
-      <AlertDialog open={showPaidPeriodsDialog} onOpenChange={setShowPaidPeriodsDialog}>
+      <AlertDialog open={showPaidPeriodesDialog} onOpenChange={setShowPaidPeriodesDialog}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-center text-xl">Periodelimiet bereikt</AlertDialogTitle>
+            <AlertDialogTitle className="text-center text-xl">Periodeslimiet bereikt</AlertDialogTitle>
             <AlertDialogDescription>
               <div className="flex items-center justify-center mb-4">
                 <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
@@ -323,17 +323,17 @@ const Periods = () => {
                 </div>
               </div>
               <p className="text-center mb-4">
-                Je hebt het maximale aantal perioden ({tierPeriodLimit}) bereikt voor je {tier.toUpperCase()}-abonnement.
+                Je hebt het maximale aantal periodes ({tierPeriodLimit}) bereikt voor je {tier.toUpperCase()}-abonnement.
               </p>
               <p className="mb-3">
-                Je hebt {paidPeriodsCount} uitbetaalde periodes. Je kunt:
+                Je hebt {paidPeriodesCount} uitbetaalde periodes. Je kunt:
               </p>
               <ul className="list-disc pl-6 space-y-2 mb-4">
-                <li>Deze perioden verwijderen om ruimte te maken voor nieuwe perioden</li>
+                <li>Deze periodes verwijderen om ruimte te maken voor nieuwe periodes</li>
                 <li>Upgraden naar een hoger abonnement voor meer opslagruimte</li>
               </ul>
               <p className="text-sm bg-amber-50 p-3 rounded-md border border-amber-200 text-amber-700 font-medium">
-                Let op: Als je uitbetaalde perioden verwijdert, gaan alle gegevens van deze perioden verloren.
+                Let op: Als je uitbetaalde periodes verwijdert, gaan alle gegevens van deze perioden verloren.
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>

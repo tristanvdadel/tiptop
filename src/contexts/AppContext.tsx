@@ -20,12 +20,14 @@ export type TipEntry = {
 
 export type Period = {
   id: string;
+  name?: string;
   startDate: string;
   endDate?: string;
   isActive: boolean;
   tips: TipEntry[];
   totalTip?: number;
   isPaid?: boolean; // Track if the period has been paid out
+  notes?: string; // Added notes field
 };
 
 export type PayoutData = {
@@ -76,6 +78,7 @@ type AppContextType = {
   deletePeriod: (periodId: string) => void;
   deleteTip: (periodId: string, tipId: string) => void;
   updateTip: (periodId: string, tipId: string, amount: number, note?: string, date?: string) => void;
+  updatePeriod: (periodId: string, updates: {name?: string, notes?: string}) => void; // New function
   
   // Add mostRecentPayout to the context
   mostRecentPayout: PayoutData | null;
@@ -500,6 +503,31 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const updatePeriod = (periodId: string, updates: {name?: string, notes?: string}) => {
+    const periodToUpdate = periods.find(p => p.id === periodId);
+    
+    if (!periodToUpdate) return;
+    
+    const updatedPeriod = {
+      ...periodToUpdate,
+      ...(updates.name !== undefined && { name: updates.name }),
+      ...(updates.notes !== undefined && { notes: updates.notes }),
+    };
+    
+    setPeriods(prev => 
+      prev.map(p => p.id === periodId ? updatedPeriod : p)
+    );
+    
+    if (currentPeriod && currentPeriod.id === periodId) {
+      setCurrentPeriod(updatedPeriod);
+    }
+    
+    toast({
+      title: "Periode bijgewerkt",
+      description: "De periode is succesvol bijgewerkt.",
+    });
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -525,6 +553,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         deletePeriod,
         deleteTip,
         updateTip,
+        updatePeriod,
       }}
     >
       {children}

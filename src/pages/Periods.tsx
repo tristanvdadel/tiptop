@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Plus, Crown, AlertTriangle, ArrowRight, Trash2, TrendingUp } from 'lucide-react';
+import { Plus, Crown, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileText } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -26,6 +26,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 const Periods = () => {
   const { 
@@ -38,7 +41,8 @@ const Periods = () => {
     getUnpaidPeriodsCount,
     calculateAverageTipPerHour,
     deletePaidPeriods,
-    deletePeriod
+    deletePeriod,
+    updatePeriod
   } = useApp();
   
   const [showLimitDialog, setShowLimitDialog] = useState(false);
@@ -47,6 +51,10 @@ const Periods = () => {
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [periodToDelete, setPeriodToDelete] = useState<string | null>(null);
   const [showDeletePeriodDialog, setShowDeletePeriodDialog] = useState(false);
+  const [showEditPeriodDialog, setShowEditPeriodDialog] = useState(false);
+  const [periodToEdit, setPeriodToEdit] = useState<string | null>(null);
+  const [editPeriodName, setEditPeriodName] = useState('');
+  const [editPeriodNotes, setEditPeriodNotes] = useState('');
   const { toast } = useToast();
   
   const sortedPeriods = [...periods].sort(
@@ -128,6 +136,32 @@ const Periods = () => {
       toast({
         title: "Periode verwijderd",
         description: "De periode is succesvol verwijderd.",
+        variant: "default"
+      });
+    }
+  };
+
+  const handleEditPeriod = (periodId: string) => {
+    const period = periods.find(p => p.id === periodId);
+    if (period) {
+      setPeriodToEdit(periodId);
+      setEditPeriodName(period.name || '');
+      setEditPeriodNotes(period.notes || '');
+      setShowEditPeriodDialog(true);
+    }
+  };
+  
+  const confirmEditPeriod = () => {
+    if (periodToEdit) {
+      updatePeriod(periodToEdit, {
+        name: editPeriodName.trim() || undefined,
+        notes: editPeriodNotes.trim() || undefined
+      });
+      setPeriodToEdit(null);
+      setShowEditPeriodDialog(false);
+      toast({
+        title: "Periode bijgewerkt",
+        description: "De periode is succesvol bijgewerkt.",
         variant: "default"
       });
     }
@@ -450,6 +484,57 @@ const Periods = () => {
         </AlertDialogContent>
       </AlertDialog>
       
+      <Dialog open={showEditPeriodDialog} onOpenChange={setShowEditPeriodDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl">Periode bewerken</DialogTitle>
+            <DialogDescription className="text-center pt-2">
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-[#9b87f5]/20 flex items-center justify-center">
+                  <Edit className="text-[#9b87f5]" size={24} />
+                </div>
+              </div>
+              Geef deze periode een duidelijke naam en voeg notities toe
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="period-name">Naam</Label>
+              <Input 
+                id="period-name" 
+                placeholder="Zomer 2023" 
+                value={editPeriodName}
+                onChange={(e) => setEditPeriodName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="period-notes">Notities</Label>
+              <Textarea 
+                id="period-notes" 
+                placeholder="Voeg relevante notities toe over deze periode..." 
+                value={editPeriodNotes}
+                onChange={(e) => setEditPeriodNotes(e.target.value)}
+                className="min-h-[120px]"
+              />
+            </div>
+          </div>
+          <DialogFooter className="sm:justify-center gap-2 flex-col sm:flex-row mt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowEditPeriodDialog(false)}
+            >
+              Annuleren
+            </Button>
+            <Button 
+              onClick={confirmEditPeriod}
+              className="bg-[#9b87f5] hover:bg-[#7E69AB]"
+            >
+              Opslaan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       {sortedPeriods.length > 0 ? (
         <div className="space-y-4">
           {tier === 'free' && sortedPeriods.length > 3 && (
@@ -478,7 +563,7 @@ const Periods = () => {
                   <CardHeader className="pb-2">
                     <CardTitle className="flex justify-between items-center text-base">
                       <span>
-                        Periode {formatPeriodDate(period.startDate)}
+                        {period.name || `Periode ${formatPeriodDate(period.startDate)}`}
                       </span>
                       <div className="flex gap-2">
                         {period.isPaid && (
@@ -486,6 +571,14 @@ const Periods = () => {
                             Uitbetaald
                           </span>
                         )}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 text-muted-foreground hover:text-[#9b87f5]"
+                          onClick={() => handleEditPeriod(period.id)}
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -531,6 +624,15 @@ const Periods = () => {
                           <span className="text-[#9b87f5] font-medium">
                             €{periodAverageTipPerHour.toFixed(2)}
                           </span>
+                        </div>
+                      )}
+                      
+                      {period.notes && (
+                        <div className="mt-3 pt-3 border-t">
+                          <div className="flex items-start gap-2">
+                            <FileText size={16} className="shrink-0 mt-0.5 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">{period.notes}</p>
+                          </div>
                         </div>
                       )}
                     </div>

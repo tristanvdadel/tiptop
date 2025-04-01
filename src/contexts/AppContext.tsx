@@ -73,6 +73,10 @@ type AppContextType = {
   hasReachedPeriodLimit: () => boolean;
   getUnpaidPeriodsCount: () => number;
   deletePaidPeriods: () => void;
+  
+  // Add mostRecentPayout to the context
+  mostRecentPayout: PayoutData | null;
+  setMostRecentPayout: (payout: PayoutData | null) => void;
 };
 
 const tierLimits: TierLimits = {
@@ -98,6 +102,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [tier] = useState<'free' | 'team' | 'pro'>('free');
   const [payouts, setPayouts] = useState<PayoutData[]>([]);
+  const [mostRecentPayout, setMostRecentPayout] = useState<PayoutData | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -393,6 +398,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
     
     setPayouts(prev => [...prev, newPayout]);
+    setMostRecentPayout(newPayout); // Set the most recent payout
     
     setPeriods(prev => 
       prev.map(period => 
@@ -423,6 +429,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         teamMembers,
         tier,
         payouts,
+        mostRecentPayout,
+        setMostRecentPayout,
         addTip,
         addTeamMember,
         removeTeamMember,

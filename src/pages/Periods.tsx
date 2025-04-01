@@ -30,6 +30,7 @@ const Periods = () => {
   const { 
     periods, 
     startNewPeriod, 
+    endCurrentPeriod,
     tier, 
     currentPeriod, 
     hasReachedPeriodLimit, 
@@ -44,7 +45,6 @@ const Periods = () => {
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const { toast } = useToast();
   
-  // Sort periods by start date, most recent first
   const sortedPeriods = [...periods].sort(
     (a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
   );
@@ -129,7 +129,6 @@ const Periods = () => {
         </div>
       </div>
       
-      {/* Current Period Card */}
       {currentPeriod && (
         <Card className="border-[#9b87f5]/30 bg-[#9b87f5]/5">
           <CardHeader className="pb-2">
@@ -169,7 +168,6 @@ const Periods = () => {
         </Card>
       )}
       
-      {/* Average tip per hour info card */}
       {averageTipPerHour > 0 && (
         <Card className="bg-gradient-to-r from-[#9b87f5]/10 to-[#7E69AB]/5 border-[#9b87f5]/20">
           <CardContent className="p-4 flex items-center justify-between">
@@ -187,7 +185,6 @@ const Periods = () => {
         </Card>
       )}
       
-      {/* Period Limit Dialog */}
       <Dialog open={showLimitDialog} onOpenChange={setShowLimitDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -229,7 +226,6 @@ const Periods = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Paid Periods Dialog */}
       <AlertDialog open={showPaidPeriodsDialog} onOpenChange={setShowPaidPeriodsDialog}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
@@ -273,7 +269,6 @@ const Periods = () => {
         </AlertDialogContent>
       </AlertDialog>
       
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
@@ -307,7 +302,6 @@ const Periods = () => {
         </AlertDialogContent>
       </AlertDialog>
       
-      {/* Upgrade Dialog */}
       <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -489,10 +483,9 @@ const Periods = () => {
                       </Button>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            );
-          })}
+                </Card>
+              );
+            })}
         </div>
       ) : (
         <Card>

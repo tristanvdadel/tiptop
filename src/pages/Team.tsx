@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Trash2, User, Upload, Crown, DollarSign, Check, Clock, Edit, Info } from 'lucide-react';
+import { Plus, Trash2, User, Upload, Crown, DollarSign, Check, Clock, Edit, Info, Copy, ArrowRight, FileCheck } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { PayoutSummary } from '@/components/PayoutSummary';
 
 const Team = () => {
   const { 
@@ -43,11 +44,14 @@ const Team = () => {
     periods,
     calculateTipDistribution, 
     markPeriodsAsPaid,
-    calculateAverageTipPerHour
+    calculateAverageTipPerHour,
+    mostRecentPayout,
+    setMostRecentPayout
   } = useApp();
   
   const [newMemberName, setNewMemberName] = useState('');
   const [showPayout, setShowPayout] = useState(false);
+  const [showPayoutSummary, setShowPayoutSummary] = useState(false);
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
   const [showCsvDialog, setShowCsvDialog] = useState(false);
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
@@ -212,13 +216,8 @@ const Team = () => {
     
     markPeriodsAsPaid(selectedPeriods);
     
-    toast({
-      title: "Uitbetaling voltooid",
-      description: "De geselecteerde periodes zijn gemarkeerd als uitbetaald.",
-    });
-    
-    setSelectedPeriods([]);
     setShowPayout(false);
+    setShowPayoutSummary(true);
   };
   
   const handlePartialPayout = () => {
@@ -229,23 +228,16 @@ const Team = () => {
     
     markPeriodsAsPaid(selectedPeriods, distribution);
     
-    toast({
-      title: "Gedeeltelijke uitbetaling voltooid",
-      description: "De gedeeltelijke uitbetaling is verwerkt.",
-    });
-    
-    setSelectedPeriods([]);
-    setShowPayout(false);
     setShowPartialPayoutDialog(false);
+    setShowPayout(false);
+    setShowPayoutSummary(true);
     setIsPartialPayout(false);
   };
   
-  const handlePartialAmountChange = (id: string, value: string) => {
-    const amount = parseFloat(value) || 0;
-    setPartialPayoutAmounts(prev => ({
-      ...prev,
-      [id]: amount
-    }));
+  const handleCloseSummary = () => {
+    setSelectedPeriods([]);
+    setShowPayoutSummary(false);
+    setMostRecentPayout(null);
   };
   
   const completedPeriods = periods.filter(p => !p.isActive && !p.isPaid);
@@ -273,6 +265,10 @@ const Team = () => {
   const tierMemberLimit = tier === 'free' ? 5 : tier === 'team' ? 10 : Infinity;
   
   const hasReachedTeamMemberLimit = teamMembers.length >= tierMemberLimit;
+  
+  if (showPayoutSummary && (mostRecentPayout || selectedPeriods.length > 0)) {
+    return <PayoutSummary onClose={handleCloseSummary} />;
+  }
   
   return (
     <div className="space-y-6">

@@ -370,7 +370,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (hasReachedPeriodLimit()) {
       toast({
         title: "Limiet bereikt",
-        description: `Je hebt het maximale aantal periodes (${tierLimits[tier].periods}) bereikt voor je huidige abonnement. Rond bestaande periodes af of upgrade.`,
+        description: `Je hebt het maximale aantal perioden (${tierLimits[tier].periods}) bereikt voor je huidige abonnement. Rond bestaande periodes af of upgrade.`,
       });
       return;
     }

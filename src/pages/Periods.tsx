@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Plus, Crown, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileText } from 'lucide-react';
+import { Plus, Crown, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileText, DollarSign } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -29,6 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { useNavigate } from 'react-router-dom';
 
 const Periods = () => {
   const { 
@@ -45,6 +46,7 @@ const Periods = () => {
     updatePeriod
   } = useApp();
   
+  const navigate = useNavigate();
   const [showLimitDialog, setShowLimitDialog] = useState(false);
   const [showPaidPeriodsDialog, setShowPaidPeriodsDialog] = useState(false);
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
@@ -167,6 +169,14 @@ const Periods = () => {
     }
   };
 
+  const goToTeamPayouts = () => {
+    navigate('/team');
+    toast({
+      title: "Ga naar uitbetalen",
+      description: "Selecteer perioden en teamleden om de fooi uit te betalen.",
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -236,6 +246,26 @@ const Periods = () => {
             </div>
             <Button variant="outline" className="text-[#9b87f5] border-[#9b87f5]/30 hover:bg-[#9b87f5]/10">
               Bekijk analyse <ArrowRight size={14} className="ml-1" />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+      
+      {unpaidPeriodsCount > 0 && (
+        <Card className="bg-gradient-to-r from-green-50 to-green-100/30 border-green-200">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center">
+              <DollarSign size={20} className="text-green-600 mr-2" />
+              <div>
+                <p className="text-sm font-medium">Onuitbetaalde perioden</p>
+                <p className="text-lg font-bold">{unpaidPeriodsCount} {unpaidPeriodsCount === 1 ? 'periode' : 'perioden'}</p>
+              </div>
+            </div>
+            <Button 
+              onClick={goToTeamPayouts}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              Ga naar uitbetalen <ArrowRight size={14} className="ml-1" />
             </Button>
           </CardContent>
         </Card>

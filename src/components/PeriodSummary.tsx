@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { BarChart2, Info } from 'lucide-react';
+import { Info, Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { 
@@ -12,13 +13,26 @@ import {
   TooltipProvider, 
   TooltipTrigger 
 } from '@/components/ui/tooltip';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const PeriodSummary = () => {
   const {
     currentPeriod,
-    calculateAverageTipPerHour
+    calculateAverageTipPerHour,
+    updatePeriod
   } = useApp();
   const navigate = useNavigate();
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [periodName, setPeriodName] = useState('');
 
   const totalTip = useMemo(() => {
     if (!currentPeriod) return 0;
@@ -27,6 +41,20 @@ const PeriodSummary = () => {
 
   const handleAnalyticsClick = () => {
     navigate('/analytics');
+  };
+
+  const handleEditClick = () => {
+    if (currentPeriod) {
+      setPeriodName(currentPeriod.name || '');
+      setIsEditDialogOpen(true);
+    }
+  };
+
+  const handleSaveName = () => {
+    if (currentPeriod) {
+      updatePeriod(currentPeriod.id, { name: periodName });
+      setIsEditDialogOpen(false);
+    }
   };
 
   if (!currentPeriod) {
@@ -43,10 +71,32 @@ const PeriodSummary = () => {
 
   const avgTipPerHour = calculateAverageTipPerHour(currentPeriod.id);
 
-  return <Card>
+  return <>
+    <Card>
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
-          <span>Huidige periode</span>
+          <div className="flex items-center gap-2">
+            <span>Huidige periode</span>
+            {currentPeriod && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6"
+                      onClick={handleEditClick}
+                    >
+                      <Pencil size={16} className="text-muted-foreground" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Naam van periode wijzigen</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
           <span className="text-sm font-normal text-muted-foreground">Gestart: {startDate}</span>
         </CardTitle>
       </CardHeader>
@@ -83,7 +133,32 @@ const PeriodSummary = () => {
           </div>
         </div>
       </CardContent>
-    </Card>;
+    </Card>
+
+    <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Periode naam wijzigen</DialogTitle>
+        </DialogHeader>
+        <div className="py-4">
+          <Label htmlFor="periodName">Naam</Label>
+          <Input
+            id="periodName"
+            value={periodName}
+            onChange={(e) => setPeriodName(e.target.value)}
+            placeholder="Voer een naam in voor deze periode"
+            className="mt-2"
+          />
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Annuleren</Button>
+          </DialogClose>
+          <Button onClick={handleSaveName}>Opslaan</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>;
 };
 
 export default PeriodSummary;

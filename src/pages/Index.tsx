@@ -31,7 +31,7 @@ const Index = () => {
             Recente fooi
             {currentPeriod && (
               <span className="text-sm font-normal text-muted-foreground ml-2">
-                {currentPeriod.name || `Periode ${formatPeriodDate(currentPeriod.startDate)}`}
+                {currentPeriod.name ? currentPeriod.name : `Periode ${formatPeriodDate(currentPeriod.startDate)}`}
               </span>
             )}
           </h2>

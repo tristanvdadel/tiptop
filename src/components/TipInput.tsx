@@ -1,10 +1,11 @@
+
 import { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Euro, Calendar as CalendarIcon } from 'lucide-react';
+import { Euro, Calendar as CalendarIcon, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Calendar } from '@/components/ui/calendar';
@@ -165,8 +166,14 @@ const TipInput = () => {
             </Button>
           )}
           
-          <Button type="submit" className="w-full gold-button" disabled={!amount || isNaN(parseFloat(amount))}>
-            Top Tip
+          <Button 
+            type="submit" 
+            variant="goldGradient" 
+            className="w-full animate-pulse-subtle group relative overflow-hidden" 
+            disabled={!amount || isNaN(parseFloat(amount))}
+          >
+            <Sparkles size={16} className="mr-1 text-amber-700 animate-pulse" />
+            <span className="relative z-10">Top Tip</span>
           </Button>
         </form>
       </CardContent>

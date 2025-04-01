@@ -97,7 +97,7 @@
 
 @layer components {
   .gold-button {
-    @apply bg-gold hover:bg-amber-500 text-black font-medium transition-colors;
+    @apply bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-500 hover:to-amber-400 text-black font-medium transition-colors shadow-md hover:shadow-amber-300/30;
   }
   
   .tier-free {
@@ -111,4 +111,17 @@
   .tier-pro {
     @apply text-tier-pro border-tier-pro;
   }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

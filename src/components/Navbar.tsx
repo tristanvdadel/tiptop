@@ -1,9 +1,8 @@
 
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Calendar, Users, BarChart } from 'lucide-react';
+import { Home, Calendar, Users, BarChart, Sparkles, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Sparkles } from 'lucide-react';
 
 const Navbar = () => {
   const location = useLocation();
@@ -28,10 +27,12 @@ const Navbar = () => {
           <span className="badge tier-free text-xs px-2 py-0.5 rounded border">BASIC</span>
         </div>
         <Link to="/fast-tip">
-          <Button className="gold-button relative group overflow-hidden shadow-lg hover:shadow-amber-300/30 transition-all">
-            <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-amber-400 to-amber-300 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-            <Sparkles size={16} className="mr-1 relative z-10" /> 
-            <span className="relative z-10">FastTip</span>
+          <Button 
+            variant="goldGradient" 
+            className="hover:scale-105 transition-transform duration-200"
+          >
+            <Zap size={16} className="mr-1 text-amber-700" /> 
+            <span>FastTip</span>
           </Button>
         </Link>
       </div>

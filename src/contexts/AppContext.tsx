@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -87,9 +86,8 @@ type AppContextType = {
   updateTip: (periodId: string, tipId: string, amount: number, note?: string, date?: string) => void;
   updatePeriod: (periodId: string, updates: {name?: string, notes?: string}) => void;
   deleteHourRegistration: (memberId: string, registrationId: string) => void;
-  updateTeamMemberBalance: (memberId: string, balance: number) => void; // Added function
-  
-  // Add mostRecentPayout to the context
+  updateTeamMemberBalance: (memberId: string, balance: number) => void;
+  clearTeamMemberHours: (memberId: string) => void;
   mostRecentPayout: PayoutData | null;
   setMostRecentPayout: (payout: PayoutData | null) => void;
 };
@@ -292,6 +290,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const clearTeamMemberHours = (memberId: string) => {
+    setTeamMembers(prev => 
+      prev.map(member => {
+        if (member.id === memberId) {
+          // Copy the existing hour registrations to a savedRegistrations field
+          // that won't be displayed but will be used in calculations
+          const savedRegistrations = member.hourRegistrations || [];
+          
+          return { 
+            ...member,
+            hours: 0, // Reset hours to 0
+            hourRegistrations: [], // Clear hourRegistrations array
+            // Keep the previous registrations in a field that's not shown in the UI
+            // but is used for tip per hour calculations
+            savedHourRegistrations: savedRegistrations
+          };
+        }
+        return member;
+      })
+    );
+  };
+
   const hasReachedPeriodLimit = () => {
     const periodLimit = tierLimits[tier].periods;
     const currentPeriodsCount = periods.length;
@@ -437,7 +457,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       0
     );
     
-    const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+    const totalHours = teamMembers.reduce((sum, member) => {
+      const currentHours = member.hours;
+      
+      const savedHours = member.savedHourRegistrations 
+        ? member.savedHourRegistrations.reduce((s, reg) => s + reg.hours, 0) 
+        : 0;
+      
+      return sum + currentHours + savedHours;
+    }, 0);
     
     if (totalHours === 0) {
       return 0;
@@ -637,6 +665,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         updatePeriod,
         deleteHourRegistration,
         updateTeamMemberBalance,
+        clearTeamMemberHours,
       }}
     >
       {children}

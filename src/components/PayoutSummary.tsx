@@ -16,7 +16,7 @@ type PayoutSummaryProps = {
 };
 
 export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
-  const { mostRecentPayout, teamMembers, periods, updateTeamMemberBalance } = useApp();
+  const { mostRecentPayout, teamMembers, periods, updateTeamMemberBalance, clearTeamMemberHours } = useApp();
   const { toast } = useToast();
   const [actualPayouts, setActualPayouts] = useState<{[key: string]: number}>({});
   const [balances, setBalances] = useState<{[key: string]: number}>({});
@@ -148,18 +148,24 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     }
   };
   
-  const handleSaveBalances = () => {
+  const handleSaveBalancesAndClose = () => {
     // Save all balances to team members
     Object.entries(balances).forEach(([memberId, balance]) => {
       updateTeamMemberBalance(memberId, balance);
     });
     
+    // Clear hours for all team members while preserving data for calculations
+    teamMembers.forEach(member => {
+      clearTeamMemberHours(member.id);
+    });
+    
     toast({
       title: "Saldi opgeslagen",
-      description: "De aangepaste uitbetaling en saldi zijn opgeslagen.",
+      description: "De aangepaste uitbetaling en saldi zijn opgeslagen. Uren zijn gewist.",
     });
     
     setHasChanges(false);
+    onClose(); // Close the payout summary and return to the team view
   };
   
   // Function to get proper display for the balance text
@@ -288,17 +294,17 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
           {hasChanges && (
             <Alert className="mt-4 bg-amber-50">
               <AlertDescription>
-                Je hebt aanpassingen gemaakt in de uitbetaling. Klik op 'Saldi opslaan' om deze op te slaan.
+                Je hebt aanpassingen gemaakt in de uitbetaling. Klik op 'Saldi opslaan en afsluiten' om deze op te slaan en de uren te wissen.
               </AlertDescription>
             </Alert>
           )}
           
           {hasChanges && (
             <Button 
-              onClick={handleSaveBalances}
+              onClick={handleSaveBalancesAndClose}
               className="w-full"
             >
-              <Save size={16} className="mr-1" /> Saldi opslaan
+              <Save size={16} className="mr-1" /> Saldi opslaan en afsluiten
             </Button>
           )}
         </CardContent>

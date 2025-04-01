@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -61,7 +62,7 @@ type AppContextType = {
   payouts: PayoutData[];
   
   // Actions
-  addTip: (amount: number, note?: string) => void;
+  addTip: (amount: number, note?: string, customDate?: string) => void;
   addTeamMember: (name: string) => void;
   removeTeamMember: (id: string) => void;
   updateTeamMemberHours: (id: string, hours: number) => void;
@@ -145,7 +146,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
   };
 
-  const addTip = (amount: number, note?: string) => {
+  const addTip = (amount: number, note?: string, customDate?: string) => {
     if (!currentPeriod) {
       if (hasReachedPeriodLimit()) {
         toast({
@@ -160,7 +161,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const newTip: TipEntry = {
       id: generateId(),
       amount,
-      date: new Date().toISOString(),
+      date: customDate || new Date().toISOString(),
       note,
       addedBy: 'current-user',
     };

@@ -4,14 +4,27 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, Check, Calendar as CalendarIcon } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
+import { format } from 'date-fns';
+import { nl } from 'date-fns/locale';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 const FastTip = () => {
-  const { addTip } = useApp();
+  const { addTip, currentPeriod } = useApp();
   const navigate = useNavigate();
   const [amount, setAmount] = useState<number>(0);
   const [note, setNote] = useState<string>('');
+  const [date, setDate] = useState<Date>(new Date());
+  const [showDateWarning, setShowDateWarning] = useState(false);
+  const { toast } = useToast();
   
   const placeholders = [
     "bijvoorbeeld: Tafel 6",
@@ -28,9 +41,32 @@ const FastTip = () => {
     setAmount(prev => prev + value);
   };
   
+  const handleDateChange = (newDate: Date | undefined) => {
+    if (!newDate) return;
+    
+    setDate(newDate);
+    
+    // Check if date is outside current period
+    if (currentPeriod && !currentPeriod.isActive && currentPeriod.endDate) {
+      const periodEnd = new Date(currentPeriod.endDate);
+      const periodStart = new Date(currentPeriod.startDate);
+      
+      if (newDate > periodEnd || newDate < periodStart) {
+        setShowDateWarning(true);
+        toast({
+          title: "Let op",
+          description: "De geselecteerde datum valt buiten de huidige periode. Je kan de fooi nog steeds toevoegen.",
+          variant: "default",
+        });
+      } else {
+        setShowDateWarning(false);
+      }
+    }
+  };
+  
   const handleSave = () => {
     if (amount > 0) {
-      addTip(amount, note);
+      addTip(amount, note, date.toISOString());
       navigate('/');
     }
   };
@@ -75,6 +111,39 @@ const FastTip = () => {
               {value}
             </Button>
           ))}
+        </div>
+        
+        <div className="w-full max-w-md mb-6">
+          <h3 className="text-base font-medium mb-2">Datum</h3>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  showDateWarning && "border-amber-500 text-amber-600"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date ? format(date, 'd MMMM yyyy', { locale: nl }) : <span>Selecteer datum</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={handleDateChange}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+                locale={nl}
+              />
+            </PopoverContent>
+          </Popover>
+          {showDateWarning && (
+            <p className="text-xs text-amber-600 mt-1">
+              Deze datum valt buiten de huidige periode.
+            </p>
+          )}
         </div>
         
         <div className="w-full max-w-md mb-6">

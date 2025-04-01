@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Crown, Info } from 'lucide-react';
@@ -9,7 +8,6 @@ import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import TipChart from '@/components/TipChart';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-
 const Analytics = () => {
   const {
     periods,
@@ -47,7 +45,6 @@ const Analytics = () => {
     const activePeriods = periods.filter(period => period.isActive);
     const periodWithTips = activePeriods.some(period => period.tips.length > 0);
     const teamHasHours = teamMembers.some(member => member.hours > 0);
-
     if (!periodWithTips && !teamHasHours) {
       return "Er ontbreken uur gegevens en fooi gegevens. Voeg ze toe om een gemiddelde te zien.";
     } else if (!periodWithTips) {
@@ -59,11 +56,9 @@ const Analytics = () => {
   };
 
   // Create the average tip per hour card component with dynamic empty state
-  const AverageTipCard = () => (
-    <Card className="mb-4">
+  const AverageTipCard = () => <Card className="mb-4">
       <CardContent className="p-4">
-        {averageTipPerHour > 0 ? (
-          <div className="flex justify-between items-center">
+        {averageTipPerHour > 0 ? <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-medium">Gemiddelde fooi per uur</h3>
               <TooltipProvider>
@@ -80,19 +75,14 @@ const Analytics = () => {
               </TooltipProvider>
             </div>
             <span className="font-medium">€{averageTipPerHour.toFixed(2)} / uur</span>
-          </div>
-        ) : (
-          <div className="text-center py-2 text-muted-foreground">
+          </div> : <div className="text-center py-2 text-muted-foreground">
             <p>{getEmptyStateMessage()}</p>
-          </div>
-        )}
+          </div>}
       </CardContent>
-    </Card>
-  );
-
+    </Card>;
   if (tier !== 'pro') {
     return <div className="space-y-4">
-        <h1 className="text-xl font-bold">Analytics</h1>
+        <h1 className="text-xl font-bold">Analyse</h1>
         
         {/* Always display the average tip per hour at the top, even for empty state */}
         <AverageTipCard />
@@ -142,7 +132,6 @@ const Analytics = () => {
         </div>
       </div>;
   }
-
   return <div className="space-y-4">
       <h1 className="text-xl font-bold">Analytics</h1>
       
@@ -156,15 +145,14 @@ const Analytics = () => {
           <CardTitle className="text-lg">Fooi per periode</CardTitle>
         </CardHeader>
         <CardContent className="pb-4">
-          {periodData.length > 0 ? (
-            <div className="h-60">
+          {periodData.length > 0 ? <div className="h-60">
               <ResponsiveContainer width="100%" height="100%">
                 <RechartsBarChart data={periodData} margin={{
-                top: 10,
-                right: 20,
-                left: 20,
-                bottom: 5
-              }}>
+              top: 10,
+              right: 20,
+              left: 20,
+              bottom: 5
+            }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
@@ -174,13 +162,10 @@ const Analytics = () => {
                   <Bar dataKey="average" name="Gem. per uur" fill="#33C3F0" />
                 </RechartsBarChart>
               </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="text-center py-10 text-muted-foreground">
+            </div> : <div className="text-center py-10 text-muted-foreground">
               <p>Er zijn nog geen periodes met fooi gegevens beschikbaar.</p>
               <p className="mt-2">Voeg fooien toe aan periodes om hier een grafiek te zien.</p>
-            </div>
-          )}
+            </div>}
         </CardContent>
       </Card>
       
@@ -192,24 +177,19 @@ const Analytics = () => {
           <p className="text-muted-foreground mb-2 text-sm">
             Het gemiddelde fooi per uur wordt berekend op basis van de totale fooi en de gewerkte uren van het team.
           </p>
-          {periodData.filter(period => period.average > 0).length > 0 ? (
-            <div className="space-y-2">
+          {periodData.filter(period => period.average > 0).length > 0 ? <div className="space-y-2">
               {periodData.filter(period => period.average > 0).map(period => <div key={period.id} className="flex justify-between p-2 border rounded-md">
                     <div>
                       <p className="font-medium text-sm">{period.name}</p>
                     </div>
                     <div className="font-medium text-sm">€{period.average.toFixed(2)}/uur</div>
                   </div>)}
-            </div>
-          ) : (
-            <div className="text-center py-6 text-muted-foreground">
+            </div> : <div className="text-center py-6 text-muted-foreground">
               <p>Er zijn nog geen periodes met voldoende gegevens om een gemiddelde te berekenen.</p>
               <p className="mt-1">Zorg dat er voor elke periode zowel uren als fooien zijn ingevoerd.</p>
-            </div>
-          )}
+            </div>}
         </CardContent>
       </Card>
     </div>;
 };
-
 export default Analytics;

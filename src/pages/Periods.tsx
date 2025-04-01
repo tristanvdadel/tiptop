@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -259,8 +258,8 @@ const Periods = () => {
             <div className="flex items-center">
               <DollarSign size={20} className="text-green-600 dark:text-green-400 mr-2" />
               <div>
-                <p className="text-sm font-medium dark:text-black/80">Onuitbetaalde periodes</p>
-                <p className="text-lg font-bold dark:text-black">
+                <p className="text-sm font-medium text-black dark:text-black/80">Onuitbetaalde periodes</p>
+                <p className="text-lg font-bold text-black dark:text-black">
                   {unpaidPeriodesCount} {unpaidPeriodesCount === 1 ? 'periode' : 'periodes'}
                 </p>
               </div>

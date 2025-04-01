@@ -44,7 +44,7 @@ const Navbar = () => {
               key={item.to}
               to={item.to}
               className={cn(
-                "flex flex-col items-center py-2 px-4 text-xs",
+                "flex flex-col items-center py-2 px-4 text-xs w-1/5",
                 location.pathname === item.to
                   ? "text-foreground font-medium"
                   : "text-muted-foreground"

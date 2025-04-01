@@ -1,3 +1,4 @@
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -252,18 +253,20 @@ const Periods = () => {
       )}
       
       {unpaidPeriodesCount > 0 && (
-        <Card className="bg-gradient-to-r from-green-50 to-green-100/30 border-green-200">
+        <Card className="bg-gradient-to-r from-green-50 to-green-100/30 border-green-200 dark:bg-green-900/20 dark:text-white/90">
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center">
-              <DollarSign size={20} className="text-green-600 mr-2" />
+              <DollarSign size={20} className="text-green-600 dark:text-green-400 mr-2" />
               <div>
-                <p className="text-sm font-medium">Onuitbetaalde periodes</p>
-                <p className="text-lg font-bold">{unpaidPeriodesCount} {unpaidPeriodesCount === 1 ? 'periode' : 'periodes'}</p>
+                <p className="text-sm font-medium dark:text-white/80">Onuitbetaalde periodes</p>
+                <p className="text-lg font-bold dark:text-white">
+                  {unpaidPeriodesCount} {unpaidPeriodesCount === 1 ? 'periode' : 'periodes'}
+                </p>
               </div>
             </div>
             <Button 
               onClick={goToTeamPayouts}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600"
             >
               Ga naar uitbetalen <ArrowRight size={14} className="ml-1" />
             </Button>

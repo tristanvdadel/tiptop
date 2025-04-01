@@ -1,3 +1,4 @@
+
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
@@ -8,12 +9,15 @@ import { useNavigate } from 'react-router-dom';
 import { Info } from 'lucide-react';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
+
 const TipChart = () => {
   const {
     periods,
     calculateAverageTipPerHour
   } = useApp();
   const navigate = useNavigate();
+
+  // Chart data calculation
   const chartData = useMemo(() => {
     // Get periods data from the last 7 days, regardless of whether there is an active period
     const today = new Date();
@@ -55,6 +59,7 @@ const TipChart = () => {
   const averageTipPerHour = useMemo(() => {
     return calculateAverageTipPerHour();
   }, [calculateAverageTipPerHour]);
+
   const chartColors = ['#9b87f5', '#F97316', '#0EA5E9', '#D946EF', '#8B5CF6'];
 
   // Create bar components for each period
@@ -62,22 +67,34 @@ const TipChart = () => {
     const bars = [];
     periods.forEach((period, index) => {
       if (chartData.some(day => day[`period${index}`] !== undefined)) {
-        bars.push(<Bar key={period.id} dataKey={`period${index}`} name={period.isActive ? 'Actieve periode' : `Periode ${format(new Date(period.startDate), 'd MMM', {
-          locale: nl
-        })}`} fill={chartColors[index % chartColors.length]} />);
+        bars.push(
+          <Bar 
+            key={period.id} 
+            dataKey={`period${index}`} 
+            name={period.isActive ? 'Actieve periode' : `Periode ${format(new Date(period.startDate), 'd MMM', {
+              locale: nl
+            })}`} 
+            fill={chartColors[index % chartColors.length]} 
+          />
+        );
       }
     });
     return bars;
   }, [chartData, periods, chartColors]);
+
   const handleAverageClick = () => {
     navigate('/analytics');
   };
+
   if (chartData.every(day => Object.keys(day).length <= 2)) {
     // Only has name and date props
     return null;
   }
-  return <div className="space-y-4">
-      {averageTipPerHour > 0 && <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={handleAverageClick}>
+
+  return (
+    <div className="space-y-4">
+      {averageTipPerHour > 0 && (
+        <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={handleAverageClick}>
           <CardContent className="p-4">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
@@ -85,7 +102,9 @@ const TipChart = () => {
                 <TooltipProvider>
                   <UITooltip>
                     <TooltipTrigger asChild>
-                      
+                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <Info size={16} className="text-muted-foreground" />
+                      </Button>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>Bekijk gedetailleerde analytische gegevens</p>
@@ -96,7 +115,8 @@ const TipChart = () => {
               <span className="font-medium">€{averageTipPerHour.toFixed(2)} / uur</span>
             </div>
           </CardContent>
-        </Card>}
+        </Card>
+      )}
 
       <Card className="mb-6">
         <CardHeader className="pb-2">
@@ -115,6 +135,8 @@ const TipChart = () => {
           </div>
         </CardContent>
       </Card>
-    </div>;
+    </div>
+  );
 };
+
 export default TipChart;

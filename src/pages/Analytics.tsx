@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Crown, Info } from 'lucide-react';
@@ -8,6 +9,7 @@ import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import TipChart from '@/components/TipChart';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
 const Analytics = () => {
   const {
     periods,
@@ -19,6 +21,7 @@ const Analytics = () => {
   const averageTipPerHour = useMemo(() => {
     return calculateAverageTipPerHour();
   }, [calculateAverageTipPerHour]);
+
   const periodData = useMemo(() => {
     return periods.map(period => {
       const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
@@ -36,6 +39,7 @@ const Analytics = () => {
       };
     });
   }, [periods, calculateAverageTipPerHour]);
+
   if (tier !== 'pro') {
     return <div className="space-y-4">
         <h1 className="text-xl font-bold">Analytics</h1>
@@ -44,7 +48,26 @@ const Analytics = () => {
         <TipChart />
         
         {averageTipPerHour > 0 && <Card>
-            
+            <CardContent className="p-4">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-medium">Gemiddelde fooi per uur</h3>
+                  <TooltipProvider>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                          <Info size={16} className="text-muted-foreground" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Gemiddelde berekend over alle periodes</p>
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
+                </div>
+                <span className="font-medium">€{averageTipPerHour.toFixed(2)} / uur</span>
+              </div>
+            </CardContent>
           </Card>}
         
         {/* Pro features preview */}
@@ -89,6 +112,7 @@ const Analytics = () => {
         </div>
       </div>;
   }
+
   return <div className="space-y-4">
       <h1 className="text-xl font-bold">Analytics</h1>
       
@@ -163,4 +187,5 @@ const Analytics = () => {
       </Card>
     </div>;
 };
+
 export default Analytics;

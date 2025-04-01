@@ -12,7 +12,6 @@ import Periods from "./pages/Periods";
 import Team from "./pages/Team";
 import MyOverview from "./pages/MyOverview";
 import Analytics from "./pages/Analytics";
-import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,7 +30,6 @@ const App = () => (
             <Route path="/team" element={<Layout><Team /></Layout>} />
             <Route path="/my-overview" element={<Layout><MyOverview /></Layout>} />
             <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
-            <Route path="/settings" element={<Layout><Settings /></Layout>} />
             <Route path="*" element={<Layout><NotFound /></Layout>} />
           </Routes>
         </BrowserRouter>

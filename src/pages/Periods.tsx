@@ -257,8 +257,8 @@ const Periods = () => {
             <div className="flex items-center">
               <DollarSign size={20} className="text-green-600 mr-2" />
               <div>
-                <p className="text-sm font-medium">Onuitbetaalde perioden</p>
-                <p className="text-lg font-bold">{unpaidPeriodsCount} {unpaidPeriodsCount === 1 ? 'periode' : 'perioden'}</p>
+                <p className="text-sm font-medium">Onuitbetaalde periodes</p>
+                <p className="text-lg font-bold">{unpaidPeriodsCount} {unpaidPeriodsCount === 1 ? 'periode' : 'periodes'}</p>
               </div>
             </div>
             <Button 
@@ -284,7 +284,7 @@ const Periods = () => {
               Je hebt het maximale aantal perioden ({tierPeriodLimit}) bereikt voor je {tier.toUpperCase()}-abonnement.
               {unpaidPeriodsCount > 0 && (
                 <p className="mt-2 font-medium">
-                  Je hebt {unpaidPeriodsCount} onbetaalde perioden. Betaal deze uit om ruimte te maken voor nieuwe perioden.
+                  Je hebt {unpaidPeriodsCount} onbetaalde periodes. Betaal deze uit om ruimte te maken voor nieuwe perioden.
                 </p>
               )}
             </DialogDescription>
@@ -326,7 +326,7 @@ const Periods = () => {
                 Je hebt het maximale aantal perioden ({tierPeriodLimit}) bereikt voor je {tier.toUpperCase()}-abonnement.
               </p>
               <p className="mb-3">
-                Je hebt {paidPeriodsCount} uitbetaalde perioden. Je kunt:
+                Je hebt {paidPeriodsCount} uitbetaalde periodes. Je kunt:
               </p>
               <ul className="list-disc pl-6 space-y-2 mb-4">
                 <li>Deze perioden verwijderen om ruimte te maken voor nieuwe perioden</li>

@@ -32,7 +32,8 @@ const PeriodSummary = () => {
   }
 
   const startDate = format(new Date(currentPeriod.startDate), 'd MMMM yyyy', { locale: nl });
-  const avgTipPerHour = calculateAverageTipPerHour(currentPeriod.id);
+  // Calculate the all-time average tip per hour instead of just for the current period
+  const avgTipPerHour = calculateAverageTipPerHour();
   
   return (
     <Card>

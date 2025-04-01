@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Check, Clock, Calendar, PlusCircle, MinusCircle, Receipt } from 'lucide-react';
+import { Plus, Trash2, Check, Clock, Calendar, PlusCircle, MinusCircle, Receipt, ChevronDown, ChevronUp, Users } from 'lucide-react';
 import { PayoutSummary } from '@/components/PayoutSummary';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -24,7 +24,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const Team = () => {
   const { teamMembers, addTeamMember, removeTeamMember, updateTeamMemberHours, deleteHourRegistration, calculateTipDistribution, markPeriodsAsPaid, currentPeriod, periods, payouts } = useApp();
@@ -223,17 +230,20 @@ const Team = () => {
 
   return (
     <div>
-      <div className="md:flex md:items-center md:justify-between">
-        <h1 className="text-xl font-bold mb-4 md:mb-0">Team leden</h1>
-        <div className="flex items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+        <div className="flex items-center gap-2">
+          <Users size={20} />
+          <h1 className="text-xl font-bold">Team leden</h1>
+        </div>
+        <div className="flex items-center gap-2">
           <Input
             type="text"
             placeholder="Naam team lid"
             value={newMemberName}
             onChange={(e) => setNewMemberName(e.target.value)}
-            className="mr-2"
+            className="w-full sm:w-auto"
           />
-          <Button onClick={handleAddMember}>
+          <Button onClick={handleAddMember} variant="goldGradient">
             <Plus size={16} className="mr-2" /> Toevoegen
           </Button>
         </div>
@@ -241,135 +251,157 @@ const Team = () => {
       
       <Separator className="my-4" />
 
-      <div className="grid gap-4 mb-8">
-        {teamMembers.map((member) => (
-          <Collapsible 
-            key={member.id} 
-            open={openMemberDetails[member.id]} 
-            onOpenChange={() => toggleMemberDetails(member.id)}
-          >
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center">
-                    <Label className="block text-lg font-medium mr-2">
-                      {member.name}
-                    </Label>
-                    {member.balance !== undefined && member.balance !== 0 && (
-                      <span className={`text-sm font-medium ${getBalanceClass(member.balance)}`}>
-                        {member.balance > 0 ? (
-                          <span className="flex items-center">
-                            <PlusCircle size={14} className="mr-1" />
-                            €{member.balance.toFixed(2)}
-                          </span>
-                        ) : (
-                          <span className="flex items-center">
-                            <MinusCircle size={14} className="mr-1" />
-                            €{Math.abs(member.balance).toFixed(2)}
-                          </span>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CollapsibleTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        {openMemberDetails[member.id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                      </Button>
-                    </CollapsibleTrigger>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="icon">
-                          <Trash2 className="h-4 w-4" />
+      {teamMembers.length > 0 ? (
+        <Card className="mb-6">
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm font-medium flex justify-between items-center">
+              <span>Teamleden ({teamMembers.length})</span>
+              <span>Totaal uren: {teamMembers.reduce((sum, member) => sum + member.hours, 0)}</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[180px]">Naam</TableHead>
+                  <TableHead className="w-[120px]">Saldo</TableHead>
+                  <TableHead className="w-[100px] text-right">Uren</TableHead>
+                  <TableHead className="w-[200px]">Toevoegen</TableHead>
+                  <TableHead className="w-[100px] text-right">Acties</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {teamMembers.map((member) => (
+                  <TableRow key={member.id}>
+                    <TableCell className="font-medium py-2">{member.name}</TableCell>
+                    <TableCell className="py-2">
+                      {member.balance !== undefined && member.balance !== 0 && (
+                        <span className={`text-xs font-medium ${getBalanceClass(member.balance)}`}>
+                          {member.balance > 0 ? (
+                            <span className="flex items-center">
+                              <PlusCircle size={14} className="mr-1" />
+                              €{member.balance.toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="flex items-center">
+                              <MinusCircle size={14} className="mr-1" />
+                              €{Math.abs(member.balance).toFixed(2)}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right py-2 font-medium">{member.hours}</TableCell>
+                    <TableCell className="py-2">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          name={`hours-${member.id}`}
+                          id={`hours-${member.id}`}
+                          className="h-8 w-20"
+                          placeholder="Uren"
+                          value={hoursInputs[member.id] || ''}
+                          onChange={(e) => handleHoursChange(member.id, e.target.value)}
+                          onKeyDown={(e) => handleKeyDown(e, member.id)}
+                        />
+                        <Button 
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleHoursSubmit(member.id)}
+                          className="h-8 w-8"
+                        >
+                          <Check className="h-4 w-4" />
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Dit teamlid wordt permanent verwijderd inclusief urenregistraties en saldo.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Annuleren</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleRemoveMember(member.id)}>Verwijderen</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-                
-                <div className="flex items-end gap-2 mb-2">
-                  <div className="flex-1">
-                    <Label className="block text-sm font-medium mb-1">
-                      Uren toevoegen
-                    </Label>
-                    <div className="flex items-center">
-                      <Input
-                        type="number"
-                        name={`hours-${member.id}`}
-                        id={`hours-${member.id}`}
-                        className="block w-full pr-10 text-sm rounded-md"
-                        placeholder="Uren"
-                        value={hoursInputs[member.id] || ''}
-                        onChange={(e) => handleHoursChange(member.id, e.target.value)}
-                        onKeyDown={(e) => handleKeyDown(e, member.id)}
-                      />
-                      <Button 
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleHoursSubmit(member.id)}
-                        className="ml-2"
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Totaal uren</p>
-                    <p className="text-xl font-semibold">{member.hours}</p>
-                  </div>
-                </div>
-                
-                <CollapsibleContent>
-                  {member.hourRegistrations && member.hourRegistrations.length > 0 && (
-                    <div className="mt-4">
-                      <h3 className="text-sm font-medium mb-2">Uren geschiedenis</h3>
-                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {member.hourRegistrations.map((registration: HourRegistration) => (
-                          <div 
-                            key={registration.id} 
-                            className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50"
-                          >
-                            <div className="flex items-center">
-                              <Clock className="h-4 w-4 mr-2 text-gray-500" />
-                              <span className="font-medium">{registration.hours} uren</span>
-                              <span className="mx-2 text-gray-400">•</span>
-                              <span className="text-xs text-gray-500 flex items-center">
-                                <Calendar className="h-3 w-3 mr-1" />
-                                {formatDate(registration.date)}
-                              </span>
-                            </div>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => handleDeleteRegistration(member.id, registration.id)}
-                              className="h-7 w-7 text-gray-500 hover:text-red-500"
-                            >
-                              <Trash2 className="h-3 w-3" />
+                        <Collapsible className="flex-1">
+                          <CollapsibleTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              {openMemberDetails[member.id] ? 
+                                <ChevronUp size={16} /> : 
+                                <ChevronDown size={16} />
+                              }
                             </Button>
-                          </div>
-                        ))}
+                          </CollapsibleTrigger>
+                        </Collapsible>
                       </div>
-                    </div>
-                  )}
-                </CollapsibleContent>
-              </CardContent>
-            </Card>
-          </Collapsible>
-        ))}
-      </div>
+                    </TableCell>
+                    <TableCell className="text-right py-2">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Dit teamlid wordt permanent verwijderd inclusief urenregistraties en saldo.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleRemoveMember(member.id)}>Verwijderen</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="mb-6">
+          <CardContent className="p-6 text-center">
+            <p>Nog geen teamleden toegevoegd</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {teamMembers.map((member) => (
+        <CollapsibleContent key={`content-${member.id}`} open={openMemberDetails[member.id]}>
+          <Card className="mb-4 border-t-0 rounded-t-none">
+            <CardContent className="p-4">
+              {member.hourRegistrations && member.hourRegistrations.length > 0 ? (
+                <div>
+                  <h3 className="text-sm font-medium mb-2 flex items-center">
+                    <Clock className="h-4 w-4 mr-2" />
+                    Uren geschiedenis voor {member.name}
+                  </h3>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {member.hourRegistrations.map((registration: HourRegistration) => (
+                      <div 
+                        key={registration.id} 
+                        className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50"
+                      >
+                        <div className="flex items-center">
+                          <span className="font-medium">{registration.hours} uren</span>
+                          <span className="mx-2 text-gray-400">•</span>
+                          <span className="text-xs text-gray-500 flex items-center">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {formatDate(registration.date)}
+                          </span>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleDeleteRegistration(member.id, registration.id)}
+                          className="h-7 w-7 text-gray-500 hover:text-red-500"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">Geen uren historie beschikbaar</p>
+              )}
+            </CardContent>
+          </Card>
+        </CollapsibleContent>
+      ))}
       
       {availablePeriods.length > 0 && (
         <div className="mb-6">
@@ -473,9 +505,10 @@ const Team = () => {
       
       {availablePeriods.length > 0 && (
         <Button 
-          className="gold-button" 
+          variant="goldGradient"
           onClick={() => setIsPayoutModalOpen(true)}
           disabled={selectedPeriods.length === 0}
+          className="w-full md:w-auto"
         >
           Markeer als uitbetaald
         </Button>

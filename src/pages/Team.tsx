@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -302,165 +303,169 @@ const Team = () => {
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[180px]">Naam</TableHead>
-                    <TableHead className="w-[120px]">Saldo</TableHead>
-                    <TableHead className="w-[80px] text-right">Uren</TableHead>
-                    <TableHead className="w-[180px]">Toevoegen</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {teamMembers.map((member) => (
-                    <React.Fragment key={member.id}>
-                      <TableRow>
-                        <TableCell className="py-2">
-                          <Collapsible>
-                            <CollapsibleTrigger className="font-medium hover:underline cursor-pointer flex items-center">
-                              {member.name}
-                              {openMemberDetails[member.id] ? 
-                                <ChevronUp size={16} className="ml-1" /> : 
-                                <ChevronDown size={16} className="ml-1" />
-                              }
-                            </CollapsibleTrigger>
-                            <CollapsibleContent>
-                              <div className="bg-muted/30 p-3 rounded-b-md mt-2 mb-2">
-                                <div className="flex items-center justify-between mb-3">
-                                  <h3 className="text-sm font-medium mb-2 flex items-center">
-                                    <Clock className="h-4 w-4 mr-2" />
-                                    Urengeschiedenis voor {member.name}
-                                  </h3>
-                                  <div className="flex items-center gap-2">
-                                    {editingMember === member.id ? (
-                                      <div className="flex items-center gap-2">
-                                        <Input
-                                          type="text"
-                                          value={editMemberName}
-                                          onChange={(e) => setEditMemberName(e.target.value)}
-                                          className="h-8 w-32"
-                                          placeholder="Nieuwe naam"
-                                        />
-                                        <Button 
-                                          variant="ghost"
-                                          size="icon"
-                                          onClick={handleUpdateMemberName}
-                                          className="h-8 w-8"
-                                        >
-                                          <Check className="h-4 w-4" />
-                                        </Button>
-                                      </div>
-                                    ) : (
-                                      <>
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon" 
-                                          onClick={() => startEditMemberName(member)}
-                                          className="h-8 w-8 text-gray-500 hover:text-amber-500"
-                                        >
-                                          <Pencil className="h-4 w-4" />
-                                        </Button>
-                                        <AlertDialog>
-                                          <AlertDialogTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700">
-                                              <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                          </AlertDialogTrigger>
-                                          <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                              <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
-                                              <AlertDialogDescription>
-                                                Dit teamlid wordt permanent verwijderd inclusief urenregistraties en saldo.
-                                              </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                              <AlertDialogCancel>Annuleren</AlertDialogCancel>
-                                              <AlertDialogAction onClick={() => handleRemoveMember(member.id)}>Verwijderen</AlertDialogAction>
-                                            </AlertDialogFooter>
-                                          </AlertDialogContent>
-                                        </AlertDialog>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                                {member.hourRegistrations && member.hourRegistrations.length > 0 ? (
-                                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                                    {member.hourRegistrations.map((registration: HourRegistration) => (
-                                      <div 
-                                        key={registration.id} 
-                                        className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50"
-                                      >
-                                        <div className="flex items-center">
-                                          <span className="font-medium">{registration.hours} uren</span>
-                                          <span className="mx-2 text-gray-400">•</span>
-                                          <span className="text-xs text-gray-500 flex items-center">
-                                            <Calendar className="h-3 w-3 mr-1" />
-                                            {formatDate(registration.date)}
-                                          </span>
+              <ScrollArea className="max-h-[600px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[180px]">Naam</TableHead>
+                      <TableHead className="w-[120px]">Saldo</TableHead>
+                      <TableHead className="w-[80px] text-right">Uren</TableHead>
+                      <TableHead className="w-[180px]">Toevoegen</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {teamMembers.map((member) => (
+                      <React.Fragment key={member.id}>
+                        <TableRow>
+                          <TableCell className="py-2">
+                            <Collapsible>
+                              <CollapsibleTrigger className="font-medium hover:underline cursor-pointer flex items-center">
+                                {member.name}
+                                {openMemberDetails[member.id] ? 
+                                  <ChevronUp size={16} className="ml-1" /> : 
+                                  <ChevronDown size={16} className="ml-1" />
+                                }
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="bg-muted/30 p-3 rounded-b-md mt-2 mb-2">
+                                  <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-medium mb-2 flex items-center">
+                                      <Clock className="h-4 w-4 mr-2" />
+                                      Urengeschiedenis voor {member.name}
+                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                      {editingMember === member.id ? (
+                                        <div className="flex items-center gap-2">
+                                          <Input
+                                            type="text"
+                                            value={editMemberName}
+                                            onChange={(e) => setEditMemberName(e.target.value)}
+                                            className="h-8 w-32"
+                                            placeholder="Nieuwe naam"
+                                          />
+                                          <Button 
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={handleUpdateMemberName}
+                                            className="h-8 w-8"
+                                          >
+                                            <Check className="h-4 w-4" />
+                                          </Button>
                                         </div>
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon" 
-                                          onClick={() => handleDeleteRegistration(member.id, registration.id)}
-                                          className="h-7 w-7 text-gray-500 hover:text-red-500"
-                                        >
-                                          <Trash2 className="h-3 w-3" />
-                                        </Button>
-                                      </div>
-                                    ))}
+                                      ) : (
+                                        <>
+                                          <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            onClick={() => startEditMemberName(member)}
+                                            className="h-8 w-8 text-gray-500 hover:text-amber-500"
+                                          >
+                                            <Pencil className="h-4 w-4" />
+                                          </Button>
+                                          <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700">
+                                                <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                              <AlertDialogHeader>
+                                                <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                  Dit teamlid wordt permanent verwijderd inclusief urenregistraties en saldo.
+                                                </AlertDialogDescription>
+                                              </AlertDialogHeader>
+                                              <AlertDialogFooter>
+                                                <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleRemoveMember(member.id)}>Verwijderen</AlertDialogAction>
+                                              </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                          </AlertDialog>
+                                        </>
+                                      )}
+                                    </div>
                                   </div>
+                                  <ScrollArea className="max-h-48">
+                                  {member.hourRegistrations && member.hourRegistrations.length > 0 ? (
+                                    <div className="space-y-2">
+                                      {member.hourRegistrations.map((registration: HourRegistration) => (
+                                        <div 
+                                          key={registration.id} 
+                                          className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50"
+                                        >
+                                          <div className="flex items-center">
+                                            <span className="font-medium">{registration.hours} uren</span>
+                                            <span className="mx-2 text-gray-400">•</span>
+                                            <span className="text-xs text-gray-500 flex items-center">
+                                              <Calendar className="h-3 w-3 mr-1" />
+                                              {formatDate(registration.date)}
+                                            </span>
+                                          </div>
+                                          <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            onClick={() => handleDeleteRegistration(member.id, registration.id)}
+                                            className="h-7 w-7 text-gray-500 hover:text-red-500"
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-gray-500">Geen uren historie beschikbaar</p>
+                                  )}
+                                  </ScrollArea>
+                                </div>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          </TableCell>
+                          <TableCell className="py-2">
+                            {member.balance !== undefined && member.balance !== 0 && (
+                              <span className={`text-xs font-medium ${getBalanceClass(member.balance)}`}>
+                                {member.balance > 0 ? (
+                                  <span className="flex items-center">
+                                    <PlusCircle size={14} className="mr-1" />
+                                    €{member.balance.toFixed(2)}
+                                  </span>
                                 ) : (
-                                  <p className="text-sm text-gray-500">Geen uren historie beschikbaar</p>
+                                  <span className="flex items-center">
+                                    <MinusCircle size={14} className="mr-1" />
+                                    €{Math.abs(member.balance).toFixed(2)}
+                                  </span>
                                 )}
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {member.balance !== undefined && member.balance !== 0 && (
-                            <span className={`text-xs font-medium ${getBalanceClass(member.balance)}`}>
-                              {member.balance > 0 ? (
-                                <span className="flex items-center">
-                                  <PlusCircle size={14} className="mr-1" />
-                                  €{member.balance.toFixed(2)}
-                                </span>
-                              ) : (
-                                <span className="flex items-center">
-                                  <MinusCircle size={14} className="mr-1" />
-                                  €{Math.abs(member.balance).toFixed(2)}
-                                </span>
-                              )}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right py-2 font-medium">{member.hours}</TableCell>
-                        <TableCell className="py-2">
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              name={`hours-${member.id}`}
-                              id={`hours-${member.id}`}
-                              className="h-8 w-20"
-                              placeholder="Uren"
-                              value={hoursInputs[member.id] || ''}
-                              onChange={(e) => handleHoursChange(member.id, e.target.value)}
-                              onKeyDown={(e) => handleKeyDown(e, member.id)}
-                            />
-                            <Button 
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleHoursSubmit(member.id)}
-                              className="h-8 w-8"
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    </React.Fragment>
-                  ))}
-                </TableBody>
-              </Table>
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right py-2 font-medium">{member.hours}</TableCell>
+                          <TableCell className="py-2">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                name={`hours-${member.id}`}
+                                id={`hours-${member.id}`}
+                                className="h-8 w-20"
+                                placeholder="Uren"
+                                value={hoursInputs[member.id] || ''}
+                                onChange={(e) => handleHoursChange(member.id, e.target.value)}
+                                onKeyDown={(e) => handleKeyDown(e, member.id)}
+                              />
+                              <Button 
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleHoursSubmit(member.id)}
+                                className="h-8 w-8"
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      </React.Fragment>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
             </div>
           </CardContent>
         </Card>

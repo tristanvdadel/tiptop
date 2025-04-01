@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Crown, Info } from 'lucide-react';
@@ -13,7 +14,8 @@ const Analytics = () => {
   const {
     periods,
     tier,
-    calculateAverageTipPerHour
+    calculateAverageTipPerHour,
+    teamMembers
   } = useApp();
 
   // Calculate all-time average tip per hour
@@ -21,18 +23,37 @@ const Analytics = () => {
     return calculateAverageTipPerHour();
   }, [calculateAverageTipPerHour]);
 
+  // Create period data for charts
+  const periodData = useMemo(() => {
+    return periods.map(period => {
+      const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
+      const startDate = format(new Date(period.startDate), 'd MMM', {
+        locale: nl
+      });
+      const endDate = period.endDate ? format(new Date(period.endDate), 'd MMM', {
+        locale: nl
+      }) : 'Actief';
+      return {
+        name: `${startDate} - ${endDate}`,
+        total: totalTips,
+        average: period.isActive ? 0 : calculateAverageTipPerHour(period.id),
+        id: period.id
+      };
+    });
+  }, [periods, calculateAverageTipPerHour]);
+
   // Determine the empty state message
   const getEmptyStateMessage = () => {
     const activePeriods = periods.filter(period => period.isActive);
     const periodWithTips = activePeriods.some(period => period.tips.length > 0);
-    const periodWithHours = activePeriods.some(period => period.hours !== undefined && period.hours > 0);
+    const teamHasHours = teamMembers.some(member => member.hours > 0);
 
-    if (!periodWithTips && !periodWithHours) {
-      return "Voeg fooi en uren toe om een gemiddelde te berekenen";
+    if (!periodWithTips && !teamHasHours) {
+      return "Er ontbreken uur gegevens en fooi gegevens. Voeg ze toe om een gemiddelde te zien";
     } else if (!periodWithTips) {
-      return "Voeg fooi-gegevens toe om een gemiddelde te zien";
-    } else if (!periodWithHours) {
-      return "Voeg uren-gegevens toe om een gemiddelde te zien";
+      return "Er ontbreken fooi gegevens. Voeg ze toe om een gemiddelde te zien";
+    } else if (!teamHasHours) {
+      return "Er ontbreken uur gegevens. Voeg ze toe om een gemiddelde te zien";
     }
     return ""; // Fallback, should not happen
   };

@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -74,6 +73,7 @@ type AppContextType = {
   hasReachedPeriodLimit: () => boolean;
   getUnpaidPeriodsCount: () => number;
   deletePaidPeriods: () => void;
+  deletePeriod: (periodId: string) => void;
   
   // Add mostRecentPayout to the context
   mostRecentPayout: PayoutData | null;
@@ -421,6 +421,25 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const filteredPeriods = periods.filter(period => !period.isPaid);
     setPeriods(filteredPeriods);
   };
+  
+  const deletePeriod = (periodId: string) => {
+    const periodToDelete = periods.find(p => p.id === periodId);
+    
+    if (!periodToDelete) return;
+    
+    if (periodToDelete.isActive) {
+      endCurrentPeriod();
+    }
+    
+    setPeriods(prev => prev.filter(p => p.id !== periodId));
+    
+    setPayouts(prev => 
+      prev.map(payout => ({
+        ...payout,
+        periodIds: payout.periodIds.filter(id => id !== periodId)
+      }))
+    );
+  };
 
   return (
     <AppContext.Provider
@@ -444,6 +463,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         hasReachedPeriodLimit,
         getUnpaidPeriodsCount,
         deletePaidPeriods,
+        deletePeriod,
       }}
     >
       {children}

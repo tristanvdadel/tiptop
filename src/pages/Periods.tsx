@@ -1,4 +1,3 @@
-
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -23,6 +22,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -37,13 +37,16 @@ const Periods = () => {
     hasReachedPeriodLimit, 
     getUnpaidPeriodsCount,
     calculateAverageTipPerHour,
-    deletePaidPeriods
+    deletePaidPeriods,
+    deletePeriod
   } = useApp();
   
   const [showLimitDialog, setShowLimitDialog] = useState(false);
   const [showPaidPeriodsDialog, setShowPaidPeriodsDialog] = useState(false);
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [periodToDelete, setPeriodToDelete] = useState<string | null>(null);
+  const [showDeletePeriodDialog, setShowDeletePeriodDialog] = useState(false);
   const { toast } = useToast();
   
   const sortedPeriods = [...periods].sort(
@@ -110,6 +113,24 @@ const Periods = () => {
     });
     setShowUpgradeDialog(false);
     // In a real app, this would trigger a subscription change
+  };
+
+  const handleDeletePeriod = (periodId: string) => {
+    setPeriodToDelete(periodId);
+    setShowDeletePeriodDialog(true);
+  };
+  
+  const confirmDeletePeriod = () => {
+    if (periodToDelete) {
+      deletePeriod(periodToDelete);
+      setPeriodToDelete(null);
+      setShowDeletePeriodDialog(false);
+      toast({
+        title: "Periode verwijderd",
+        description: "De periode is succesvol verwijderd.",
+        variant: "default"
+      });
+    }
   };
 
   return (
@@ -396,6 +417,39 @@ const Periods = () => {
         </DialogContent>
       </Dialog>
       
+      <AlertDialog open={showDeletePeriodDialog} onOpenChange={setShowDeletePeriodDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-center text-xl">Periode verwijderen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                  <Trash2 className="text-red-500" size={24} />
+                </div>
+              </div>
+              <p className="text-center mb-4">
+                Weet je zeker dat je deze periode wilt verwijderen?
+              </p>
+              <div className="bg-red-50 p-4 rounded-md border border-red-200 mb-2">
+                <p className="text-red-700 font-medium mb-2">Deze actie is onomkeerbaar!</p>
+                <p className="text-sm text-red-600">
+                  Alle gegevens van deze periode worden permanent verwijderd, inclusief fooi-invoeren.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeletePeriod}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Ja, verwijder deze periode
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
       {sortedPeriods.length > 0 ? (
         <div className="space-y-4">
           {tier === 'free' && sortedPeriods.length > 3 && (
@@ -432,6 +486,14 @@ const Periods = () => {
                             Uitbetaald
                           </span>
                         )}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleDeletePeriod(period.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     </CardTitle>
                   </CardHeader>
@@ -472,18 +534,6 @@ const Periods = () => {
                         </div>
                       )}
                     </div>
-                  
-                    {isPeriodHidden && (
-                      <div className="mt-4 flex justify-center">
-                        <Button 
-                          variant="outline" 
-                          className="text-[#7E69AB] border-[#7E69AB]"
-                          onClick={handleUpgrade}
-                        >
-                          <Crown size={16} className="mr-1 text-[#7E69AB]" /> Upgraden naar {tier === 'free' ? 'TEAM' : 'PRO'}
-                        </Button>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               );

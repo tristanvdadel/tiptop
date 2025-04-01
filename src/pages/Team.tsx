@@ -453,7 +453,7 @@ const Team = () => {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleHoursSubmit(member.id)}
-                              className="h-8 w-8"
+                              className="h-8 w-8 flex items-center justify-center"
                             >
                               <Check className="h-4 w-4" />
                             </Button>

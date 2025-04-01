@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import EditTipDialog from './EditTipDialog';
+import { useToast } from "@/hooks/use-toast";
 
 interface TipCardProps {
   tip: TipEntry;
@@ -27,6 +28,7 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
   const { currentPeriod, deleteTip, updateTip } = useApp();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const { toast } = useToast();
   
   const actualPeriodId = periodId || (currentPeriod ? currentPeriod.id : '');
   
@@ -36,9 +38,20 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
   });
 
   const handleDelete = () => {
-    if (!actualPeriodId) return;
+    if (!actualPeriodId) {
+      toast({
+        title: "Fout bij verwijderen",
+        description: "Kan fooi niet verwijderen: geen periode gevonden.",
+        variant: "destructive",
+      });
+      return;
+    }
     deleteTip(actualPeriodId, tip.id);
     setIsDeleteDialogOpen(false);
+    toast({
+      title: "Fooi verwijderd",
+      description: "De fooi is succesvol verwijderd.",
+    });
   };
 
   return (
@@ -58,6 +71,7 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
                 size="icon" 
                 className="h-8 w-8" 
                 onClick={() => setIsEditDialogOpen(true)}
+                aria-label="Bewerk fooi"
               >
                 <Pencil size={16} />
               </Button>
@@ -66,6 +80,7 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
                 size="icon" 
                 className="h-8 w-8 text-destructive hover:text-destructive" 
                 onClick={() => setIsDeleteDialogOpen(true)}
+                aria-label="Verwijder fooi"
               >
                 <Trash2 size={16} />
               </Button>

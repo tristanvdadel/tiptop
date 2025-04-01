@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, Info, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
   Tooltip, 
@@ -23,12 +23,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const PeriodSummary = () => {
   const {
     currentPeriod,
     updatePeriod,
-    startNewPeriod
+    startNewPeriod,
+    hasReachedPeriodLimit
   } = useApp();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [periodName, setPeriodName] = useState('');
@@ -50,10 +52,24 @@ const PeriodSummary = () => {
     if (currentPeriod) {
       updatePeriod(currentPeriod.id, { name: periodName });
       setIsEditDialogOpen(false);
+      
+      toast({
+        title: "Periode bijgewerkt",
+        description: "De naam van de periode is bijgewerkt.",
+      });
     }
   };
 
   const handleStartNewPeriod = () => {
+    if (hasReachedPeriodLimit()) {
+      toast({
+        title: "Limiet bereikt",
+        description: "Je hebt het maximale aantal periodes bereikt. Rond bestaande periodes af of upgrade naar PRO.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     startNewPeriod();
     toast({
       title: "Nieuwe periode gestart",
@@ -64,8 +80,14 @@ const PeriodSummary = () => {
   if (!currentPeriod) {
     return (
       <Card>
-        <CardContent className="p-6 text-center">
-          <p className="text-muted-foreground mb-4">Geen actieve periode</p>
+        <CardContent className="p-6">
+          <div className="text-center mb-4">
+            <ClipboardList className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
+            <h3 className="text-lg font-medium mb-1">Geen actieve periode</h3>
+            <p className="text-muted-foreground mb-4">
+              Start een nieuwe periode om fooien te kunnen registreren.
+            </p>
+          </div>
           <Button 
             onClick={handleStartNewPeriod} 
             className="w-full gold-button"
@@ -86,7 +108,7 @@ const PeriodSummary = () => {
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <span>Huidige periode</span>
+            <span>{currentPeriod.name || "Huidige periode"}</span>
             {currentPeriod && (
               <TooltipProvider>
                 <Tooltip>
@@ -114,8 +136,19 @@ const PeriodSummary = () => {
         <div>
           <h3 className="text-lg font-medium mb-2">Totaal fooi: €{totalTip.toFixed(2)}</h3>
           <p className="text-sm text-muted-foreground mb-3">
-            {currentPeriod.tips.length} fooi invoer(en) in deze periode
+            {currentPeriod.tips.length > 0 
+              ? `${currentPeriod.tips.length} fooi invoer(en) in deze periode` 
+              : "Nog geen fooien in deze periode. Voeg fooien toe om ze hier te zien."}
           </p>
+          
+          {currentPeriod.tips.length === 0 && (
+            <Alert className="mt-2 bg-muted/50 border-muted">
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Gebruik het invoerveld hierboven om fooien toe te voegen aan deze periode.
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
       </CardContent>
     </Card>

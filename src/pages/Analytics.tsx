@@ -49,11 +49,11 @@ const Analytics = () => {
     const teamHasHours = teamMembers.some(member => member.hours > 0);
 
     if (!periodWithTips && !teamHasHours) {
-      return "Er ontbreken uur gegevens en fooi gegevens. Voeg ze toe om een gemiddelde te zien";
+      return "Er ontbreken uur gegevens en fooi gegevens. Voeg ze toe om een gemiddelde te zien.";
     } else if (!periodWithTips) {
-      return "Er ontbreken fooi gegevens. Voeg ze toe om een gemiddelde te zien";
+      return "Er ontbreken fooi gegevens. Voeg ze toe om een gemiddelde te zien.";
     } else if (!teamHasHours) {
-      return "Er ontbreken uur gegevens. Voeg ze toe om een gemiddelde te zien";
+      return "Er ontbreken uur gegevens. Voeg ze toe om een gemiddelde te zien.";
     }
     return ""; // Fallback, should not happen
   };
@@ -156,24 +156,31 @@ const Analytics = () => {
           <CardTitle className="text-lg">Fooi per periode</CardTitle>
         </CardHeader>
         <CardContent className="pb-4">
-          <div className="h-60">
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsBarChart data={periodData} margin={{
-              top: 10,
-              right: 20,
-              left: 20,
-              bottom: 5
-            }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip formatter={(value: number) => [`€${value.toFixed(2)}`, '']} />
-                <Legend />
-                <Bar dataKey="total" name="Totaal fooi" fill="#9b87f5" />
-                <Bar dataKey="average" name="Gem. per uur" fill="#33C3F0" />
-              </RechartsBarChart>
-            </ResponsiveContainer>
-          </div>
+          {periodData.length > 0 ? (
+            <div className="h-60">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsBarChart data={periodData} margin={{
+                top: 10,
+                right: 20,
+                left: 20,
+                bottom: 5
+              }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip formatter={(value: number) => [`€${value.toFixed(2)}`, '']} />
+                  <Legend />
+                  <Bar dataKey="total" name="Totaal fooi" fill="#9b87f5" />
+                  <Bar dataKey="average" name="Gem. per uur" fill="#33C3F0" />
+                </RechartsBarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="text-center py-10 text-muted-foreground">
+              <p>Er zijn nog geen periodes met fooi gegevens beschikbaar.</p>
+              <p className="mt-2">Voeg fooien toe aan periodes om hier een grafiek te zien.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
       
@@ -185,14 +192,21 @@ const Analytics = () => {
           <p className="text-muted-foreground mb-2 text-sm">
             Het gemiddelde fooi per uur wordt berekend op basis van de totale fooi en de gewerkte uren van het team.
           </p>
-          <div className="space-y-2">
-            {periodData.filter(period => period.average > 0).map(period => <div key={period.id} className="flex justify-between p-2 border rounded-md">
-                  <div>
-                    <p className="font-medium text-sm">{period.name}</p>
-                  </div>
-                  <div className="font-medium text-sm">€{period.average.toFixed(2)}/uur</div>
-                </div>)}
-          </div>
+          {periodData.filter(period => period.average > 0).length > 0 ? (
+            <div className="space-y-2">
+              {periodData.filter(period => period.average > 0).map(period => <div key={period.id} className="flex justify-between p-2 border rounded-md">
+                    <div>
+                      <p className="font-medium text-sm">{period.name}</p>
+                    </div>
+                    <div className="font-medium text-sm">€{period.average.toFixed(2)}/uur</div>
+                  </div>)}
+            </div>
+          ) : (
+            <div className="text-center py-6 text-muted-foreground">
+              <p>Er zijn nog geen periodes met voldoende gegevens om een gemiddelde te berekenen.</p>
+              <p className="mt-1">Zorg dat er voor elke periode zowel uren als fooien zijn ingevoerd.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>;

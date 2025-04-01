@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Euro, Calendar as CalendarIcon } from 'lucide-react';
+import { Euro, Calendar as CalendarIcon, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Calendar } from '@/components/ui/calendar';
@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { TipEntry } from '@/contexts/AppContext';
+import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface EditTipDialogProps {
   isOpen: boolean;
@@ -34,6 +36,8 @@ const EditTipDialog = ({ isOpen, onClose, tip, periodId, onSave }: EditTipDialog
   const [amount, setAmount] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [date, setDate] = useState<Date>(new Date());
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
   
   // Initialize form with tip data when dialog opens
   useEffect(() => {
@@ -41,12 +45,25 @@ const EditTipDialog = ({ isOpen, onClose, tip, periodId, onSave }: EditTipDialog
       setAmount(tip.amount.toString());
       setNote(tip.note || '');
       setDate(new Date(tip.date));
+      setError(null);
     }
   }, [isOpen, tip]);
   
   const handleSave = () => {
     const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+    
+    if (isNaN(parsedAmount)) {
+      setError("Voer een geldig bedrag in");
+      return;
+    }
+    
+    if (parsedAmount <= 0) {
+      setError("Het bedrag moet groter zijn dan 0");
+      return;
+    }
+    
+    if (!periodId) {
+      setError("Geen periode gevonden om de fooi aan toe te wijzen");
       return;
     }
     
@@ -57,6 +74,11 @@ const EditTipDialog = ({ isOpen, onClose, tip, periodId, onSave }: EditTipDialog
       note.trim() || undefined,
       date.toISOString()
     );
+    
+    toast({
+      title: "Fooi bijgewerkt",
+      description: "De fooi is succesvol bijgewerkt.",
+    });
     
     onClose();
   };
@@ -69,12 +91,22 @@ const EditTipDialog = ({ isOpen, onClose, tip, periodId, onSave }: EditTipDialog
         </DialogHeader>
         
         <div className="grid gap-4 py-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
           <div className="flex items-center">
             <Euro size={20} className="mr-2 text-muted-foreground" />
             <Input
               type="number"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                setError(null);
+              }}
               placeholder="Bedrag"
               step="0.01"
               min="0"
@@ -109,14 +141,17 @@ const EditTipDialog = ({ isOpen, onClose, tip, periodId, onSave }: EditTipDialog
           <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Notitie"
+            placeholder="Notitie (optioneel)"
             className="min-h-[80px]"
           />
         </div>
         
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Annuleren</Button>
-          <Button onClick={handleSave} disabled={!amount || isNaN(parseFloat(amount))}>
+          <Button 
+            onClick={handleSave} 
+            disabled={!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0}
+          >
             Opslaan
           </Button>
         </DialogFooter>

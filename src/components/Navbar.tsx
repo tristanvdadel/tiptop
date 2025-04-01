@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Home, Calendar, Users, BarChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 const Navbar = () => {
   const location = useLocation();
@@ -16,7 +16,7 @@ const Navbar = () => {
       to: '/analytics', 
       icon: <BarChart size={20} />, 
       label: 'Analyse', 
-      isPro: false  // Changed from true to false to make it appear as regular item
+      isPro: false
     },
   ];
 
@@ -28,11 +28,14 @@ const Navbar = () => {
           <span className="badge tier-free text-xs px-2 py-0.5 rounded border">BASIC</span>
         </div>
         <Link to="/fast-tip">
-          <Button className="gold-button">
-            <Plus size={16} className="mr-1" /> FastTip
+          <Button className="gold-button relative group overflow-hidden shadow-lg hover:shadow-amber-300/30 transition-all">
+            <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-amber-400 to-amber-300 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+            <Sparkles size={16} className="mr-1 relative z-10" /> 
+            <span className="relative z-10">FastTip</span>
           </Button>
         </Link>
       </div>
+      
       <nav className="fixed bottom-0 left-0 right-0 bg-background border-t z-10">
         <div className="flex justify-around items-center">
           {navItems.map((item) => (
@@ -44,7 +47,6 @@ const Navbar = () => {
                 location.pathname === item.to
                   ? "text-foreground font-medium"
                   : "text-muted-foreground"
-                // Removed the conditional styling for Pro items
               )}
             >
               {item.icon}

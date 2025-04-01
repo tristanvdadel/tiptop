@@ -3,46 +3,22 @@ import React from 'react';
 import TipInput from '@/components/TipInput';
 import TipCard from '@/components/TipCard';
 import PeriodSummary from '@/components/PeriodSummary';
-import TipChart from '@/components/TipChart';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Card, CardContent } from '@/components/ui/card'; // Added this import
 
 const Index = () => {
-  const { currentPeriod, calculateAverageTipPerHour } = useApp();
+  const { currentPeriod } = useApp();
   
   const formatPeriodDate = (date: string) => {
     return format(new Date(date), 'd MMMM yyyy', { locale: nl });
   };
   
-  const averageTipPerHour = calculateAverageTipPerHour();
-  
   return (
     <div className="space-y-6">
-      <TipChart />
-      
       <div className="grid md:grid-cols-2 gap-6">
         <div>
           <PeriodSummary />
-          
-          {averageTipPerHour > 0 && (
-            <div className="mt-6">
-              <Card 
-                className="cursor-pointer hover:bg-muted/50 transition-colors" 
-                onClick={() => window.location.href = '/analytics'}
-              >
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-medium">Gemiddelde fooi per uur</h3>
-                    </div>
-                    <span className="font-medium">€{averageTipPerHour.toFixed(2)} / uur</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
           
           <div className="mt-6">
             <TipInput />

@@ -4,8 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Info, Pencil } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
   Tooltip, 
@@ -29,7 +28,6 @@ const PeriodSummary = () => {
     currentPeriod,
     updatePeriod
   } = useApp();
-  const navigate = useNavigate();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [periodName, setPeriodName] = useState('');
 

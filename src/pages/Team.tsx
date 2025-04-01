@@ -54,7 +54,7 @@ const Team = () => {
   useEffect(() => {
     const initialHours: { [key: string]: string } = {};
     teamMembers.forEach(member => {
-      initialHours[member.id] = member.hours > 0 ? member.hours.toString() : '';
+      initialHours[member.id] = '';
     });
     setHoursInputs(initialHours);
   }, [teamMembers]);

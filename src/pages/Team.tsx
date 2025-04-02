@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, KeyboardEvent } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { TeamMember, Period, HourRegistration } from '@/contexts/AppContext';
@@ -348,22 +349,28 @@ const Team = () => {
                                       </>}
                                   </div>
                                 </div>
-                                <ScrollArea className="max-h-[300px]">
-                                {member.hourRegistrations && member.hourRegistrations.length > 0 ? <div className="space-y-2">
-                                    {member.hourRegistrations.map((registration: HourRegistration) => <div key={registration.id} className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50">
-                                        <div className="flex items-center">
-                                          <span className="font-medium">{registration.hours} uren</span>
-                                          <span className="mx-2 text-gray-400">•</span>
-                                          <span className="text-xs text-gray-500 flex items-center">
-                                            <Calendar className="h-3 w-3 mr-1" />
-                                            {formatDate(registration.date)}
-                                          </span>
+                                <ScrollArea className="max-h-[300px] overflow-y-auto">
+                                  {member.hourRegistrations && member.hourRegistrations.length > 0 ? (
+                                    <div className="space-y-2">
+                                      {member.hourRegistrations.map((registration: HourRegistration) => (
+                                        <div key={registration.id} className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50">
+                                          <div className="flex items-center">
+                                            <span className="font-medium">{registration.hours} uren</span>
+                                            <span className="mx-2 text-gray-400">•</span>
+                                            <span className="text-xs text-gray-500 flex items-center">
+                                              <Calendar className="h-3 w-3 mr-1" />
+                                              {formatDate(registration.date)}
+                                            </span>
+                                          </div>
+                                          <Button variant="ghost" size="icon" onClick={() => handleDeleteRegistration(member.id, registration.id)} className="h-7 w-7 text-gray-500 hover:text-red-500">
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
                                         </div>
-                                        <Button variant="ghost" size="icon" onClick={() => handleDeleteRegistration(member.id, registration.id)} className="h-7 w-7 text-gray-500 hover:text-red-500">
-                                          <Trash2 className="h-3 w-3" />
-                                        </Button>
-                                      </div>)}
-                                  </div> : <p className="text-sm text-gray-500">Geen uren historie beschikbaar</p>}
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-gray-500">Geen uren historie beschikbaar</p>
+                                  )}
                                 </ScrollArea>
                               </div>
                             </CollapsibleContent>

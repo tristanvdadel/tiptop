@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
 const Team = () => {
   const {
     teamMembers,
@@ -46,9 +47,11 @@ const Team = () => {
   const {
     toast
   } = useToast();
+
   useEffect(() => {
     setSelectedPeriods([]);
   }, []);
+
   useEffect(() => {
     const initialHours: {
       [key: string]: string;
@@ -58,6 +61,7 @@ const Team = () => {
     });
     setHoursInputs(initialHours);
   }, [teamMembers]);
+
   const handleAddMember = () => {
     if (newMemberName.trim() !== '') {
       const nameExists = teamMembers.some(member => member.name.toLowerCase() === newMemberName.trim().toLowerCase());
@@ -73,15 +77,18 @@ const Team = () => {
       setNewMemberName('');
     }
   };
+
   const handleRemoveMember = (id: string) => {
     removeTeamMember(id);
   };
+
   const handleHoursChange = (id: string, value: string) => {
     setHoursInputs(prev => ({
       ...prev,
       [id]: value
     }));
   };
+
   const handleHoursSubmit = (id: string) => {
     const value = hoursInputs[id];
     if (value !== undefined) {
@@ -105,15 +112,18 @@ const Team = () => {
       }
     }
   };
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>, id: string) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleHoursSubmit(id);
     }
   };
+
   const handleDeleteRegistration = (memberId: string, registrationId: string) => {
     deleteHourRegistration(memberId, registrationId);
   };
+
   const togglePeriodSelection = (periodId: string) => {
     setSelectedPeriods(prev => {
       if (prev.includes(periodId)) {
@@ -123,6 +133,7 @@ const Team = () => {
       }
     });
   };
+
   const calculateDistributionForSelectedPeriods = useCallback(() => {
     if (selectedPeriods.length === 0 || teamMembers.length === 0) {
       setDistribution([]);
@@ -131,19 +142,23 @@ const Team = () => {
     const calculatedDistribution = calculateTipDistribution(selectedPeriods);
     setDistribution(calculatedDistribution);
   }, [selectedPeriods, calculateTipDistribution, teamMembers.length]);
+
   useEffect(() => {
     calculateDistributionForSelectedPeriods();
   }, [selectedPeriods, calculateDistributionForSelectedPeriods]);
+
   const toggleMemberDetails = (memberId: string) => {
     setOpenMemberDetails(prev => ({
       ...prev,
       [memberId]: !prev[memberId]
     }));
   };
+
   const startEditMemberName = (member: TeamMember) => {
     setEditingMember(member.id);
     setEditMemberName(member.name);
   };
+
   const handleUpdateMemberName = () => {
     if (!editingMember) return;
     if (updateTeamMemberName(editingMember, editMemberName)) {
@@ -151,6 +166,7 @@ const Team = () => {
       setEditMemberName('');
     }
   };
+
   const setTeamMembers = (members: TeamMember[]) => {
     console.log("Team members would be updated to:", members);
     toast({
@@ -160,6 +176,7 @@ const Team = () => {
     });
     setEditingMember(null);
   };
+
   const handlePayout = () => {
     if (selectedPeriods.length === 0) {
       toast({
@@ -200,21 +217,25 @@ const Team = () => {
     setIsPayoutModalOpen(false);
     setShowPayoutSummary(true);
   };
+
   const formatDate = (dateString: string): string => {
     return format(new Date(dateString), 'd MMM yyyy HH:mm', {
       locale: nl
     });
   };
+
   const unpaidPeriods = periods.filter(period => !period.isPaid && !period.isActive);
   const availablePeriods = unpaidPeriods;
   const formatBalance = (balance?: number): string => {
     if (balance === undefined || balance === 0) return '';
     return balance > 0 ? `+€${balance.toFixed(2)}` : `-€${Math.abs(balance).toFixed(2)}`;
   };
+
   const getBalanceClass = (balance?: number): string => {
     if (balance === undefined || balance === 0) return '';
     return balance > 0 ? 'text-green-600' : 'text-red-600';
   };
+
   const calculateTotalTipsAndHours = useCallback(() => {
     if (selectedPeriods.length === 0) {
       return {
@@ -235,13 +256,16 @@ const Team = () => {
       totalHours
     };
   }, [selectedPeriods, periods, teamMembers]);
+
   const {
     totalTips,
     totalHours
   } = calculateTotalTipsAndHours();
+
   if (showPayoutSummary) {
     return <PayoutSummary onClose={() => setShowPayoutSummary(false)} />;
   }
+
   return <div className="pb-20 min-h-[calc(100vh-100px)]">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <div className="flex items-center gap-2">
@@ -281,7 +305,7 @@ const Team = () => {
                     {teamMembers.map(member => <TableRow key={member.id}>
                         <TableCell className="py-2">
                           <Collapsible>
-                            <CollapsibleTrigger className="font-medium hover:underline cursor-pointer flex items-center">
+                            <CollapsibleTrigger className="font-medium hover:underline cursor-pointer flex items-center" onClick={() => toggleMemberDetails(member.id)}>
                               {member.name}
                               {openMemberDetails[member.id] ? <ChevronUp size={16} className="ml-1" /> : <ChevronDown size={16} className="ml-1" />}
                             </CollapsibleTrigger>
@@ -324,7 +348,7 @@ const Team = () => {
                                       </>}
                                   </div>
                                 </div>
-                                <ScrollArea className="max-h-48">
+                                <ScrollArea className="max-h-[300px]">
                                 {member.hourRegistrations && member.hourRegistrations.length > 0 ? <div className="space-y-2">
                                     {member.hourRegistrations.map((registration: HourRegistration) => <div key={registration.id} className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50">
                                         <div className="flex items-center">
@@ -471,4 +495,5 @@ const Team = () => {
       </AlertDialog>
     </div>;
 };
+
 export default Team;

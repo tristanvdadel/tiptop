@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
+
 const Periods = () => {
   const {
     periods,
@@ -39,6 +40,7 @@ const Periods = () => {
   const [periodToEdit, setPeriodToEdit] = useState<string | null>(null);
   const [editPeriodName, setEditPeriodName] = useState('');
   const [editPeriodNotes, setEditPeriodNotes] = useState('');
+  const [showDeleteAllPaidDialog, setShowDeleteAllPaidDialog] = useState(false);
   const {
     toast
   } = useToast();
@@ -52,6 +54,7 @@ const Periods = () => {
   const unpaidPeriodesCount = getUnpaidPeriodsCount();
   const paidPeriodesCount = periods.filter(p => p.isPaid).length;
   const averageTipPerHour = calculateAverageTipPerHour();
+
   const handleStartNewPeriod = () => {
     if (currentPeriod) {
       return; // Already have an active period
@@ -71,24 +74,29 @@ const Periods = () => {
       description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode."
     });
   };
+
   const handleDeletePaidPeriods = () => {
     setShowPaidPeriodesDialog(false);
     setShowDeleteConfirmDialog(true);
   };
+
   const confirmDeletePaidPeriods = () => {
     deletePaidPeriods();
     setShowDeleteConfirmDialog(false);
+    setShowDeleteAllPaidDialog(false);
     toast({
       title: "Uitbetaalde periodes verwijderd",
       description: "Alle uitbetaalde periodes zijn verwijderd. Je kunt nu nieuwe periodes starten.",
       variant: "default"
     });
   };
+
   const handleUpgrade = () => {
     setShowUpgradeDialog(true);
     setShowPaidPeriodesDialog(false);
     setShowLimitDialog(false);
   };
+
   const doUpgrade = (newTier: 'pro') => {
     toast({
       title: `Upgraden naar ${newTier.toUpperCase()}`,
@@ -98,10 +106,12 @@ const Periods = () => {
     setShowUpgradeDialog(false);
     // In a real app, this would trigger a subscription change
   };
+
   const handleDeletePeriod = (periodId: string) => {
     setPeriodToDelete(periodId);
     setShowDeletePeriodDialog(true);
   };
+
   const confirmDeletePeriod = () => {
     if (periodToDelete) {
       deletePeriod(periodToDelete);
@@ -114,6 +124,7 @@ const Periods = () => {
       });
     }
   };
+
   const handleEditPeriod = (periodId: string) => {
     const period = periods.find(p => p.id === periodId);
     if (period) {
@@ -123,6 +134,7 @@ const Periods = () => {
       setShowEditPeriodDialog(true);
     }
   };
+
   const confirmEditPeriod = () => {
     if (periodToEdit) {
       updatePeriod(periodToEdit, {
@@ -138,6 +150,7 @@ const Periods = () => {
       });
     }
   };
+
   const goToTeamPayouts = () => {
     navigate('/team');
     toast({
@@ -145,6 +158,11 @@ const Periods = () => {
       description: "Selecteer perioden en teamleden om de fooi uit te betalen."
     });
   };
+
+  const handleDeleteAllPaidPeriods = () => {
+    setShowDeleteAllPaidDialog(true);
+  };
+
   return <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Periodes</h1>
@@ -433,6 +451,36 @@ const Periods = () => {
         </DialogContent>
       </Dialog>
       
+      <AlertDialog open={showDeleteAllPaidDialog} onOpenChange={setShowDeleteAllPaidDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-center text-xl">Alle uitbetaalde periodes verwijderen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                  <Trash2 className="text-red-500" size={24} />
+                </div>
+              </div>
+              <p className="text-center mb-4">
+                Weet je zeker dat je alle uitbetaalde periodes wilt verwijderen?
+              </p>
+              <div className="bg-red-50 p-4 rounded-md border border-red-200 mb-2">
+                <p className="text-red-700 font-medium mb-2">Deze actie is onomkeerbaar!</p>
+                <p className="text-sm text-red-600">
+                  Alle uitbetaalde periodes worden permanent verwijderd. Je verliest alle gegevens van deze periodes, inclusief fooi-invoeren en statistieken.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeletePaidPeriods} className="bg-destructive hover:bg-destructive/90">
+              Ja, verwijder uitbetaalde periodes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
       {sortedPeriods.length > 0 ? <div className="space-y-4">
           {tier === 'basic' && sortedPeriods.length > 3 && <Card className="border-[#7E69AB]">
               <CardContent className="p-4 flex items-center">
@@ -510,6 +558,18 @@ const Periods = () => {
                   </CardContent>
                 </Card>;
       })}
+          
+          {paidPeriodesCount > 0 && (
+            <div className="pt-4 border-t border-border mt-8">
+              <Button 
+                variant="outline" 
+                className="w-full border-destructive/30 text-destructive hover:bg-destructive/10"
+                onClick={handleDeleteAllPaidPeriods}
+              >
+                <Trash2 size={16} className="mr-2" /> Verwijder alle uitbetaalde periodes
+              </Button>
+            </div>
+          )}
         </div> : <Card>
           <CardContent className="p-6 text-center">
             <p className="text-muted-foreground">Nog geen periodes gestart.</p>
@@ -520,4 +580,5 @@ const Periods = () => {
         </Card>}
     </div>;
 };
+
 export default Periods;

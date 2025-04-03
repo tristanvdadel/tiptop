@@ -14,7 +14,7 @@ const Layout = ({ children }: LayoutProps) => {
   return (
     <div className="min-h-screen flex flex-col">
       {!isFastTip && <Navbar />}
-      <main className="flex-grow container mx-auto px-4 pb-16 pt-4 w-full">
+      <main className="flex-grow container mx-auto px-4 pb-20 pt-4 w-full">
         {children}
       </main>
     </div>
@@ -22,4 +22,3 @@ const Layout = ({ children }: LayoutProps) => {
 };
 
 export default Layout;
-

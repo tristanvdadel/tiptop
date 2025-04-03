@@ -37,7 +37,7 @@ const Navbar = () => {
         </Link>
       </div>
       
-      <nav className="fixed bottom-0 left-0 right-0 bg-background border-t z-10">
+      <nav className="fixed bottom-0 left-0 right-0 bg-background border-t z-50">
         <div className="flex justify-around items-center">
           {navItems.map((item) => (
             <Link
@@ -61,4 +61,3 @@ const Navbar = () => {
 };
 
 export default Navbar;
-

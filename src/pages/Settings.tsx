@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -130,8 +129,6 @@ const Settings = () => {
               </DialogContent>
             </Dialog>
           </div>
-          
-          <Separator />
           
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">

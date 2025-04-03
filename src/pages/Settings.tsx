@@ -19,6 +19,8 @@ const Settings = () => {
   const { toast } = useToast();
   const [language, setLanguage] = useState("nl");
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [userName, setUserName] = useState("Gebruiker");
+  const [userEmail] = useState("gebruiker@example.com");
   
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -37,11 +39,25 @@ const Settings = () => {
     }
   };
 
+  const handleProfileSave = (data: { name: string }) => {
+    setUserName(data.name);
+    toast({
+      title: "Profiel bijgewerkt",
+      description: "Je profielgegevens zijn succesvol opgeslagen.",
+    });
+  };
+
   const passwordForm = useForm({
     defaultValues: {
       currentPassword: "",
       newPassword: "",
       confirmPassword: "",
+    },
+  });
+
+  const profileForm = useForm({
+    defaultValues: {
+      name: userName,
     },
   });
 
@@ -93,40 +109,58 @@ const Settings = () => {
                 <User className="h-14 w-14 p-2 rounded-full bg-muted text-muted-foreground" />
               )}
               <div>
-                <p className="font-medium">Gebruiker</p>
-                <p className="text-sm text-muted-foreground">gebruiker@example.com</p>
+                <p className="font-medium">{userName}</p>
+                <p className="text-sm text-muted-foreground">{userEmail}</p>
               </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <span>Profiel</span>
             </div>
             <Dialog>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="flex items-center gap-1">
-                  <Upload className="h-3.5 w-3.5" />
-                  <span>Foto wijzigen</span>
+                <Button variant="outline" size="sm">
+                  Wijzigen
                 </Button>
               </DialogTrigger>
-              <DialogContent className="w-[90%] max-w-md">
+              <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                  <DialogTitle>Profielfoto wijzigen</DialogTitle>
+                  <DialogTitle>Profiel wijzigen</DialogTitle>
                   <DialogDescription>
-                    Upload een nieuwe profielfoto.
+                    Pas je profielgegevens en foto aan.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="picture">Selecteer een afbeelding</Label>
-                    <Input 
-                      id="picture" 
-                      type="file" 
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="w-full" 
-                    />
+                <form onSubmit={profileForm.handleSubmit(handleProfileSave)}>
+                  <div className="grid gap-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Naam</Label>
+                      <Input 
+                        id="name" 
+                        defaultValue={userName}
+                        {...profileForm.register("name", { required: true })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="picture">Profielfoto</Label>
+                      <Input 
+                        id="picture" 
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="w-full" 
+                      />
+                    </div>
                   </div>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline">Annuleren</Button>
-                  <Button type="submit">Opslaan</Button>
-                </DialogFooter>
+                  <DialogFooter>
+                    <Button variant="outline" type="button" onClick={() => document.querySelector('dialog')?.close()}>
+                      Annuleren
+                    </Button>
+                    <Button type="submit">Opslaan</Button>
+                  </DialogFooter>
+                </form>
               </DialogContent>
             </Dialog>
           </div>

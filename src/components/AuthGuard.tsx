@@ -29,10 +29,12 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
         // Check if user is in a team (only for protected pages, not Management)
         if (location.pathname !== '/management') {
           try {
+            // Using direct selection instead of joins to avoid recursion
             const { data: teamMembers, error } = await supabase
               .from('team_members')
-              .select('*')
-              .eq('user_id', data.session?.user.id);
+              .select('id') // Just need to know if any records exist
+              .eq('user_id', data.session?.user.id)
+              .limit(1);
             
             if (error) {
               console.error('Error checking team membership:', error);

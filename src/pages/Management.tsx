@@ -41,13 +41,10 @@ const Management = () => {
       setUser(user);
       
       try {
-        // Fetch user teams
+        // First, fetch team memberships directly (no joins)
         const { data: teamMembers, error: memberError } = await supabase
           .from('team_members')
-          .select(`
-            *,
-            teams:team_id (*)
-          `)
+          .select('id, team_id, role')
           .eq('user_id', user.id);
         
         if (memberError) {
@@ -69,21 +66,24 @@ const Management = () => {
         if (adminMemberships.length > 0) {
           setIsAdmin(true);
           
-          // Get full team details
-          const { data: teams, error: teamsError } = await supabase
-            .from('teams')
-            .select('*')
-            .in('id', adminMemberships.map(tm => tm.team_id));
-          
-          if (teamsError) {
-            console.error('Error fetching teams:', teamsError);
-            setError(teamsError.message);
-          } else {
-            setUserTeams(teams || []);
+          // Get team details in a separate query
+          if (adminMemberships.length > 0) {
+            const teamIds = adminMemberships.map(tm => tm.team_id);
+            const { data: teams, error: teamsError } = await supabase
+              .from('teams')
+              .select('*')
+              .in('id', teamIds);
             
-            // Select first team by default if available
-            if (teams && teams.length > 0 && !selectedTeamId) {
-              setSelectedTeamId(teams[0].id);
+            if (teamsError) {
+              console.error('Error fetching teams:', teamsError);
+              setError(teamsError.message);
+            } else {
+              setUserTeams(teams || []);
+              
+              // Select first team by default if available
+              if (teams && teams.length > 0 && !selectedTeamId) {
+                setSelectedTeamId(teams[0].id);
+              }
             }
           }
         }
@@ -141,7 +141,7 @@ const Management = () => {
       
       setNewTeamName('');
       
-      // Refresh teams
+      // Refresh teams - fetch directly without joins
       const { data: teams } = await supabase
         .from('teams')
         .select('*')
@@ -234,10 +234,10 @@ const Management = () => {
       // Check if already a member
       const { data: existingMember } = await supabase
         .from('team_members')
-        .select('*')
+        .select('id')
         .eq('team_id', invite?.team_id)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       
       if (existingMember) {
         throw new Error("Je bent al lid van dit team");

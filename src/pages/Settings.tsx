@@ -13,22 +13,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { useAuth } from "@/contexts/AuthContext";
-import TeamManagement from "@/components/TeamManagement";
 
 const Settings = () => {
   const { theme, toggleTheme } = useTheme();
-  const { user, signOut } = useAuth();
   const { toast } = useToast();
   const [language, setLanguage] = useState("nl");
   const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [userName, setUserName] = useState(() => {
-    if (user?.user_metadata?.first_name || user?.user_metadata?.last_name) {
-      return `${user.user_metadata.first_name || ''} ${user.user_metadata.last_name || ''}`.trim();
-    }
-    return "Gebruiker";
-  });
-  const [userEmail] = useState(() => user?.email || "gebruiker@example.com");
+  const [userName, setUserName] = useState("Gebruiker");
+  const [userEmail] = useState("gebruiker@example.com");
   
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -91,14 +83,6 @@ const Settings = () => {
     });
     
     passwordForm.reset();
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
   };
   
   return (
@@ -279,15 +263,12 @@ const Settings = () => {
               <LogOut className="h-4 w-4 text-muted-foreground" />
               <span>Uitloggen</span>
             </div>
-            <Button variant="destructive" size="sm" onClick={handleLogout}>
+            <Button variant="destructive" size="sm">
               Uitloggen
             </Button>
           </div>
         </CardContent>
       </Card>
-
-      {/* Team Management Section */}
-      <TeamManagement />
 
       <Card>
         <CardHeader>

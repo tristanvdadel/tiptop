@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Calendar, Users, BarChart, Sparkles, Zap, Settings, Building2 } from 'lucide-react';
+import { Home, Calendar, Users, BarChart, Sparkles, Zap, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -11,7 +11,12 @@ const Navbar = () => {
     { to: '/', icon: <Home size={20} />, label: 'Home' },
     { to: '/periods', icon: <Calendar size={20} />, label: 'Periodes' },
     { to: '/team', icon: <Users size={20} />, label: 'Team' },
-    { to: '/management', icon: <Building2 size={20} />, label: 'Beheer' },
+    { 
+      to: '/analytics', 
+      icon: <BarChart size={20} />, 
+      label: 'Analyse', 
+      isPro: false
+    },
     { to: '/settings', icon: <Settings size={20} />, label: 'Instellingen' },
   ];
 

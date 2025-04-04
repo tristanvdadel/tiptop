@@ -12,6 +12,7 @@ import Index from "./pages/Index";
 import FastTip from "./pages/FastTip";
 import Periods from "./pages/Periods";
 import Team from "./pages/Team";
+import Management from "./pages/Management";
 import MyOverview from "./pages/MyOverview";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
@@ -65,6 +66,11 @@ const App = () => (
                 <Route path="/team" element={
                   <ProtectedRoute>
                     <Layout><Team /></Layout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/management" element={
+                  <ProtectedRoute>
+                    <Layout><Management /></Layout>
                   </ProtectedRoute>
                 } />
                 <Route path="/my-overview" element={

@@ -7,17 +7,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PlusCircle, Users, Link, Settings, LogIn } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, Team, TeamMember, Invite } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useNavigate } from "react-router-dom";
-import { v4 as uuidv4 } from 'uuid';
 import { addDays } from 'date-fns';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const Management = () => {
-  const [userTeams, setUserTeams] = useState<any[]>([]);
+  const [userTeams, setUserTeams] = useState<Team[]>([]);
   const [userTeamMemberships, setUserTeamMemberships] = useState<any[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
@@ -25,6 +26,7 @@ const Management = () => {
   const [loadingTeams, setLoadingTeams] = useState(true);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -38,55 +40,63 @@ const Management = () => {
       }
       setUser(user);
       
-      // Fetch user teams
-      const { data: teamMembers, error: memberError } = await supabase
-        .from('team_members')
-        .select(`
-          *,
-          teams:team_id (*)
-        `)
-        .eq('user_id', user.id);
-      
-      if (memberError) {
-        console.error('Error fetching team memberships:', memberError);
-        toast({
-          title: "Fout bij ophalen teams",
-          description: memberError.message,
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      setUserTeamMemberships(teamMembers || []);
-      
-      // Find admin team memberships
-      const adminMemberships = teamMembers?.filter(tm => tm.role === 'admin') || [];
-      if (adminMemberships.length > 0) {
-        setIsAdmin(true);
+      try {
+        // Fetch user teams
+        const { data: teamMembers, error: memberError } = await supabase
+          .from('team_members')
+          .select(`
+            *,
+            teams:team_id (*)
+          `)
+          .eq('user_id', user.id);
         
-        // Get full team details
-        const { data: teams, error: teamsError } = await supabase
-          .from('teams')
-          .select('*')
-          .in('id', adminMemberships.map(tm => tm.team_id));
+        if (memberError) {
+          console.error('Error fetching team memberships:', memberError);
+          setError(memberError.message);
+          toast({
+            title: "Fout bij ophalen teams",
+            description: memberError.message,
+            variant: "destructive",
+          });
+          setLoadingTeams(false);
+          return;
+        }
         
-        if (teamsError) {
-          console.error('Error fetching teams:', teamsError);
-        } else {
-          setUserTeams(teams || []);
+        setUserTeamMemberships(teamMembers || []);
+        
+        // Find admin team memberships
+        const adminMemberships = teamMembers?.filter(tm => tm.role === 'admin') || [];
+        if (adminMemberships.length > 0) {
+          setIsAdmin(true);
           
-          // Select first team by default if available
-          if (teams && teams.length > 0 && !selectedTeamId) {
-            setSelectedTeamId(teams[0].id);
+          // Get full team details
+          const { data: teams, error: teamsError } = await supabase
+            .from('teams')
+            .select('*')
+            .in('id', adminMemberships.map(tm => tm.team_id));
+          
+          if (teamsError) {
+            console.error('Error fetching teams:', teamsError);
+            setError(teamsError.message);
+          } else {
+            setUserTeams(teams || []);
+            
+            // Select first team by default if available
+            if (teams && teams.length > 0 && !selectedTeamId) {
+              setSelectedTeamId(teams[0].id);
+            }
           }
         }
+      } catch (err: any) {
+        console.error('Error in team fetch:', err);
+        setError(err.message);
       }
       
       setLoadingTeams(false);
     };
     
     checkUser();
-  }, [navigate, toast]);
+  }, [navigate, toast, selectedTeamId]);
 
   // Create a new team
   const handleCreateTeam = async () => {
@@ -99,7 +109,7 @@ const Management = () => {
         .insert([
           { name: newTeamName, created_by: user.id }
         ])
-        .select('id')
+        .select()
         .single();
       
       if (teamError) throw teamError;
@@ -217,7 +227,7 @@ const Management = () => {
       }
       
       // Check if invite is expired
-      if (new Date(invite.expires_at) < new Date()) {
+      if (invite && new Date(invite.expires_at) < new Date()) {
         throw new Error("Deze uitnodigingscode is verlopen");
       }
       
@@ -225,7 +235,7 @@ const Management = () => {
       const { data: existingMember } = await supabase
         .from('team_members')
         .select('*')
-        .eq('team_id', invite.team_id)
+        .eq('team_id', invite?.team_id)
         .eq('user_id', user.id)
         .single();
       
@@ -238,10 +248,10 @@ const Management = () => {
         .from('team_members')
         .insert([
           { 
-            team_id: invite.team_id, 
+            team_id: invite?.team_id, 
             user_id: user.id,
-            role: invite.role,
-            permissions: invite.permissions
+            role: invite?.role,
+            permissions: invite?.permissions
           }
         ]);
       
@@ -273,6 +283,16 @@ const Management = () => {
   return (
     <div className="container mx-auto px-4 py-6 space-y-6 pb-20">
       <h1 className="text-2xl font-bold">Beheer</h1>
+      
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Fout bij laden van teams</AlertTitle>
+          <AlertDescription>
+            {error}
+          </AlertDescription>
+        </Alert>
+      )}
       
       <Tabs defaultValue="teams">
         <TabsList className="grid w-full grid-cols-2">
@@ -430,6 +450,16 @@ const Management = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      
+      {userTeams.length === 0 && !loadingTeams && !error && (
+        <Alert className="mt-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Geen team gevonden</AlertTitle>
+          <AlertDescription>
+            Je hebt nog geen team. Maak een nieuw team aan om fooi en uren te kunnen registreren.
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 };

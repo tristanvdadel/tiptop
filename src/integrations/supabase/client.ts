@@ -21,3 +21,41 @@ export const isLoggedIn = async () => {
   const user = await getUser();
   return !!user;
 };
+
+// Interface extensions to help with TypeScript
+export interface Team {
+  id: string;
+  name: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface TeamMember {
+  id: string;
+  team_id: string;
+  user_id: string;
+  role: string;
+  permissions: {
+    add_tips: boolean;
+    add_hours: boolean;
+    view_team: boolean;
+    view_reports: boolean;
+  };
+  created_at: string;
+}
+
+export interface Invite {
+  id: string;
+  team_id: string;
+  code: string;
+  role: string;
+  created_by: string;
+  created_at: string;
+  expires_at: string;
+  permissions: {
+    add_tips: boolean;
+    add_hours: boolean;
+    view_team: boolean;
+    view_reports: boolean;
+  };
+}

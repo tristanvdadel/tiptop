@@ -15,6 +15,10 @@ import MyOverview from "./pages/MyOverview";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import Login from "./pages/Login";
+import Splash from "./pages/Splash";
+import Management from "./pages/Management";
+import AuthGuard from "./components/AuthGuard";
 
 const queryClient = new QueryClient();
 
@@ -27,14 +31,20 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Layout><Index /></Layout>} />
+              {/* Public routes */}
+              <Route path="/splash" element={<Splash />} />
+              <Route path="/login" element={<Login />} />
               <Route path="/fast-tip" element={<FastTip />} />
-              <Route path="/periods" element={<Layout><Periods /></Layout>} />
-              <Route path="/team" element={<Layout><Team /></Layout>} />
-              <Route path="/my-overview" element={<Layout><MyOverview /></Layout>} />
-              <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
-              <Route path="/settings" element={<Layout><Settings /></Layout>} />
-              <Route path="*" element={<Layout><NotFound /></Layout>} />
+              
+              {/* Protected routes */}
+              <Route path="/" element={<AuthGuard><Layout><Index /></Layout></AuthGuard>} />
+              <Route path="/periods" element={<AuthGuard><Layout><Periods /></Layout></AuthGuard>} />
+              <Route path="/team" element={<AuthGuard><Layout><Team /></Layout></AuthGuard>} />
+              <Route path="/management" element={<AuthGuard><Layout><Management /></Layout></AuthGuard>} />
+              <Route path="/my-overview" element={<AuthGuard><Layout><MyOverview /></Layout></AuthGuard>} />
+              <Route path="/analytics" element={<AuthGuard><Layout><Analytics /></Layout></AuthGuard>} />
+              <Route path="/settings" element={<AuthGuard><Layout><Settings /></Layout></AuthGuard>} />
+              <Route path="*" element={<AuthGuard><Layout><NotFound /></Layout></AuthGuard>} />
             </Routes>
           </BrowserRouter>
         </AppProvider>

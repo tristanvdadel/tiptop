@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -65,6 +66,7 @@ type AppContextType = {
   calculateAverageTipPerHour: (periodId?: string, calculationMode?: 'period' | 'day' | 'week' | 'month') => number;
   markPeriodsAsPaid: (periodIds: string[], customDistribution?: PayoutData['distribution']) => void;
   hasReachedLimit: () => boolean;
+  hasReachedPeriodLimit: () => boolean; // Added missing property
   getUnpaidPeriodsCount: () => number;
   deletePaidPeriods: () => void;
   deletePeriod: (periodId: string) => void;
@@ -320,6 +322,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const hasReachedLimit = () => {
     return false; // No limits in the paid version
+  };
+  
+  const hasReachedPeriodLimit = () => {
+    return false; // No limits in the paid version (added function)
   };
   
   const getUnpaidPeriodsCount = () => {
@@ -635,6 +641,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         calculateAverageTipPerHour,
         markPeriodsAsPaid,
         hasReachedLimit,
+        hasReachedPeriodLimit, // Added to the provider
         getUnpaidPeriodsCount,
         deletePaidPeriods,
         deletePeriod,

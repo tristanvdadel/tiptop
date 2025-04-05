@@ -1,4 +1,3 @@
-
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
@@ -64,7 +63,7 @@ const PeriodSummary = () => {
     if (hasReachedPeriodLimit()) {
       toast({
         title: "Limiet bereikt",
-        description: "Je hebt het maximale aantal periodes bereikt. Rond bestaande periodes af of upgrade naar PRO.",
+        description: "Je hebt het maximale aantal periodes bereikt. Rond bestaande periodes af.",
         variant: "destructive"
       });
       return;

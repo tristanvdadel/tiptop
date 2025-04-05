@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Plus, Crown, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileText, DollarSign } from 'lucide-react';
+import { Plus, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileText, DollarSign } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -20,7 +20,6 @@ const Periods = () => {
     periods,
     startNewPeriod,
     endCurrentPeriod,
-    tier,
     currentPeriod,
     hasReachedPeriodLimit,
     getUnpaidPeriodsCount,
@@ -33,7 +32,6 @@ const Periods = () => {
   const [showLimitDialog, setShowLimitDialog] = useState(false);
   const [showPaidPeriodesDialog, setShowPaidPeriodesDialog] = useState(false);
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
-  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [periodToDelete, setPeriodToDelete] = useState<string | null>(null);
   const [showDeletePeriodDialog, setShowDeletePeriodDialog] = useState(false);
   const [showEditPeriodDialog, setShowEditPeriodDialog] = useState(false);
@@ -50,7 +48,7 @@ const Periods = () => {
       locale: nl
     });
   };
-  const tierPeriodLimit = tier === 'basic' ? 7 : Infinity;
+  const tierPeriodLimit = Infinity;
   const unpaidPeriodesCount = getUnpaidPeriodsCount();
   const paidPeriodesCount = periods.filter(p => p.isPaid).length;
   const averageTipPerHour = calculateAverageTipPerHour();
@@ -168,7 +166,7 @@ const Periods = () => {
         <h1 className="text-2xl font-bold">Periodes</h1>
         <div className="flex items-center gap-2">
           <Badge className="tier-free">
-            {periods.length}/{tier === 'basic' ? '7' : 'totaal'}
+            {periods.length}/totaal
           </Badge>
           <Button onClick={handleStartNewPeriod} disabled={!!currentPeriod} className="gold-button">
             <Plus size={16} className="mr-1" /> Nieuwe periode
@@ -251,7 +249,7 @@ const Periods = () => {
                   <AlertTriangle className="text-amber-500" size={24} />
                 </div>
               </div>
-              Je hebt het maximale aantal periodes ({tierPeriodLimit}) bereikt voor je {tier.toUpperCase()}-abonnement.
+              Je hebt het maximale aantal periodes ({tierPeriodLimit}) bereikt voor je FREE-abonnement.
               {unpaidPeriodesCount > 0 && <p className="mt-2 font-medium">
                   Je hebt {unpaidPeriodesCount} onbetaalde periodes. Betaal deze uit om ruimte te maken voor nieuwe periodes.
                 </p>}
@@ -281,7 +279,7 @@ const Periods = () => {
                 </div>
               </div>
               <p className="text-center mb-4">
-                Je hebt het maximale aantal periodes ({tierPeriodLimit}) bereikt voor je {tier.toUpperCase()}-abonnement.
+                Je hebt het maximale aantal periodes ({tierPeriodLimit}) bereikt voor je FREE-abonnement.
               </p>
               <p className="mb-3">
                 Je hebt {paidPeriodesCount} uitbetaalde periodes. Je kunt:
@@ -352,7 +350,7 @@ const Periods = () => {
           </DialogHeader>
           
           <div className="space-y-4">
-            <Card className={`border-[#9b87f5] ${tier !== 'pro' ? 'bg-[#9b87f5]/5' : ''}`}>
+            <Card className={`border-[#9b87f5] `}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex justify-between items-center">
                   <span className="flex items-center">
@@ -376,11 +374,9 @@ const Periods = () => {
                     <span className="text-green-500 mr-2">✓</span> Prioriteit support
                   </li>
                 </ul>
-                {tier !== 'pro' ? <Button onClick={() => doUpgrade('pro')} className="w-full bg-[#9b87f5] hover:bg-[#8B5CF6]">
+                <Button onClick={() => doUpgrade('pro')} className="w-full bg-[#9b87f5] hover:bg-[#8B5CF6]">
                     Upgrade naar PRO
-                  </Button> : <Button disabled className="w-full bg-[#9b87f5]/50">
-                    Huidige Abonnement
-                  </Button>}
+                  </Button>
               </CardContent>
             </Card>
           </div>
@@ -482,21 +478,12 @@ const Periods = () => {
       </AlertDialog>
       
       {sortedPeriods.length > 0 ? <div className="space-y-4">
-          {tier === 'basic' && sortedPeriods.length > 3 && <Card className="border-[#7E69AB]">
-              <CardContent className="p-4 flex items-center">
-                <Crown size={20} className="text-[#7E69AB] mr-2" />
-                <p className="text-sm">
-                  Upgrade naar <span className="font-medium text-[#7E69AB]">PRO</span> om toegang te krijgen tot meer historische periodes.
-                </p>
-              </CardContent>
-            </Card>}
           
           {sortedPeriods.filter(period => !period.isActive) // Filter out active period since we show it separately at the top
       .map((period, index) => {
-        const isPeriodHidden = tier === 'basic' && index >= 3;
         const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
         const periodAverageTipPerHour = period.isPaid ? calculateAverageTipPerHour(period.id) : 0;
-        return <Card key={period.id} className={isPeriodHidden ? 'opacity-40' : ''}>
+        return <Card key={period.id}>
                   <CardHeader className="pb-2">
                     <CardTitle className="flex justify-between items-center text-base">
                       <span>

@@ -358,14 +358,6 @@ const Management = () => {
                               {inviteCode}
                             </div>
                             
-                            <div className="flex flex-col items-center">
-                              <Label className="mb-2">QR Code:</Label>
-                              <QRCodeSVG 
-                                value={`tiptop-invite:${inviteCode}`}
-                                size={200}
-                              />
-                            </div>
-                            
                             <Button
                               onClick={() => {
                                 navigator.clipboard.writeText(inviteCode);

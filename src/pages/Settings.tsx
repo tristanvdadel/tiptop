@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -13,6 +12,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 const Settings = () => {
   const { theme, toggleTheme } = useTheme();
@@ -21,6 +22,7 @@ const Settings = () => {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userName, setUserName] = useState("Gebruiker");
   const [userEmail] = useState("gebruiker@example.com");
+  const navigate = useNavigate();
   
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -83,6 +85,24 @@ const Settings = () => {
     });
     
     passwordForm.reset();
+  };
+  
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Uitgelogd",
+        description: "Je bent succesvol uitgelogd.",
+      });
+      navigate('/splash');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast({
+        title: 'Fout bij uitloggen',
+        description: 'Er is een fout opgetreden bij het uitloggen.',
+        variant: 'destructive',
+      });
+    }
   };
   
   return (
@@ -263,7 +283,7 @@ const Settings = () => {
               <LogOut className="h-4 w-4 text-muted-foreground" />
               <span>Uitloggen</span>
             </div>
-            <Button variant="destructive" size="sm">
+            <Button variant="destructive" size="sm" onClick={handleSignOut}>
               Uitloggen
             </Button>
           </div>

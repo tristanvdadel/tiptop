@@ -19,7 +19,6 @@ import { AlertCircle } from "lucide-react";
 
 const Management = () => {
   const [userTeams, setUserTeams] = useState<Team[]>([]);
-  const [userTeamMemberships, setUserTeamMemberships] = useState<any[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
@@ -33,70 +32,69 @@ const Management = () => {
   // Fetch user and check if logged in
   useEffect(() => {
     const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-      setUser(user);
-      
       try {
-        // First, fetch team memberships directly (no joins)
-        const { data: teamMembers, error: memberError } = await supabase
-          .from('team_members')
-          .select('id, team_id, role')
-          .eq('user_id', user.id);
-        
-        if (memberError) {
-          console.error('Error fetching team memberships:', memberError);
-          setError(memberError.message);
-          toast({
-            title: "Fout bij ophalen teams",
-            description: memberError.message,
-            variant: "destructive",
-          });
-          setLoadingTeams(false);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          navigate('/login');
           return;
         }
+        setUser(user);
         
-        setUserTeamMemberships(teamMembers || []);
+        // First, get the teams the user is an admin of
+        setLoadingTeams(true);
+        setError(null);
         
-        // Find admin team memberships
-        const adminMemberships = teamMembers?.filter(tm => tm.role === 'admin') || [];
-        if (adminMemberships.length > 0) {
-          setIsAdmin(true);
+        try {
+          // Get all team memberships for this user
+          const { data: memberships, error: membershipError } = await supabase
+            .from('team_members')
+            .select('team_id, role')
+            .eq('user_id', user.id);
           
-          // Get team details in a separate query
-          if (adminMemberships.length > 0) {
-            const teamIds = adminMemberships.map(tm => tm.team_id);
+          if (membershipError) {
+            throw membershipError;
+          }
+          
+          // Find admin memberships
+          const adminTeamIds = memberships
+            ?.filter(membership => membership.role === 'admin')
+            .map(membership => membership.team_id) || [];
+          
+          setIsAdmin(adminTeamIds.length > 0);
+          
+          // If user is admin of any teams, fetch those teams
+          if (adminTeamIds.length > 0) {
             const { data: teams, error: teamsError } = await supabase
               .from('teams')
               .select('*')
-              .in('id', teamIds);
+              .in('id', adminTeamIds);
             
             if (teamsError) {
-              console.error('Error fetching teams:', teamsError);
-              setError(teamsError.message);
-            } else {
-              setUserTeams(teams || []);
-              
-              // Select first team by default if available
-              if (teams && teams.length > 0 && !selectedTeamId) {
-                setSelectedTeamId(teams[0].id);
-              }
+              throw teamsError;
+            }
+            
+            setUserTeams(teams || []);
+            
+            // Select first team by default
+            if (teams && teams.length > 0 && !selectedTeamId) {
+              setSelectedTeamId(teams[0].id);
             }
           }
+        } catch (err: any) {
+          console.error('Error fetching teams:', err);
+          setError(err.message || 'Er is een fout opgetreden bij het ophalen van teams');
+        } finally {
+          setLoadingTeams(false);
         }
       } catch (err: any) {
-        console.error('Error in team fetch:', err);
-        setError(err.message);
+        console.error('Error checking user:', err);
+        setError(err.message || 'Er is een fout opgetreden');
+        setLoadingTeams(false);
       }
-      
-      setLoadingTeams(false);
     };
     
     checkUser();
-  }, [navigate, toast, selectedTeamId]);
+  }, [navigate, selectedTeamId]);
 
   // Create a new team
   const handleCreateTeam = async () => {
@@ -141,7 +139,7 @@ const Management = () => {
       
       setNewTeamName('');
       
-      // Refresh teams - fetch directly without joins
+      // Fetch the newly created team
       const { data: teams } = await supabase
         .from('teams')
         .select('*')
@@ -152,6 +150,11 @@ const Management = () => {
         setSelectedTeamId(teams[0].id);
         setIsAdmin(true);
       }
+      
+      // Refresh the page to reflect changes
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
       
     } catch (error: any) {
       console.error('Error creating team:', error);

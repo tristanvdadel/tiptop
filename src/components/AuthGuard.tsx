@@ -21,41 +21,46 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
   
   useEffect(() => {
     const checkAuth = async () => {
-      const { data } = await supabase.auth.getSession();
-      const isAuthenticated = !!data.session;
-      setAuthenticated(isAuthenticated);
-      
-      if (isAuthenticated) {
-        // Check if user is in a team (only for protected pages, not Management)
-        if (location.pathname !== '/management') {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const isAuthenticated = !!data.session;
+        setAuthenticated(isAuthenticated);
+        
+        if (isAuthenticated && location.pathname !== '/management') {
           try {
-            // Using direct selection instead of joins to avoid recursion
-            const { data: teamMembers, error } = await supabase
+            // Query the database to check if the user is in any team
+            const { count, error } = await supabase
               .from('team_members')
-              .select('id') // Just need to know if any records exist
-              .eq('user_id', data.session?.user.id)
-              .limit(1);
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', data.session?.user.id);
             
             if (error) {
               console.error('Error checking team membership:', error);
+              setHasTeam(false);
             } else {
-              setHasTeam(teamMembers && teamMembers.length > 0);
+              setHasTeam(count ? count > 0 : false);
             }
           } catch (err) {
             console.error('Error checking team:', err);
+            setHasTeam(false);
           }
         }
+      } catch (err) {
+        console.error('Error checking authentication:', err);
+        setAuthenticated(false);
+      } finally {
+        setCheckingTeam(false);
+        setLoading(false);
       }
-      
-      setCheckingTeam(false);
-      setLoading(false);
     };
     
     checkAuth();
     
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setAuthenticated(!!session);
-      setLoading(false);
+      if (!session) {
+        setLoading(false);
+      }
     });
     
     return () => {

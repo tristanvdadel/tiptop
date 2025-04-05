@@ -24,6 +24,7 @@ const Management = () => {
   const [selectedTeamId, setSelectedTeamId] = useState(null);
   const [user, setUser] = useState(null);
   const [error, setError] = useState(null);
+  const [hasAnyTeam, setHasAnyTeam] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -59,6 +60,7 @@ const Management = () => {
           }
           
           setUserTeamMemberships(teamMembers || []);
+          setHasAnyTeam(teamMembers && teamMembers.length > 0);
           
           const adminMemberships = teamMembers?.filter(tm => tm.role === 'admin') || [];
           
@@ -278,9 +280,11 @@ const Management = () => {
       )}
       
       <Tabs defaultValue="teams">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className={`grid w-full ${hasAnyTeam ? 'grid-cols-1' : 'grid-cols-2'}`}>
           <TabsTrigger value="teams">Mijn teams</TabsTrigger>
-          <TabsTrigger value="join">Team toetreden</TabsTrigger>
+          {!hasAnyTeam && (
+            <TabsTrigger value="join">Team toetreden</TabsTrigger>
+          )}
         </TabsList>
         
         <TabsContent value="teams" className="space-y-4 mt-4">
@@ -408,30 +412,32 @@ const Management = () => {
           )}
         </TabsContent>
         
-        <TabsContent value="join" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Team toetreden met code</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="inviteCode">Uitnodigingscode</Label>
-                  <Input
-                    id="inviteCode"
-                    placeholder="Voer code in"
-                    value={inviteCode}
-                    onChange={(e) => setInviteCode(e.target.value)}
-                  />
+        {!hasAnyTeam && (
+          <TabsContent value="join" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Team toetreden met code</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="inviteCode">Uitnodigingscode</Label>
+                    <Input
+                      id="inviteCode"
+                      placeholder="Voer code in"
+                      value={inviteCode}
+                      onChange={(e) => setInviteCode(e.target.value)}
+                    />
+                  </div>
+                  <Button onClick={handleJoinTeam} disabled={!inviteCode.trim()}>
+                    <LogIn className="mr-2 h-4 w-4" />
+                    Team toetreden
+                  </Button>
                 </div>
-                <Button onClick={handleJoinTeam} disabled={!inviteCode.trim()}>
-                  <LogIn className="mr-2 h-4 w-4" />
-                  Team toetreden
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
       
       {userTeams.length === 0 && !loadingTeams && !error && (

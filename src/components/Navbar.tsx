@@ -6,11 +6,52 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 
 const Navbar = () => {
   const location = useLocation();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [teamName, setTeamName] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const fetchTeamName = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        
+        // Fetch the team the user belongs to
+        const { data: teamMembers, error: memberError } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', session.user.id)
+          .single();
+        
+        if (memberError || !teamMembers) {
+          console.error('Error fetching team membership:', memberError);
+          return;
+        }
+        
+        // Get the team name
+        const { data: team, error: teamError } = await supabase
+          .from('teams')
+          .select('name')
+          .eq('id', teamMembers.team_id)
+          .single();
+        
+        if (teamError || !team) {
+          console.error('Error fetching team:', teamError);
+          return;
+        }
+        
+        setTeamName(team.name);
+      } catch (error) {
+        console.error('Error fetching team data:', error);
+      }
+    };
+    
+    fetchTeamName();
+  }, []);
   
   const navItems = [
     { to: '/', icon: <Home size={20} />, label: 'Home' },
@@ -49,7 +90,14 @@ const Navbar = () => {
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <div className="flex items-center">
           <h1 className="text-2xl font-bold mr-2">TipTop</h1>
-          <span className="badge tier-free text-xs px-2 py-0.5 rounded border">BASIC</span>
+          <div className="flex items-center gap-2">
+            <span className="badge tier-free text-xs px-2 py-0.5 rounded border">BASIC</span>
+            {teamName && (
+              <span className="text-sm ml-1 font-medium text-muted-foreground">
+                | {teamName}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
           <Link to="/fast-tip">

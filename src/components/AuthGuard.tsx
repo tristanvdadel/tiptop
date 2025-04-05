@@ -19,6 +19,14 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   
+  // Pages that don't require a team
+  const noTeamRequiredPages = ['/management'];
+  // Pages that specifically need a team
+  const teamRequiredPages = ['/', '/periods', '/team', '/analytics', '/fast-tip'];
+  
+  const needsTeam = teamRequiredPages.includes(location.pathname);
+  const isManagementPage = location.pathname === '/management';
+  
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -26,29 +34,33 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
         const isAuthenticated = !!data.session;
         setAuthenticated(isAuthenticated);
         
-        if (isAuthenticated && location.pathname !== '/management') {
-          // We zorgen ervoor dat we geen query uitvoeren die een oneindige recursie kan veroorzaken
-          // Door expliciet alleen de count op te halen zonder joins of referenties naar dezelfde tabel
-          try {
-            const { count, error } = await supabase
-              .from('team_members')
-              .select('*', { count: 'exact', head: true })
-              .eq('user_id', data.session?.user.id);
-            
-            if (error) {
-              console.error('Error checking team membership:', error);
+        if (isAuthenticated) {
+          // Only check team membership if not on a noTeamRequiredPages page
+          if (!noTeamRequiredPages.includes(location.pathname)) {
+            try {
+              const { count, error } = await supabase
+                .from('team_members')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', data.session?.user.id);
+              
+              if (error) {
+                console.error('Error checking team membership:', error);
+                setHasTeam(false);
+              } else {
+                // Count can be null if there are no rows
+                setHasTeam(count ? count > 0 : false);
+              }
+            } catch (err) {
+              console.error('Error checking team:', err);
               setHasTeam(false);
-            } else {
-              // Count kan null zijn als er geen rijen zijn
-              setHasTeam(count ? count > 0 : false);
+            } finally {
+              setCheckingTeam(false);
             }
-          } catch (err) {
-            console.error('Error checking team:', err);
-            setHasTeam(false);
-          } finally {
+          } else {
             setCheckingTeam(false);
           }
         } else {
+          setHasTeam(false);
           setCheckingTeam(false);
         }
       } catch (err) {
@@ -67,6 +79,7 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
       if (!session) {
         setLoading(false);
         setCheckingTeam(false);
+        setHasTeam(false);
       }
     });
     
@@ -87,22 +100,30 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
     return <Navigate to="/login" replace />;
   }
   
-  // If we checked team status and there's no team, and we're not on the management page
-  if (!checkingTeam && !hasTeam && location.pathname !== '/management') {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <Alert variant="destructive" className="max-w-md mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Je moet eerst een team aanmaken</AlertTitle>
-          <AlertDescription>
-            Voordat je fooi en uren kunt registreren, moet je eerst een team aanmaken of lid worden van een team.
-          </AlertDescription>
-        </Alert>
-        <Button onClick={() => navigate('/management')}>
-          Naar Teambeheer
-        </Button>
-      </div>
-    );
+  // If checking team status is done and the user has no team
+  if (!checkingTeam && !hasTeam) {
+    // If they're on the management page, allow access (where they can create a team)
+    if (isManagementPage) {
+      return <>{children}</>;
+    }
+    
+    // If they're trying to access a page that requires a team, redirect to management
+    if (needsTeam) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen p-4">
+          <Alert variant="destructive" className="max-w-md mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Je moet eerst een team aanmaken</AlertTitle>
+            <AlertDescription>
+              Voordat je fooi en uren kunt registreren, moet je eerst een team aanmaken of lid worden van een team.
+            </AlertDescription>
+          </Alert>
+          <Button onClick={() => navigate('/management')}>
+            Naar Teambeheer
+          </Button>
+        </div>
+      );
+    }
   }
   
   return <>{children}</>;

@@ -4,7 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { LogOut, Bell, Moon, User, Edit, CreditCard, Globe, Lock, Upload } from "lucide-react";
+import { LogOut, Bell, Moon, User, CreditCard, Globe, Lock, Upload } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Badge } from "@/components/ui/badge";
 
 const Settings = () => {
   const { theme, toggleTheme } = useTheme();
@@ -116,10 +115,7 @@ const Settings = () => {
       
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <div className="flex items-center space-x-3">
-            <CardTitle>Account</CardTitle>
-            <Badge className="bg-tier-free text-white font-semibold text-xs">BASIC</Badge>
-          </div>
+          <CardTitle>Account</CardTitle>
           <CardDescription>Beheer je account instellingen</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -268,14 +264,15 @@ const Settings = () => {
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="space-y-2">
-                    <h4 className="font-medium">Huidig abonnement</h4>
-                    <p className="text-sm text-muted-foreground">Pro Plan - €9,99/maand</p>
+                    <h4 className="font-medium">Huidige abonnement</h4>
+                    <p className="text-sm text-muted-foreground">TipTop - €25/maand</p>
+                    <p className="text-xs text-muted-foreground">Eerste maand is gratis</p>
                     <p className="text-xs text-muted-foreground">Volgende factuurdatum: 15 juni 2024</p>
                   </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline">Annuleren</Button>
-                  <Button>Upgraden</Button>
+                  <Button>Abonnement wijzigen</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

@@ -1,6 +1,6 @@
 
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Calendar, Users, BarChart, Sparkles, Zap, Settings, Shield } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Home, Calendar, Users, BarChart, Zap, Settings, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
@@ -54,12 +54,7 @@ const Navbar = () => {
     { to: '/periods', icon: <Calendar size={20} />, label: 'Periodes' },
     { to: '/team', icon: <Users size={20} />, label: 'Team' },
     { to: '/management', icon: <Shield size={20} />, label: 'Beheer' },
-    { 
-      to: '/analytics', 
-      icon: <BarChart size={20} />, 
-      label: 'Analyse', 
-      isPro: false
-    },
+    { to: '/analytics', icon: <BarChart size={20} />, label: 'Analyse' },
     { to: '/settings', icon: <Settings size={20} />, label: 'Instellingen' },
   ];
 

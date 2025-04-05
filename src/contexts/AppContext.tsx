@@ -47,25 +47,11 @@ export type PayoutData = {
   }[];
 };
 
-type TierLimits = {
-  basic: {
-    periods: number;
-    teamMembers: number;
-    hourRegistrationsPerMember: number;
-  };
-  pro: {
-    periods: number;
-    teamMembers: number;
-    hourRegistrationsPerMember: number;
-  };
-};
-
 type AppContextType = {
   // State
   currentPeriod: Period | null;
   periods: Period[];
   teamMembers: TeamMember[];
-  tier: 'basic' | 'pro';
   payouts: PayoutData[];
   
   // Actions
@@ -78,7 +64,7 @@ type AppContextType = {
   calculateTipDistribution: (periodIds?: string[], calculationMode?: 'period' | 'day' | 'week' | 'month') => TeamMember[];
   calculateAverageTipPerHour: (periodId?: string, calculationMode?: 'period' | 'day' | 'week' | 'month') => number;
   markPeriodsAsPaid: (periodIds: string[], customDistribution?: PayoutData['distribution']) => void;
-  hasReachedPeriodLimit: () => boolean;
+  hasReachedLimit: () => boolean;
   getUnpaidPeriodsCount: () => number;
   deletePaidPeriods: () => void;
   deletePeriod: (periodId: string) => void;
@@ -93,17 +79,11 @@ type AppContextType = {
   setMostRecentPayout: (payout: PayoutData | null) => void;
 };
 
-const tierLimits: TierLimits = {
-  basic: {
-    periods: 7,
-    teamMembers: 10,
-    hourRegistrationsPerMember: 7,
-  },
-  pro: {
-    periods: Infinity,
-    teamMembers: Infinity,
-    hourRegistrationsPerMember: Infinity,
-  },
+// Define app limits
+const appLimits = {
+  periods: Infinity,
+  teamMembers: Infinity,
+  hourRegistrationsPerMember: Infinity,
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -112,7 +92,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [periods, setPeriods] = useState<Period[]>([]);
   const [currentPeriod, setCurrentPeriod] = useState<Period | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [tier] = useState<'basic' | 'pro'>('basic');
   const [payouts, setPayouts] = useState<PayoutData[]>([]);
   const [mostRecentPayout, setMostRecentPayout] = useState<PayoutData | null>(null);
   const { toast } = useToast();
@@ -159,10 +138,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const addTip = (amount: number, note?: string, customDate?: string) => {
     if (!currentPeriod) {
-      if (hasReachedPeriodLimit()) {
+      if (hasReachedLimit()) {
         toast({
           title: "Limiet bereikt",
-          description: `Je hebt het maximale aantal perioden (${tierLimits[tier].periods}) bereikt voor je huidige abonnement. Rond bestaande periodes af of upgrade.`,
+          description: "Je hebt het maximale aantal perioden bereikt. Rond bestaande periodes af.",
         });
         return;
       }
@@ -190,14 +169,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addTeamMember = (name: string) => {
-    if (teamMembers.length >= tierLimits[tier].teamMembers) {
-      toast({
-        title: "Limiet bereikt",
-        description: `Je hebt het maximale aantal teamleden (${tierLimits[tier].teamMembers}) bereikt voor je huidige abonnement.`,
-      });
-      return;
-    }
-    
     const newMember: TeamMember = {
       id: generateId(),
       name,
@@ -216,15 +187,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       prev.map(member => {
         if (member.id === id) {
           const existingRegistrations = member.hourRegistrations || [];
-          
-          // Check if member has reached the hourRegistrations limit based on tier
-          if (existingRegistrations.length >= tierLimits[tier].hourRegistrationsPerMember) {
-            toast({
-              title: "Limiet bereikt",
-              description: `Je hebt het maximale aantal urenregistraties (${tierLimits[tier].hourRegistrationsPerMember}) bereikt voor dit teamlid in je huidige abonnement.`,
-            });
-            return member;
-          }
           
           const newRegistration: HourRegistration = {
             id: generateId(),
@@ -356,10 +318,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return true;
   };
 
-  const hasReachedPeriodLimit = () => {
-    const periodLimit = tierLimits[tier].periods;
-    const currentPeriodsCount = periods.length;
-    return currentPeriodsCount >= periodLimit;
+  const hasReachedLimit = () => {
+    return false; // No limits in the paid version
   };
   
   const getUnpaidPeriodsCount = () => {
@@ -367,14 +327,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const startNewPeriod = () => {
-    if (hasReachedPeriodLimit()) {
-      toast({
-        title: "Limiet bereikt",
-        description: `Je hebt het maximale aantal perioden (${tierLimits[tier].periods}) bereikt voor je huidige abonnement. Rond bestaande periodes af of upgrade.`,
-      });
-      return;
-    }
-    
     if (currentPeriod && currentPeriod.isActive) {
       endCurrentPeriod();
     }
@@ -433,21 +385,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return [];
     }
     
-    if (calculationMode === 'period' || tier !== 'pro') {
-      return teamMembers.map(member => {
-        const tipShare = totalHours > 0 
-          ? (member.hours / totalHours) * totalTip 
-          : 0;
-        
-        const existingBalance = member.balance || 0;
-          
-        return {
-          ...member,
-          tipAmount: parseFloat((tipShare + existingBalance).toFixed(2)),
-        };
-      });
-    }
-    
+    // Advanced calculation modes are available for all users now
     let adjustmentFactor = 1;
     
     switch (calculationMode) {
@@ -515,10 +453,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return 0;
     }
     
-    if (calculationMode === 'period' || tier !== 'pro') {
-      return totalTips / totalHours;
-    }
-    
+    // Advanced calculation modes are available for all users now
     let adjustmentFactor = 1;
     
     switch (calculationMode) {
@@ -687,7 +622,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         currentPeriod,
         periods,
         teamMembers,
-        tier,
         payouts,
         mostRecentPayout,
         setMostRecentPayout,
@@ -700,7 +634,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         calculateTipDistribution,
         calculateAverageTipPerHour,
         markPeriodsAsPaid,
-        hasReachedPeriodLimit,
+        hasReachedLimit,
         getUnpaidPeriodsCount,
         deletePaidPeriods,
         deletePeriod,

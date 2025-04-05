@@ -27,8 +27,9 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
         setAuthenticated(isAuthenticated);
         
         if (isAuthenticated && location.pathname !== '/management') {
+          // We zorgen ervoor dat we geen query uitvoeren die een oneindige recursie kan veroorzaken
+          // Door expliciet alleen de count op te halen zonder joins of referenties naar dezelfde tabel
           try {
-            // Simplified query to check team membership - reduces risk of recursion
             const { count, error } = await supabase
               .from('team_members')
               .select('*', { count: 'exact', head: true })
@@ -38,6 +39,7 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
               console.error('Error checking team membership:', error);
               setHasTeam(false);
             } else {
+              // Count kan null zijn als er geen rijen zijn
               setHasTeam(count ? count > 0 : false);
             }
           } catch (err) {

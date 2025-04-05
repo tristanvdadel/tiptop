@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +27,6 @@ const Management = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Fetch user and check if logged in
   useEffect(() => {
     const checkUser = async () => {
       try {
@@ -43,7 +41,6 @@ const Management = () => {
         setError(null);
         
         try {
-          // First, fetch team memberships directly (no joins)
           const { data: teamMembers, error: memberError } = await supabase
             .from('team_members')
             .select('id, team_id, role')
@@ -63,13 +60,11 @@ const Management = () => {
           
           setUserTeamMemberships(teamMembers || []);
           
-          // Find admin team memberships
           const adminMemberships = teamMembers?.filter(tm => tm.role === 'admin') || [];
           
           if (adminMemberships.length > 0) {
             setIsAdmin(true);
             
-            // Get team details in a separate query
             const teamIds = adminMemberships.map(tm => tm.team_id);
             const { data: teams, error: teamsError } = await supabase
               .from('teams')
@@ -82,7 +77,6 @@ const Management = () => {
             } else {
               setUserTeams(teams || []);
               
-              // Select first team by default if available and none selected yet
               if (teams && teams.length > 0 && !selectedTeamId) {
                 setSelectedTeamId(teams[0].id);
               }
@@ -104,14 +98,12 @@ const Management = () => {
     checkUser();
   }, [navigate, toast, selectedTeamId]);
 
-  // Create a new team
   const handleCreateTeam = async () => {
     if (!newTeamName.trim() || !user) return;
     
     try {
       console.log("Creating team:", newTeamName, "for user:", user.id);
       
-      // Create team
       const { data: team, error: teamError } = await supabase
         .from('teams')
         .insert([
@@ -127,7 +119,6 @@ const Management = () => {
       
       console.log("Team created:", team);
       
-      // Add creator as admin
       const { error: memberError } = await supabase
         .from('team_members')
         .insert([
@@ -149,7 +140,6 @@ const Management = () => {
         throw memberError;
       }
       
-      // Success
       toast({
         title: "Team aangemaakt",
         description: `Team '${newTeamName}' is succesvol aangemaakt.`
@@ -157,7 +147,6 @@ const Management = () => {
       
       setNewTeamName('');
       
-      // Refresh the page to reflect changes
       window.location.reload();
       
     } catch (error) {
@@ -170,18 +159,13 @@ const Management = () => {
     }
   };
 
-  // Generate invite code
   const handleGenerateInvite = async (role, permissions) => {
     if (!selectedTeamId || !user) return;
     
     try {
-      // Generate a random code
       const code = Math.random().toString(36).substring(2, 10).toUpperCase();
-      
-      // Set expiration to 7 days from now
       const expiresAt = addDays(new Date(), 7).toISOString();
       
-      // Create the invite
       const { error } = await supabase
         .from('invites')
         .insert([
@@ -197,7 +181,6 @@ const Management = () => {
       
       if (error) throw error;
       
-      // Success
       setInviteCode(code);
       toast({
         title: "Uitnodigingscode aangemaakt",
@@ -214,12 +197,10 @@ const Management = () => {
     }
   };
 
-  // Join team with invite code
   const handleJoinTeam = async () => {
     if (!inviteCode.trim() || !user) return;
     
     try {
-      // Find the invite
       const { data: invite, error: inviteError } = await supabase
         .from('invites')
         .select('*')
@@ -233,12 +214,10 @@ const Management = () => {
         throw inviteError;
       }
       
-      // Check if invite is expired
-      if (invite && new Date(invite.expires_at) < new Date()) {
+      if (new Date(invite.expires_at) < new Date()) {
         throw new Error("Deze uitnodigingscode is verlopen");
       }
       
-      // Check if already a member
       const { data: existingMember } = await supabase
         .from('team_members')
         .select('id')
@@ -250,7 +229,6 @@ const Management = () => {
         throw new Error("Je bent al lid van dit team");
       }
       
-      // Add user to team
       const { error: memberError } = await supabase
         .from('team_members')
         .insert([
@@ -264,7 +242,6 @@ const Management = () => {
       
       if (memberError) throw memberError;
       
-      // Success
       toast({
         title: "Succesvol toegevoegd",
         description: "Je bent toegevoegd aan het team."
@@ -272,7 +249,6 @@ const Management = () => {
       
       setInviteCode('');
       
-      // Refresh page after joining
       setTimeout(() => {
         window.location.reload();
       }, 1500);

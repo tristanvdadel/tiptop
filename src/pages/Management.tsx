@@ -5,27 +5,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Link, Settings, LogIn } from 'lucide-react';
+import { PlusCircle, Users, Link, LogIn } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { supabase, Team, TeamMember, Invite } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useNavigate } from "react-router-dom";
 import { addDays } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 
 const Management = () => {
-  const [userTeams, setUserTeams] = useState<Team[]>([]);
+  const [userTeams, setUserTeams] = useState([]);
+  const [userTeamMemberships, setUserTeamMemberships] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [loadingTeams, setLoadingTeams] = useState(true);
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState(null);
+  const [user, setUser] = useState(null);
+  const [error, setError] = useState(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -40,67 +39,78 @@ const Management = () => {
         }
         setUser(user);
         
-        // First, get the teams the user is an admin of
         setLoadingTeams(true);
         setError(null);
         
         try {
-          // Get all team memberships for this user
-          const { data: memberships, error: membershipError } = await supabase
+          // First, fetch team memberships directly (no joins)
+          const { data: teamMembers, error: memberError } = await supabase
             .from('team_members')
-            .select('team_id, role')
+            .select('id, team_id, role')
             .eq('user_id', user.id);
-          
-          if (membershipError) {
-            throw membershipError;
+            
+          if (memberError) {
+            console.error('Error fetching team memberships:', memberError);
+            setError(memberError.message);
+            toast({
+              title: "Fout bij ophalen teams",
+              description: memberError.message,
+              variant: "destructive"
+            });
+            setLoadingTeams(false);
+            return;
           }
           
-          // Find admin memberships
-          const adminTeamIds = memberships
-            ?.filter(membership => membership.role === 'admin')
-            .map(membership => membership.team_id) || [];
+          setUserTeamMemberships(teamMembers || []);
           
-          setIsAdmin(adminTeamIds.length > 0);
+          // Find admin team memberships
+          const adminMemberships = teamMembers?.filter(tm => tm.role === 'admin') || [];
           
-          // If user is admin of any teams, fetch those teams
-          if (adminTeamIds.length > 0) {
+          if (adminMemberships.length > 0) {
+            setIsAdmin(true);
+            
+            // Get team details in a separate query
+            const teamIds = adminMemberships.map(tm => tm.team_id);
             const { data: teams, error: teamsError } = await supabase
               .from('teams')
               .select('*')
-              .in('id', adminTeamIds);
-            
+              .in('id', teamIds);
+              
             if (teamsError) {
-              throw teamsError;
-            }
-            
-            setUserTeams(teams || []);
-            
-            // Select first team by default
-            if (teams && teams.length > 0 && !selectedTeamId) {
-              setSelectedTeamId(teams[0].id);
+              console.error('Error fetching teams:', teamsError);
+              setError(teamsError.message);
+            } else {
+              setUserTeams(teams || []);
+              
+              // Select first team by default if available and none selected yet
+              if (teams && teams.length > 0 && !selectedTeamId) {
+                setSelectedTeamId(teams[0].id);
+              }
             }
           }
-        } catch (err: any) {
-          console.error('Error fetching teams:', err);
-          setError(err.message || 'Er is een fout opgetreden bij het ophalen van teams');
-        } finally {
-          setLoadingTeams(false);
+        } catch (err) {
+          console.error('Error in team fetch:', err);
+          setError(err.message);
         }
-      } catch (err: any) {
+        
+        setLoadingTeams(false);
+      } catch (err) {
         console.error('Error checking user:', err);
-        setError(err.message || 'Er is een fout opgetreden');
+        setError(err.message);
         setLoadingTeams(false);
       }
     };
     
     checkUser();
-  }, [navigate, selectedTeamId]);
+  }, [navigate, toast, selectedTeamId]);
 
   // Create a new team
   const handleCreateTeam = async () => {
     if (!newTeamName.trim() || !user) return;
     
     try {
+      console.log("Creating team:", newTeamName, "for user:", user.id);
+      
       // Create team
       const { data: team, error: teamError } = await supabase
         .from('teams')
@@ -110,7 +120,12 @@ const Management = () => {
         .select()
         .single();
       
-      if (teamError) throw teamError;
+      if (teamError) {
+        console.error("Team creation error:", teamError);
+        throw teamError;
+      }
+      
+      console.log("Team created:", team);
       
       // Add creator as admin
       const { error: memberError } = await supabase
@@ -129,45 +144,34 @@ const Management = () => {
           }
         ]);
       
-      if (memberError) throw memberError;
+      if (memberError) {
+        console.error("Team member creation error:", memberError);
+        throw memberError;
+      }
       
       // Success
       toast({
         title: "Team aangemaakt",
-        description: `Team '${newTeamName}' is succesvol aangemaakt.`,
+        description: `Team '${newTeamName}' is succesvol aangemaakt.`
       });
       
       setNewTeamName('');
       
-      // Fetch the newly created team
-      const { data: teams } = await supabase
-        .from('teams')
-        .select('*')
-        .eq('created_by', user.id);
-      
-      setUserTeams(teams || []);
-      if (teams && teams.length > 0) {
-        setSelectedTeamId(teams[0].id);
-        setIsAdmin(true);
-      }
-      
       // Refresh the page to reflect changes
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      window.location.reload();
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating team:', error);
       toast({
         title: "Fout bij aanmaken team",
         description: error.message || "Er is een fout opgetreden bij het aanmaken van het team.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
 
   // Generate invite code
-  const handleGenerateInvite = async (role: string, permissions: any) => {
+  const handleGenerateInvite = async (role, permissions) => {
     if (!selectedTeamId || !user) return;
     
     try {
@@ -197,15 +201,15 @@ const Management = () => {
       setInviteCode(code);
       toast({
         title: "Uitnodigingscode aangemaakt",
-        description: "De code is 7 dagen geldig.",
+        description: "De code is 7 dagen geldig."
       });
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error generating invite:', error);
       toast({
         title: "Fout bij aanmaken uitnodiging",
         description: error.message || "Er is een fout opgetreden bij het aanmaken van de uitnodiging.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
@@ -263,7 +267,7 @@ const Management = () => {
       // Success
       toast({
         title: "Succesvol toegevoegd",
-        description: "Je bent toegevoegd aan het team.",
+        description: "Je bent toegevoegd aan het team."
       });
       
       setInviteCode('');
@@ -273,12 +277,12 @@ const Management = () => {
         window.location.reload();
       }, 1500);
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error joining team:', error);
       toast({
         title: "Fout bij deelnemen aan team",
         description: error.message || "Er is een fout opgetreden bij het deelnemen aan het team.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
@@ -387,7 +391,7 @@ const Management = () => {
                                 navigator.clipboard.writeText(inviteCode);
                                 toast({
                                   title: "Gekopieerd",
-                                  description: "Uitnodigingscode is gekopieerd naar het klembord.",
+                                  description: "Uitnodigingscode is gekopieerd naar het klembord."
                                 });
                               }}
                               className="mt-2"

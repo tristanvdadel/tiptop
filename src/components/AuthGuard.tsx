@@ -28,7 +28,7 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
         
         if (isAuthenticated && location.pathname !== '/management') {
           try {
-            // Query the database to check if the user is in any team
+            // Simplified query to check team membership - reduces risk of recursion
             const { count, error } = await supabase
               .from('team_members')
               .select('*', { count: 'exact', head: true })
@@ -43,13 +43,17 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
           } catch (err) {
             console.error('Error checking team:', err);
             setHasTeam(false);
+          } finally {
+            setCheckingTeam(false);
           }
+        } else {
+          setCheckingTeam(false);
         }
       } catch (err) {
         console.error('Error checking authentication:', err);
         setAuthenticated(false);
-      } finally {
         setCheckingTeam(false);
+      } finally {
         setLoading(false);
       }
     };
@@ -60,6 +64,7 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
       setAuthenticated(!!session);
       if (!session) {
         setLoading(false);
+        setCheckingTeam(false);
       }
     });
     

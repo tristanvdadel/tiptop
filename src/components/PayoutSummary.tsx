@@ -36,6 +36,9 @@ export const PayoutSummary = ({
   }>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [inputValues, setInputValues] = useState<{
+    [key: string]: string;
+  }>({});
 
   const roundDownToNearest = (value: number, nearest: number = 5): number => {
     return Math.floor(value / nearest) * nearest;
@@ -49,6 +52,10 @@ export const PayoutSummary = ({
       const initialBalances: {
         [key: string]: number;
       } = {};
+      const initialInputValues: {
+        [key: string]: string;
+      } = {};
+      
       mostRecentPayout.distribution.forEach(item => {
         const member = teamMembers.find(m => m.id === item.memberId);
         if (member) {
@@ -58,10 +65,13 @@ export const PayoutSummary = ({
           const roundedPayout = roundDownToNearest(totalDue);
           initialPayouts[item.memberId] = roundedPayout;
           initialBalances[item.memberId] = totalDue - roundedPayout;
+          initialInputValues[item.memberId] = roundedPayout.toString();
         }
       });
+      
       setActualPayouts(initialPayouts);
       setBalances(initialBalances);
+      setInputValues(initialInputValues);
     }
   }, [mostRecentPayout, teamMembers]);
 
@@ -153,6 +163,11 @@ export const PayoutSummary = ({
   };
 
   const handleActualPayoutChange = (memberId: string, value: string) => {
+    setInputValues(prev => ({
+      ...prev,
+      [memberId]: value
+    }));
+    
     const amount = parseFloat(value);
     if (!isNaN(amount)) {
       const member = memberPayouts.find(m => m.id === memberId);
@@ -268,7 +283,15 @@ export const PayoutSummary = ({
                         <Label htmlFor={`actual-${member.id}`} className="text-sm">
                           Daadwerkelijk uitbetaald
                         </Label>
-                        <Input id={`actual-${member.id}`} type="number" value={actualPayout} onChange={e => handleActualPayoutChange(member.id, e.target.value)} step="0.01" min="0" className="mt-1" />
+                        <Input 
+                          id={`actual-${member.id}`} 
+                          type="number" 
+                          value={inputValues[member.id] || ""} 
+                          onChange={e => handleActualPayoutChange(member.id, e.target.value)} 
+                          step="0.01" 
+                          min="0" 
+                          className="mt-1" 
+                        />
                       </div>
                       
                       <div className="flex-1">

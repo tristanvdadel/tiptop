@@ -1,16 +1,13 @@
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Calendar, Users, BarChart, Sparkles, Zap, Settings, LogOut, Shield } from 'lucide-react';
+import { Home, Calendar, Users, BarChart, Sparkles, Zap, Settings, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 const Navbar = () => {
   const location = useLocation();
-  const { toast } = useToast();
-  const navigate = useNavigate();
   const [teamName, setTeamName] = useState<string | null>(null);
   
   useEffect(() => {
@@ -66,37 +63,16 @@ const Navbar = () => {
     { to: '/settings', icon: <Settings size={20} />, label: 'Instellingen' },
   ];
 
-  const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast({
-        title: 'Uitgelogd',
-        description: 'Je bent succesvol uitgelogd.',
-      });
-      navigate('/splash');
-    } catch (error) {
-      console.error('Error signing out:', error);
-      toast({
-        title: 'Fout bij uitloggen',
-        description: 'Er is een fout opgetreden bij het uitloggen.',
-        variant: 'destructive',
-      });
-    }
-  };
-
   return (
     <header className="bg-background border-b">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <div className="flex items-center">
           <h1 className="text-2xl font-bold mr-2">TipTop</h1>
-          <div className="flex items-center gap-2">
-            <span className="badge tier-free text-xs px-2 py-0.5 rounded border">BASIC</span>
-            {teamName && (
-              <span className="text-sm ml-1 font-medium text-muted-foreground">
-                | {teamName}
-              </span>
-            )}
-          </div>
+          {teamName && (
+            <span className="text-sm ml-1 font-medium text-muted-foreground">
+              | {teamName}
+            </span>
+          )}
         </div>
         <div className="flex gap-2">
           <Link to="/fast-tip">
@@ -107,14 +83,6 @@ const Navbar = () => {
               <span>FastTip</span>
             </Button>
           </Link>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={handleSignOut}
-            title="Uitloggen"
-          >
-            <LogOut size={18} />
-          </Button>
         </div>
       </div>
       

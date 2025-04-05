@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -14,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { Badge } from "@/components/ui/badge";
 
 const Settings = () => {
   const { theme, toggleTheme } = useTheme();
@@ -113,8 +115,11 @@ const Settings = () => {
       </div>
       
       <Card>
-        <CardHeader>
-          <CardTitle>Account</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div className="flex items-center space-x-3">
+            <CardTitle>Account</CardTitle>
+            <Badge className="bg-tier-free text-white font-semibold text-xs">BASIC</Badge>
+          </div>
           <CardDescription>Beheer je account instellingen</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

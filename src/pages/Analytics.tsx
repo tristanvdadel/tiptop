@@ -1,6 +1,7 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Crown, Info } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useMemo } from 'react';
@@ -8,10 +9,10 @@ import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import TipChart from '@/components/TipChart';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
 const Analytics = () => {
   const {
     periods,
-    tier,
     calculateAverageTipPerHour,
     teamMembers
   } = useApp();
@@ -80,60 +81,10 @@ const Analytics = () => {
           </div>}
       </CardContent>
     </Card>;
-  if (tier !== 'pro') {
-    return <div className="space-y-4">
-        <h1 className="text-xl font-bold">Analyse</h1>
-        
-        {/* Always display the average tip per hour at the top, even for empty state */}
-        <AverageTipCard />
-        
-        {/* Basic analytics available to all users */}
-        <TipChart />
-        
-        {/* Pro features preview */}
-        <div className="relative mt-8">
-          <Card className="filter blur-[2px]">
-            <CardHeader className="pb-2 pt-4">
-              <CardTitle className="text-lg">Fooi per periode</CardTitle>
-            </CardHeader>
-            <CardContent className="pb-4">
-              <div className="h-60">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsBarChart data={periodData} margin={{
-                  top: 10,
-                  right: 20,
-                  left: 20,
-                  bottom: 5
-                }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip formatter={(value: number) => [`€${value.toFixed(2)}`, '']} />
-                    <Legend />
-                    <Bar dataKey="total" name="Totaal fooi" fill="#9b87f5" />
-                    <Bar dataKey="average" name="Gem. per uur" fill="#33C3F0" />
-                  </RechartsBarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-          <div className="absolute inset-0 flex items-center justify-center z-10 bg-background/60 backdrop-blur-sm rounded-lg">
-            <div className="text-center p-4">
-              <Crown size={36} className="mx-auto mb-2 text-tier-pro" />
-              <h2 className="text-lg font-medium mb-1">PRO-functie</h2>
-              <p className="text-muted-foreground mb-3 text-sm max-w-md">
-                Upgrade om toegang te krijgen tot geavanceerde statistieken en grafieken.
-              </p>
-              <Button className="bg-tier-pro hover:bg-tier-pro/90 text-white text-sm h-8 px-3">
-                Upgraden naar PRO
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>;
-  }
-  return <div className="space-y-4">
-      <h1 className="text-xl font-bold">Analytics</h1>
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-xl font-bold">Analyse</h1>
       
       {/* Always display the average tip per hour at the top, even for empty state */}
       <AverageTipCard />
@@ -190,6 +141,9 @@ const Analytics = () => {
             </div>}
         </CardContent>
       </Card>
-    </div>;
+    </div>
+  );
 };
+
 export default Analytics;
+

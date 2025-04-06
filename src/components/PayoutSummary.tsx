@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { PrinterIcon, ClipboardList, FileCheck, ArrowLeft, Download, Save, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -350,26 +348,11 @@ export const PayoutSummary = ({
                     
                     <div className="flex items-center mt-3 space-x-2">
                       <div className="flex-1">
-                        <Label htmlFor={`actual-${member.id}`} className="text-sm">
+                        <label className="text-sm">
                           Daadwerkelijk uitbetaald
-                        </Label>
-                        <Input 
-                          id={`actual-${member.id}`} 
-                          type="number" 
-                          value={inputValues[member.id] || ""} 
-                          onChange={e => handleActualPayoutChange(member.id, e.target.value)} 
-                          step="0.01" 
-                          min="0" 
-                          className="mt-1" 
-                        />
-                      </div>
-                      
-                      <div className="flex-1">
-                        <Label htmlFor={`carried-${member.id}`} className="text-sm">
-                          Saldo
-                        </Label>
-                        <div className="mt-1 flex items-center">
-                          <Input id={`carried-${member.id}`} type="number" value={carriedBalance} readOnly className={`bg-gray-50 ${carriedBalance < 0 ? 'text-red-600' : carriedBalance > 0 ? 'text-green-600' : ''}`} />
+                        </label>
+                        <div className="mt-1 flex items-center justify-between">
+                          <span>€{actualPayout.toFixed(2)}</span>
                           {carriedBalance !== 0 && <span className={`ml-2 text-xs ${carriedBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
                               {getBalanceText(carriedBalance)}
                             </span>}
@@ -465,3 +448,5 @@ export const PayoutSummary = ({
       </AlertDialog>
     </div>;
 };
+
+export default PayoutSummary;

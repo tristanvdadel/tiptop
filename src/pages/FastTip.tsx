@@ -1,9 +1,10 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Check, Calendar as CalendarIcon, Sparkles, Zap } from 'lucide-react';
+import { ArrowLeft, Check, Calendar as CalendarIcon, Sparkles, Zap, Settings } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -17,6 +18,15 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 const FastTip = () => {
   const { addTip, currentPeriod } = useApp();
@@ -26,6 +36,8 @@ const FastTip = () => {
   const [date, setDate] = useState<Date>(new Date());
   const [showDateWarning, setShowDateWarning] = useState(false);
   const [keepOpen, setKeepOpen] = useState<boolean>(false);
+  const [quickAmounts, setQuickAmounts] = useState<number[]>([1, 2, 5, 10]);
+  const [newQuickAmounts, setNewQuickAmounts] = useState<string>('');
   const { toast } = useToast();
   
   const placeholders = [
@@ -37,6 +49,18 @@ const FastTip = () => {
   const [placeholder] = useState(
     placeholders[Math.floor(Math.random() * placeholders.length)]
   );
+  
+  useEffect(() => {
+    // Load quick amounts from localStorage if available
+    const savedQuickAmounts = localStorage.getItem('quickAmounts');
+    if (savedQuickAmounts) {
+      try {
+        setQuickAmounts(JSON.parse(savedQuickAmounts));
+      } catch (e) {
+        console.error('Failed to parse quick amounts from localStorage');
+      }
+    }
+  }, []);
   
   const handleAddAmount = (value: number) => {
     setAmount(prev => prev + value);
@@ -89,48 +113,114 @@ const FastTip = () => {
     }
   };
   
+  const handleSaveQuickAmounts = () => {
+    try {
+      const amounts = newQuickAmounts.split(',').map(val => parseFloat(val.trim()));
+      
+      if (amounts.some(isNaN)) {
+        toast({
+          title: "Ongeldige invoer",
+          description: "Zorg ervoor dat alle ingevoerde waarden geldige getallen zijn, gescheiden door komma's.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setQuickAmounts(amounts);
+      localStorage.setItem('quickAmounts', JSON.stringify(amounts));
+      
+      toast({
+        title: "Instellingen opgeslagen",
+        description: "De snelknoppen zijn bijgewerkt.",
+      });
+      
+      setNewQuickAmounts('');
+    } catch (e) {
+      toast({
+        title: "Fout",
+        description: "Er is een fout opgetreden bij het opslaan van de instellingen.",
+        variant: "destructive",
+      });
+    }
+  };
+  
   return (
     <div className="h-screen flex flex-col bg-gradient-to-b from-amber-50 to-amber-100 dark:bg-black">
-      <header className="bg-background p-4 flex items-center shadow-sm">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={() => navigate('/')}
-          className="mr-2"
-        >
-          <ArrowLeft size={24} />
-        </Button>
-        <h1 className="text-xl font-bold flex items-center">
-          <Zap size={18} className="mr-2 text-amber-500" />
-          FastTip
-        </h1>
+      <header className="bg-amber-500 dark:bg-amber-600 p-4 flex items-center justify-between shadow-sm">
+        <div className="flex items-center">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => navigate('/')}
+            className="mr-2 text-white hover:bg-amber-600 dark:hover:bg-amber-700"
+          >
+            <ArrowLeft size={24} />
+          </Button>
+          <h1 className="text-xl font-bold flex items-center text-white">
+            <Zap size={18} className="mr-2 text-white" />
+            FastTip
+          </h1>
+        </div>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-white hover:bg-amber-600 dark:hover:bg-amber-700"
+            >
+              <Settings size={20} />
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Snelknoppen instellen</DialogTitle>
+              <DialogDescription>
+                Stel de bedragen in voor de snelknoppen. Voer de gewenste bedragen in gescheiden door komma's.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Input
+                placeholder="1, 2, 5, 10"
+                value={newQuickAmounts}
+                onChange={(e) => setNewQuickAmounts(e.target.value)}
+                className="mb-2"
+              />
+              <p className="text-xs text-muted-foreground">
+                Huidige waarden: {quickAmounts.join(', ')}
+              </p>
+            </div>
+            <DialogFooter>
+              <Button onClick={handleSaveQuickAmounts}>Opslaan</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </header>
       
       <div className="flex-grow flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white dark:bg-black/50 backdrop-blur-md shadow-xl rounded-xl p-6 border border-amber-100 dark:border-amber-900/50 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-amber-50/40 dark:from-amber-900/10 to-transparent pointer-events-none"></div>
+        <div className="w-full max-w-md bg-amber-500 dark:bg-amber-600 shadow-xl rounded-xl p-6 border border-amber-400 dark:border-amber-700/50 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-amber-400/40 dark:from-amber-500/10 to-transparent pointer-events-none"></div>
           <div className="relative z-10">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-medium mb-2">Bedrag</h2>
+              <h2 className="text-2xl font-medium mb-2 text-white">Bedrag</h2>
               <div className="relative inline-block">
-                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-2xl">€</span>
+                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-2xl text-amber-800">€</span>
                 <Input
                   type="number"
                   value={amount === 0 ? '' : amount}
                   onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
                   onKeyDown={handleKeyDown}
                   placeholder="0.00"
-                  className="text-center text-3xl h-16 w-48 pl-10 pr-4 border-amber-200 focus:border-amber-400 focus:ring-amber-400"
+                  className="text-center text-3xl h-16 w-48 pl-10 pr-4 border-amber-300 focus:border-amber-200 focus:ring-amber-200 bg-amber-50 dark:bg-amber-800/30 dark:border-amber-700 dark:text-white dark:placeholder:text-amber-200/50"
                 />
               </div>
             </div>
             
             <div className="grid grid-cols-2 gap-3 w-full mb-6">
-              {[1, 2, 5, 10].map((value) => (
+              {quickAmounts.map((value) => (
                 <Button 
                   key={value}
                   variant="outline" 
-                  className="text-lg py-6 border-amber-200 hover:bg-amber-100 hover:text-amber-900 transition-all" 
+                  className="text-lg py-6 border-amber-300 text-white hover:bg-amber-400 hover:text-amber-900 transition-all dark:border-amber-700 dark:hover:bg-amber-500" 
                   onClick={() => handleAddAmount(value)}
                 >
                   +{value}
@@ -139,13 +229,13 @@ const FastTip = () => {
             </div>
             
             <div className="w-full mb-6">
-              <h3 className="text-base font-medium mb-2">Datum</h3>
+              <h3 className="text-base font-medium mb-2 text-white">Datum</h3>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal border-amber-200",
+                      "w-full justify-start text-left font-normal border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-800/30 text-amber-900 dark:text-white",
                       showDateWarning && "border-amber-500 text-amber-600"
                     )}
                   >
@@ -165,20 +255,20 @@ const FastTip = () => {
                 </PopoverContent>
               </Popover>
               {showDateWarning && (
-                <p className="text-xs text-amber-600 mt-1">
+                <p className="text-xs text-amber-100 mt-1">
                   Deze datum valt buiten de huidige periode.
                 </p>
               )}
             </div>
             
             <div className="w-full mb-6">
-              <h3 className="text-base font-medium mb-2">Notitie</h3>
+              <h3 className="text-base font-medium mb-2 text-white">Notitie</h3>
               <Textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
-                className="w-full placeholder:italic border-amber-200 focus:border-amber-400 focus:ring-amber-400"
+                className="w-full placeholder:italic border-amber-300 focus:border-amber-200 focus:ring-amber-200 bg-amber-50 dark:bg-amber-800/30 dark:border-amber-700 dark:text-white dark:placeholder:text-amber-200/50"
                 rows={3}
               />
             </div>
@@ -188,15 +278,16 @@ const FastTip = () => {
                 <Switch 
                   id="keep-open" 
                   checked={keepOpen} 
-                  onCheckedChange={setKeepOpen} 
+                  onCheckedChange={setKeepOpen}
+                  className="data-[state=checked]:bg-white data-[state=checked]:text-amber-500"
                 />
-                <Label htmlFor="keep-open">Blijf op deze pagina na invoer</Label>
+                <Label htmlFor="keep-open" className="text-white">Blijf op deze pagina na invoer</Label>
               </div>
             </div>
             
             <Button 
               variant="default"
-              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg bg-white text-black hover:bg-amber-50 dark:bg-gradient-to-r dark:from-amber-400 dark:to-amber-300 dark:text-black dark:hover:from-amber-500 dark:hover:to-amber-400"
+              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg bg-white text-amber-900 hover:bg-amber-50 dark:bg-white dark:text-amber-900 dark:hover:bg-amber-100"
               disabled={amount <= 0}
               onClick={handleSave}
             >

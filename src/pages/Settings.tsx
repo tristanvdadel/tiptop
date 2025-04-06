@@ -3,19 +3,17 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { LogOut, Bell, Moon, User, CreditCard, Globe, Lock, Upload, Calendar, CalendarClock } from "lucide-react";
+import { LogOut, Bell, Moon, User, CreditCard, Globe, Lock, Upload, Calendar } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useApp } from "@/contexts/AppContext";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const Settings = () => {
   const {
@@ -25,35 +23,13 @@ const Settings = () => {
   const {
     toast
   } = useToast();
-  const {
-    periodDuration,
-    setPeriodDuration,
-    autoClosePeriods,
-    setAutoClosePeriods,
-    periodAutoCloseTime,
-    setPeriodAutoCloseTime,
-    periodAutoCloseDays,
-    setPeriodAutoCloseDays
-  } = useApp();
   const [language, setLanguage] = useState("nl");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userName, setUserName] = useState("Gebruiker");
   const [userEmail] = useState("gebruiker@example.com");
-  const [autoCloseFrequency, setAutoCloseFrequency] = useState("daily");
+  const [periodDuration, setPeriodDuration] = useState("week");
+  const [autoClosePeriods, setAutoClosePeriods] = useState(true);
   const navigate = useNavigate();
-
-  // Initialize autoCloseFrequency based on periodAutoCloseDays
-  useEffect(() => {
-    if (!periodAutoCloseDays) return;
-    
-    if (periodAutoCloseDays.length === 7) {
-      setAutoCloseFrequency("daily");
-    } else if (periodAutoCloseDays.length === 1 && periodAutoCloseDays[0] === 0) {
-      setAutoCloseFrequency("weekly");
-    } else if (periodAutoCloseDays.length === 0) {
-      setAutoCloseFrequency("monthly");
-    }
-  }, [periodAutoCloseDays]);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -132,32 +108,6 @@ const Settings = () => {
         description: 'Er is een fout opgetreden bij het uitloggen.',
         variant: 'destructive'
       });
-    }
-  };
-
-  const handleAutoCloseFrequencyChange = (value: string) => {
-    setAutoCloseFrequency(value);
-    
-    if (value === "daily") {
-      setPeriodAutoCloseDays([0, 1, 2, 3, 4, 5, 6]);
-    } else if (value === "weekly") {
-      setPeriodAutoCloseDays([0]);
-    } else if (value === "monthly") {
-      setPeriodAutoCloseDays([]);
-    }
-  };
-
-  const handleAutoCloseToggle = (checked: boolean) => {
-    setAutoClosePeriods(checked);
-    
-    // Set default values when turning on auto-close
-    if (checked && !periodAutoCloseTime) {
-      setPeriodAutoCloseTime("23:00");
-    }
-    
-    // Set default frequency if not already set
-    if (checked && (!periodAutoCloseDays || periodAutoCloseDays.length === 0)) {
-      handleAutoCloseFrequencyChange("daily");
     }
   };
 
@@ -339,14 +289,14 @@ const Settings = () => {
               <Calendar className="h-4 w-4" />
               <Label htmlFor="periodDuration">Periode duur</Label>
             </div>
-            <Select value={periodDuration} onValueChange={setPeriodDuration}>
+            <Select defaultValue={periodDuration} onValueChange={setPeriodDuration}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Selecteer duur" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="week">Wekelijks</SelectItem>
                 <SelectItem value="month">Maandelijks</SelectItem>
-                
+                <SelectItem value="custom">Aangepast</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -355,67 +305,15 @@ const Settings = () => {
           
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <CalendarClock className="h-4 w-4" />
+              <Calendar className="h-4 w-4" />
               <Label htmlFor="autoClosePeriods">Automatisch periodes afsluiten</Label>
             </div>
             <Switch 
               id="autoClosePeriods" 
               checked={autoClosePeriods} 
-              onCheckedChange={handleAutoCloseToggle} 
+              onCheckedChange={setAutoClosePeriods} 
             />
           </div>
-          
-          {autoClosePeriods && (
-            <div className="pl-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Label htmlFor="periodAutoCloseTime">Sluitingstijd</Label>
-                </div>
-                <Input
-                  id="periodAutoCloseTime"
-                  type="time"
-                  value={periodAutoCloseTime}
-                  onChange={(e) => setPeriodAutoCloseTime(e.target.value)}
-                  className="w-[180px]"
-                />
-              </div>
-              
-              <div>
-                <Label className="mb-2 block">Frequentie</Label>
-                <RadioGroup 
-                  value={autoCloseFrequency} 
-                  onValueChange={handleAutoCloseFrequencyChange}
-                  className="mt-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="daily" id="daily" />
-                    <Label htmlFor="daily">Dagelijks</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="weekly" id="weekly" />
-                    <Label htmlFor="weekly">Wekelijks (zondag)</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="monthly" id="monthly" />
-                    <Label htmlFor="monthly">Maandelijks (einde maand)</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-                           
-              <div className="text-sm text-muted-foreground space-y-1">
-                {autoCloseFrequency === "daily" && (
-                  <p>Periodes worden elke dag automatisch afgesloten om {periodAutoCloseTime}.</p>
-                )}
-                {autoCloseFrequency === "weekly" && (
-                  <p>Periodes worden elke zondag automatisch afgesloten om {periodAutoCloseTime}.</p>
-                )}
-                {autoCloseFrequency === "monthly" && (
-                  <p>Periodes worden aan het einde van elke maand automatisch afgesloten om {periodAutoCloseTime}.</p>
-                )}
-                <p>Dit voorkomt dat je per ongeluk in een oude periode blijft werken.</p>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 

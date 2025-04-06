@@ -78,14 +78,6 @@ type AppContextType = {
   updateTeamMemberName: (memberId: string, newName: string) => boolean;
   mostRecentPayout: PayoutData | null;
   setMostRecentPayout: (payout: PayoutData | null) => void;
-  periodDuration: string;
-  setPeriodDuration: (duration: string) => void;
-  autoClosePeriods: boolean;
-  setAutoClosePeriods: (autoClose: boolean) => void;
-  periodAutoCloseTime: string; 
-  setPeriodAutoCloseTime: (time: string) => void;
-  periodAutoCloseDays?: number[];
-  setPeriodAutoCloseDays: (days: number[]) => void;
 };
 
 // Define app limits
@@ -103,10 +95,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [payouts, setPayouts] = useState<PayoutData[]>([]);
   const [mostRecentPayout, setMostRecentPayout] = useState<PayoutData | null>(null);
-  const [periodDuration, setPeriodDuration] = useState<string>("week");
-  const [autoClosePeriods, setAutoClosePeriods] = useState<boolean>(false);
-  const [periodAutoCloseTime, setPeriodAutoCloseTime] = useState<string>("23:00");
-  const [periodAutoCloseDays, setPeriodAutoCloseDays] = useState<number[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -144,86 +132,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     localStorage.setItem('payouts', JSON.stringify(payouts));
   }, [payouts]);
-
-  useEffect(() => {
-    const storedPeriodDuration = localStorage.getItem('periodDuration');
-    const storedAutoClosePeriods = localStorage.getItem('autoClosePeriods');
-    const storedPeriodAutoCloseTime = localStorage.getItem('periodAutoCloseTime');
-    const storedPeriodAutoCloseDays = localStorage.getItem('periodAutoCloseDays');
-    
-    if (storedPeriodDuration) {
-      setPeriodDuration(storedPeriodDuration);
-    }
-    
-    if (storedAutoClosePeriods) {
-      setAutoClosePeriods(storedAutoClosePeriods === 'true');
-    }
-    
-    if (storedPeriodAutoCloseTime) {
-      setPeriodAutoCloseTime(storedPeriodAutoCloseTime);
-    }
-
-    if (storedPeriodAutoCloseDays) {
-      setPeriodAutoCloseDays(JSON.parse(storedPeriodAutoCloseDays));
-    }
-
-    if (autoClosePeriods) {
-      const checkPeriodAutoClose = () => {
-        if (!currentPeriod || !autoClosePeriods) return;
-        
-        const now = new Date();
-        const [hours, minutes] = periodAutoCloseTime.split(':').map(Number);
-        
-        const closeTime = new Date();
-        closeTime.setHours(hours, minutes, 0, 0);
-        
-        if (periodAutoCloseDays && periodAutoCloseDays.length > 0) {
-          const today = now.getDay(); // 0 is Sunday, 1 is Monday, etc.
-          
-          if (!periodAutoCloseDays.includes(today)) {
-            return; // Not a day to auto-close
-          }
-        } else {
-          const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-          const isLastDayOfMonth = now.getDate() === lastDayOfMonth;
-          
-          if (!isLastDayOfMonth) {
-            return;
-          }
-        }
-        
-        if (now >= closeTime) {
-          endCurrentPeriod();
-          toast({
-            title: "Periode automatisch afgesloten",
-            description: `De actieve periode is automatisch afgesloten om ${periodAutoCloseTime}.`,
-          });
-        }
-      };
-      
-      checkPeriodAutoClose();
-      
-      const intervalId = setInterval(checkPeriodAutoClose, 60000);
-      
-      return () => clearInterval(intervalId);
-    }
-  }, [autoClosePeriods, periodAutoCloseTime, currentPeriod, periodAutoCloseDays, toast]);
-
-  useEffect(() => {
-    localStorage.setItem('periodDuration', periodDuration);
-  }, [periodDuration]);
-  
-  useEffect(() => {
-    localStorage.setItem('autoClosePeriods', autoClosePeriods.toString());
-  }, [autoClosePeriods]);
-  
-  useEffect(() => {
-    localStorage.setItem('periodAutoCloseTime', periodAutoCloseTime);
-  }, [periodAutoCloseTime]);
-  
-  useEffect(() => {
-    localStorage.setItem('periodAutoCloseDays', JSON.stringify(periodAutoCloseDays));
-  }, [periodAutoCloseDays]);
 
   const generateId = () => {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -350,12 +258,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setTeamMembers(prev => 
       prev.map(member => {
         if (member.id === memberId) {
+          // Copy the existing hour registrations to a savedRegistrations field
+          // that won't be displayed but will be used in calculations
           const savedRegistrations = member.hourRegistrations || [];
           
           return { 
             ...member,
-            hours: 0,
-            hourRegistrations: [],
+            hours: 0, // Reset hours to 0
+            hourRegistrations: [], // Clear hourRegistrations array
+            // Keep the previous registrations in a field that's not shown in the UI
+            // but is used for tip per hour calculations
             savedHourRegistrations: savedRegistrations
           };
         }
@@ -365,6 +277,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateTeamMemberName = (memberId: string, newName: string): boolean => {
+    // Validate input
     if (!newName.trim()) {
       toast({
         title: "Ongeldige naam",
@@ -374,6 +287,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
     
+    // Check if name already exists (case insensitive)
     const nameExists = teamMembers.some(
       member => member.id !== memberId && 
                 member.name.toLowerCase() === newName.trim().toLowerCase()
@@ -388,6 +302,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
     
+    // Update the name
     setTeamMembers(prev => 
       prev.map(member => 
         member.id === memberId 
@@ -405,11 +320,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const hasReachedLimit = () => {
-    return false;
+    return false; // No limits in the paid version
   };
   
   const hasReachedPeriodLimit = () => {
-    return false;
+    return false; // No limits in the paid version (added function)
   };
   
   const getUnpaidPeriodsCount = () => {
@@ -475,6 +390,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return [];
     }
     
+    // Advanced calculation modes are available for all users now
     let adjustmentFactor = 1;
     
     switch (calculationMode) {
@@ -539,7 +455,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }, 0);
     
     if (totalHours === 0 && totalTips > 0) {
-      const defaultHourlyRate = 10;
+      const defaultHourlyRate = 10; // Assume 10 hours as default for calculation
       return totalTips / defaultHourlyRate;
     }
     
@@ -547,6 +463,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return 0;
     }
     
+    // Advanced calculation modes are available for all users now
     let adjustmentFactor = 1;
     
     switch (calculationMode) {
@@ -585,7 +502,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
     
     setPayouts(prev => [...prev, newPayout]);
-    setMostRecentPayout(newPayout);
+    setMostRecentPayout(newPayout); // Set the most recent payout
     
     setPeriods(prev => 
       prev.map(period => 
@@ -718,14 +635,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         payouts,
         mostRecentPayout,
         setMostRecentPayout,
-        periodDuration,
-        setPeriodDuration,
-        autoClosePeriods,
-        setAutoClosePeriods,
-        periodAutoCloseTime,
-        setPeriodAutoCloseTime,
-        periodAutoCloseDays,
-        setPeriodAutoCloseDays,
         addTip,
         addTeamMember,
         removeTeamMember,

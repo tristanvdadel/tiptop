@@ -264,6 +264,10 @@ const Team = () => {
     totalHours
   } = calculateTotalTipsAndHours();
 
+  const handleViewPayoutHistory = () => {
+    navigate('/management', { state: { initialTab: 'payouts' } });
+  };
+
   if (showPayoutSummary) {
     return (
       <div>

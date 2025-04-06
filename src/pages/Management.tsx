@@ -9,13 +9,16 @@ import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { addDays } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import PayoutHistory from '@/components/PayoutHistory';
 
 const Management = () => {
+  const location = useLocation();
+  const initialTabFromState = location.state?.initialTab;
+  
   const [userTeams, setUserTeams] = useState([]);
   const [userTeamMemberships, setUserTeamMemberships] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -26,9 +29,15 @@ const Management = () => {
   const [user, setUser] = useState(null);
   const [error, setError] = useState(null);
   const [hasAnyTeam, setHasAnyTeam] = useState(false);
-  const [activeTab, setActiveTab] = useState("teams");
+  const [activeTab, setActiveTab] = useState(initialTabFromState || "teams");
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (initialTabFromState) {
+      setActiveTab(initialTabFromState);
+    }
+  }, [initialTabFromState]);
 
   useEffect(() => {
     const checkUser = async () => {

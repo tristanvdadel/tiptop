@@ -42,13 +42,13 @@ const PayoutHistory = () => {
               </TableHeader>
               <TableBody>
                 {payouts.map((payout, index) => {
-                  const totalAmount = payout.distributions.reduce(
+                  const totalAmount = payout.distribution.reduce(
                     (sum, dist) => sum + dist.amount, 
                     0
                   );
                   
                   return (
-                    <TableRow key={payout.id || index} className="group">
+                    <TableRow key={index} className="group">
                       <TableCell className="font-medium">
                         {formatDate(payout.date)}
                       </TableCell>

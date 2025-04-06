@@ -38,11 +38,11 @@ const PayoutHistory = () => {
     const payoutDate = formatDate(selectedPayout.date);
     const memberDetails = selectedPayout.distribution.map(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
-      return `${member?.name || 'Onbekend lid'}: €${item.amount.toFixed(2)}`;
+      return `${member?.name || 'Onbekend lid'}: €${item.actualAmount?.toFixed(2) || item.amount.toFixed(2)}`;
     }).join('\n');
 
     const totalAmount = selectedPayout.distribution.reduce(
-      (sum, dist) => sum + dist.amount, 
+      (sum, dist) => sum + (dist.actualAmount || dist.amount), 
       0
     );
 
@@ -59,10 +59,10 @@ const PayoutHistory = () => {
   const downloadCSV = () => {
     if (!selectedPayout) return;
     
-    const headers = "Naam,Bedrag\n";
+    const headers = "Naam,Berekend bedrag,Daadwerkelijk uitbetaald,Saldo\n";
     const rows = selectedPayout.distribution.map(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
-      return `${member?.name || 'Onbekend lid'},${item.amount.toFixed(2)}`;
+      return `${member?.name || 'Onbekend lid'},${item.amount.toFixed(2)},${(item.actualAmount || item.amount).toFixed(2)},${(item.balance || 0).toFixed(2)}`;
     }).join('\n');
     
     const csv = headers + rows;
@@ -101,13 +101,19 @@ const PayoutHistory = () => {
                   <TableRow>
                     <TableHead>Datum</TableHead>
                     <TableHead>Periodes</TableHead>
-                    <TableHead className="text-right">Totaal bedrag</TableHead>
+                    <TableHead className="text-right">Berekend bedrag</TableHead>
+                    <TableHead className="text-right">Uitbetaald</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {payouts.map((payout, index) => {
-                    const totalAmount = payout.distribution.reduce(
+                    const calculatedAmount = payout.distribution.reduce(
                       (sum, dist) => sum + dist.amount, 
+                      0
+                    );
+                    
+                    const actualAmount = payout.distribution.reduce(
+                      (sum, dist) => sum + (dist.actualAmount || dist.amount), 
                       0
                     );
                     
@@ -136,7 +142,10 @@ const PayoutHistory = () => {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          €{totalAmount.toFixed(2)}
+                          €{calculatedAmount.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          €{actualAmount.toFixed(2)}
                         </TableCell>
                       </TableRow>
                     );
@@ -191,7 +200,9 @@ const PayoutHistory = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Naam</TableHead>
-                        <TableHead className="text-right">Bedrag</TableHead>
+                        <TableHead className="text-right">Berekend</TableHead>
+                        <TableHead className="text-right">Uitbetaald</TableHead>
+                        <TableHead className="text-right">Saldo</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -201,6 +212,12 @@ const PayoutHistory = () => {
                           <TableRow key={idx}>
                             <TableCell>{member?.name || 'Onbekend lid'}</TableCell>
                             <TableCell className="text-right">€{item.amount.toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-medium">
+                              €{(item.actualAmount || item.amount).toFixed(2)}
+                            </TableCell>
+                            <TableCell className={`text-right ${item.balance > 0 ? 'text-green-600' : item.balance < 0 ? 'text-red-600' : ''}`}>
+                              {item.balance ? `€${Math.abs(item.balance).toFixed(2)} ${item.balance > 0 ? '+' : '-'}` : '-'}
+                            </TableCell>
                           </TableRow>
                         );
                       })}
@@ -208,9 +225,13 @@ const PayoutHistory = () => {
                     <tfoot>
                       <tr className="border-t">
                         <td className="p-2 font-bold">Totaal</td>
-                        <td className="p-2 text-right font-bold">
+                        <td className="p-2 text-right">
                           €{selectedPayout.distribution.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}
                         </td>
+                        <td className="p-2 text-right font-bold">
+                          €{selectedPayout.distribution.reduce((sum, item) => sum + (item.actualAmount || item.amount), 0).toFixed(2)}
+                        </td>
+                        <td className="p-2"></td>
                       </tr>
                     </tfoot>
                   </Table>

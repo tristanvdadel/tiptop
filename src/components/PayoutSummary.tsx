@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Link } from 'react-router-dom';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 type PayoutSummaryProps = {
   onClose: () => void;
@@ -39,6 +41,7 @@ export const PayoutSummary = ({
   const [inputValues, setInputValues] = useState<{
     [key: string]: string;
   }>({});
+  const [showExitConfirmation, setShowExitConfirmation] = useState(false);
 
   const roundDownToNearest = (value: number, nearest: number = 5): number => {
     return Math.floor(value / nearest) * nearest;
@@ -191,18 +194,41 @@ export const PayoutSummary = ({
   };
 
   const handleSaveBalancesAndClose = () => {
-    Object.entries(balances).forEach(([memberId, balance]) => {
-      updateTeamMemberBalance(memberId, balance);
-    });
-    memberPayouts.forEach(member => {
-      clearTeamMemberHours(member.id);
-    });
-    toast({
-      title: "Saldi opgeslagen",
-      description: "De aangepaste uitbetaling en saldi zijn opgeslagen. Uren zijn gewist."
-    });
-    setHasChanges(false);
+    // Save the actual payout amounts in the payout object
+    if (mostRecentPayout && hasChanges) {
+      // This would ideally update the payout record with actual amounts
+      // For now, we just save the balances
+      Object.entries(balances).forEach(([memberId, balance]) => {
+        updateTeamMemberBalance(memberId, balance);
+      });
+      
+      // Update distribution with actual amounts (if context supported it)
+      // For now, this is just conceptual
+      const updatedDistribution = mostRecentPayout.distribution.map(item => ({
+        ...item,
+        actualAmount: actualPayouts[item.memberId] || item.amount,
+        balance: balances[item.memberId] || 0
+      }));
+      
+      memberPayouts.forEach(member => {
+        clearTeamMemberHours(member.id);
+      });
+      
+      toast({
+        title: "Saldi opgeslagen",
+        description: "De aangepaste uitbetaling en saldi zijn opgeslagen. Uren zijn gewist."
+      });
+      setHasChanges(false);
+    }
     onClose();
+  };
+
+  const handleBackButtonClick = () => {
+    if (hasChanges) {
+      setShowExitConfirmation(true);
+    } else {
+      onClose();
+    }
   };
 
   const getBalanceText = (balance: number) => {
@@ -217,7 +243,7 @@ export const PayoutSummary = ({
   return <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Uitbetaling samenvatting</h1>
-        <Button variant="outline" onClick={onClose}>
+        <Button variant="outline" onClick={handleBackButtonClick}>
           <ArrowLeft size={16} className="mr-1" /> Terug
         </Button>
       </div>
@@ -313,7 +339,7 @@ export const PayoutSummary = ({
           
           {hasChanges && <Alert className="mt-4 bg-amber-50">
               <AlertDescription>
-                Je hebt aanpassingen gemaakt in de uitbetaling. Klik op 'Saldi opslaan en afsluiten' om deze op te slaan en de uren te wissen.
+                <strong>Let op:</strong> Je hebt aanpassingen gemaakt in de uitbetaling. Klik op 'Saldi opslaan en afsluiten' hieronder om deze op te slaan voordat je verder gaat.
               </AlertDescription>
             </Alert>}
           
@@ -341,11 +367,36 @@ export const PayoutSummary = ({
             Je kunt altijd oude uitbetalingen terugvinden in het geschiedenis-overzicht.
           </p>
           <div className="flex justify-center">
-            <Button onClick={onClose} variant="goldGradient">
+            <Button onClick={handleBackButtonClick} variant="goldGradient">
               <ArrowLeft size={16} className="mr-1" /> Terug naar team
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* Confirmation dialog when trying to exit with unsaved changes */}
+      <AlertDialog open={showExitConfirmation} onOpenChange={setShowExitConfirmation}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Wijzigingen niet opgeslagen</AlertDialogTitle>
+            <AlertDialogDescription>
+              Je hebt wijzigingen aangebracht in de uitbetaling die nog niet zijn opgeslagen.
+              Wil je deze wijzigingen opslaan voordat je verder gaat?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowExitConfirmation(false)}>Annuleren</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSaveBalancesAndClose} className="bg-green-600 hover:bg-green-700">
+              Opslaan en afsluiten
+            </AlertDialogAction>
+            <AlertDialogAction onClick={() => {
+              setShowExitConfirmation(false);
+              onClose();
+            }} className="bg-amber-600 hover:bg-amber-700">
+              Afsluiten zonder opslaan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>;
 };

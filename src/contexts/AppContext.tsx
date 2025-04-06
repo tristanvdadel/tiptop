@@ -84,6 +84,8 @@ type AppContextType = {
   setAutoClosePeriods: (autoClose: boolean) => void;
   periodAutoCloseTime: string; 
   setPeriodAutoCloseTime: (time: string) => void;
+  periodAutoCloseDays?: number[];
+  setPeriodAutoCloseDays: (days: number[]) => void;
 };
 
 // Define app limits
@@ -104,6 +106,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [periodDuration, setPeriodDuration] = useState<string>("week");
   const [autoClosePeriods, setAutoClosePeriods] = useState<boolean>(false);
   const [periodAutoCloseTime, setPeriodAutoCloseTime] = useState<string>("23:00");
+  const [periodAutoCloseDays, setPeriodAutoCloseDays] = useState<number[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -146,6 +149,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const storedPeriodDuration = localStorage.getItem('periodDuration');
     const storedAutoClosePeriods = localStorage.getItem('autoClosePeriods');
     const storedPeriodAutoCloseTime = localStorage.getItem('periodAutoCloseTime');
+    const storedPeriodAutoCloseDays = localStorage.getItem('periodAutoCloseDays');
     
     if (storedPeriodDuration) {
       setPeriodDuration(storedPeriodDuration);
@@ -159,6 +163,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setPeriodAutoCloseTime(storedPeriodAutoCloseTime);
     }
 
+    if (storedPeriodAutoCloseDays) {
+      setPeriodAutoCloseDays(JSON.parse(storedPeriodAutoCloseDays));
+    }
+
     if (autoClosePeriods) {
       const checkPeriodAutoClose = () => {
         if (!currentPeriod || !autoClosePeriods) return;
@@ -169,10 +177,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const closeTime = new Date();
         closeTime.setHours(hours, minutes, 0, 0);
         
-        const periodStartDay = new Date(currentPeriod.startDate).getDate();
-        const currentDay = now.getDate();
+        if (periodAutoCloseDays && periodAutoCloseDays.length > 0) {
+          const today = now.getDay(); // 0 is Sunday, 1 is Monday, etc.
+          
+          if (!periodAutoCloseDays.includes(today)) {
+            return; // Not a day to auto-close
+          }
+        } else {
+          const periodStartDay = new Date(currentPeriod.startDate).getDate();
+          const currentDay = now.getDate();
+          
+          if (periodStartDay === currentDay) {
+            return; // Same day, don't auto-close
+          }
+        }
         
-        if (now >= closeTime && currentDay !== periodStartDay) {
+        if (now >= closeTime) {
           endCurrentPeriod();
           toast({
             title: "Periode automatisch afgesloten",
@@ -187,7 +207,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       
       return () => clearInterval(intervalId);
     }
-  }, [autoClosePeriods, periodAutoCloseTime, currentPeriod, toast]);
+  }, [autoClosePeriods, periodAutoCloseTime, currentPeriod, periodAutoCloseDays, toast]);
 
   useEffect(() => {
     localStorage.setItem('periodDuration', periodDuration);
@@ -200,6 +220,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     localStorage.setItem('periodAutoCloseTime', periodAutoCloseTime);
   }, [periodAutoCloseTime]);
+  
+  useEffect(() => {
+    localStorage.setItem('periodAutoCloseDays', JSON.stringify(periodAutoCloseDays));
+  }, [periodAutoCloseDays]);
 
   const generateId = () => {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -700,6 +724,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setAutoClosePeriods,
         periodAutoCloseTime,
         setPeriodAutoCloseTime,
+        periodAutoCloseDays,
+        setPeriodAutoCloseDays,
         addTip,
         addTeamMember,
         removeTeamMember,

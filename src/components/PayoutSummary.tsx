@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -108,6 +107,12 @@ export const PayoutSummary = ({
         </CardContent>
       </Card>;
   }
+  
+  const formatDate = (dateString: string): string => {
+    return format(new Date(dateString), 'd MMMM yyyy', {
+      locale: nl
+    });
+  };
   
   const payoutDate = format(new Date(mostRecentPayout.date), 'd MMMM yyyy', {
     locale: nl

@@ -78,18 +78,12 @@ const TipChart = () => {
     return bars;
   }, [chartData, periods, chartColors]);
 
-  // Only hide the chart if there's absolutely no data to show
-  const hasAnyPeriodWithTips = periods.some(period => period.tips.length > 0);
-  
   // Check if there's any tip data in the last 7 days
   const hasTipsInLastWeek = chartData.some(day => 
     Object.keys(day).some(key => key.startsWith('period'))
   );
 
-  if (!hasAnyPeriodWithTips) {
-    return null;
-  }
-
+  // Always show the chart, even if there's no data in the last 7 days
   return (
     <Card className="mb-6">
       <CardHeader className="pb-2">

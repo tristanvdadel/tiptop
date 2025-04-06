@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, KeyboardEvent } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { TeamMember, Period, HourRegistration } from '@/contexts/AppContext';
@@ -8,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Check, Clock, Calendar, PlusCircle, MinusCircle, Receipt, ChevronDown, ChevronUp, Users, Pencil } from 'lucide-react';
+import { Plus, Trash2, Check, Clock, Calendar, PlusCircle, MinusCircle, Receipt, ChevronDown, ChevronUp, Users, Pencil, History } from 'lucide-react';
 import { PayoutSummary } from '@/components/PayoutSummary';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -17,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useNavigate } from 'react-router-dom';
 
 const Team = () => {
   const {
@@ -48,6 +48,7 @@ const Team = () => {
   const {
     toast
   } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     setSelectedPeriods([]);
@@ -264,7 +265,21 @@ const Team = () => {
   } = calculateTotalTipsAndHours();
 
   if (showPayoutSummary) {
-    return <PayoutSummary onClose={() => setShowPayoutSummary(false)} />;
+    return (
+      <div>
+        <PayoutSummary onClose={() => setShowPayoutSummary(false)} />
+        <div className="mt-4 flex justify-center">
+          <Button 
+            variant="outline"
+            className="flex items-center gap-2"
+            onClick={handleViewPayoutHistory}
+          >
+            <History className="h-4 w-4" />
+            Bekijk uitbetaal geschiedenis
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return <div className="pb-20 min-h-[calc(100vh-100px)]">

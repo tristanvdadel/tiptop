@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Link, LogIn } from 'lucide-react';
+import { PlusCircle, Users, Link, LogIn, History } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { addDays } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import PayoutHistory from '@/components/PayoutHistory';
 
 const Management = () => {
   const [userTeams, setUserTeams] = useState([]);
@@ -25,6 +26,7 @@ const Management = () => {
   const [user, setUser] = useState(null);
   const [error, setError] = useState(null);
   const [hasAnyTeam, setHasAnyTeam] = useState(false);
+  const [activeTab, setActiveTab] = useState("teams");
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -279,12 +281,13 @@ const Management = () => {
         </Alert>
       )}
       
-      <Tabs defaultValue="teams">
-        <TabsList className={`grid w-full ${hasAnyTeam ? 'grid-cols-1' : 'grid-cols-2'}`}>
+      <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue="teams">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="teams">Mijn teams</TabsTrigger>
-          {!hasAnyTeam && (
-            <TabsTrigger value="join">Team toetreden</TabsTrigger>
-          )}
+          <TabsTrigger value="payouts" className="flex items-center gap-1">
+            <History className="h-4 w-4" />
+            Uitbetalingen
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="teams" className="space-y-4 mt-4">
@@ -402,6 +405,10 @@ const Management = () => {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+        
+        <TabsContent value="payouts" className="mt-4">
+          <PayoutHistory />
         </TabsContent>
         
         {!hasAnyTeam && (

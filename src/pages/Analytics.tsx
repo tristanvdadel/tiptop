@@ -11,6 +11,8 @@ import TipChart from '@/components/TipChart';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const Analytics = () => {
   const {
@@ -19,6 +21,8 @@ const Analytics = () => {
     teamMembers,
     payouts
   } = useApp();
+  
+  const isMobile = useIsMobile();
 
   // Calculate all-time average tip per hour, include paid periods
   const averageTipPerHour = useMemo(() => {
@@ -93,9 +97,11 @@ const Analytics = () => {
   };
 
   // Create the average tip per hour card component with dynamic empty state
-  const AverageTipCard = () => <Card className="mb-4">
+  const AverageTipCard = () => (
+    <Card className="mb-4 w-full">
       <CardContent className="p-4">
-        {averageTipPerHour > 0 ? <div className="flex justify-between items-center">
+        {averageTipPerHour > 0 ? (
+          <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-medium">Gemiddelde fooi per uur</h3>
               <TooltipProvider>
@@ -112,17 +118,21 @@ const Analytics = () => {
               </TooltipProvider>
             </div>
             <span className="font-medium">€{averageTipPerHour.toFixed(2)} / uur</span>
-          </div> : <div className="text-center py-2 text-muted-foreground">
+          </div>
+        ) : (
+          <div className="text-center py-2 text-muted-foreground">
             <p>{getEmptyStateMessage()}</p>
-          </div>}
+          </div>
+        )}
       </CardContent>
-    </Card>;
+    </Card>
+  );
 
   // Check if we have any periods with tips
   const hasAnyPeriodWithTips = periods.some(period => period.tips.length > 0);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full max-w-full px-1 sm:px-4">
       <h1 className="text-xl font-bold">Analyse</h1>
       
       {/* Always display the average tip per hour at the top, even for empty state */}
@@ -130,7 +140,7 @@ const Analytics = () => {
       
       <TipChart />
       
-      <Card>
+      <Card className="w-full">
         <CardHeader className="pb-2 pt-4">
           <CardTitle className="text-lg">Verloop van fooi per uur</CardTitle>
         </CardHeader>
@@ -141,20 +151,28 @@ const Analytics = () => {
               ` (Laatste ${lineChartData.length} periodes weergegeven)`}
           </p>
           {hasAnyPeriodWithTips ? (
-            <div className="h-60">
-              <ChartContainer config={chartConfig} className="h-full">
+            <div className="h-60 w-full overflow-x-auto">
+              <ChartContainer config={chartConfig} className="h-full min-w-[320px]">
                 <LineChart 
                   data={lineChartData} 
                   margin={{
                     top: 10,
-                    right: 20,
-                    left: 20,
-                    bottom: 5
+                    right: isMobile ? 5 : 20,
+                    left: isMobile ? 5 : 20,
+                    bottom: isMobile ? 70 : 40
                   }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" tickMargin={5} height={60} tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" />
-                  <YAxis />
+                  <XAxis 
+                    dataKey="name" 
+                    tickMargin={5} 
+                    height={60} 
+                    tick={{ fontSize: isMobile ? 8 : 10 }} 
+                    interval={0} 
+                    angle={-45} 
+                    textAnchor="end" 
+                  />
+                  <YAxis width={isMobile ? 30 : 40} tick={{ fontSize: isMobile ? 10 : 12 }} />
                   <ChartTooltip 
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
@@ -167,15 +185,20 @@ const Analytics = () => {
                       return null;
                     }}
                   />
-                  <Legend />
+                  <Legend 
+                    wrapperStyle={{ 
+                      fontSize: isMobile ? '10px' : '12px',
+                      marginTop: isMobile ? '10px' : '5px'
+                    }} 
+                  />
                   <Line 
                     type="monotone" 
                     dataKey="average" 
                     name="Gem. fooi per uur" 
                     stroke="#33C3F0" 
                     strokeWidth={2} 
-                    dot={{r: 5}} 
-                    activeDot={{r: 8}}
+                    dot={{r: isMobile ? 3 : 5}} 
+                    activeDot={{r: isMobile ? 5 : 8}}
                   />
                 </LineChart>
               </ChartContainer>
@@ -189,7 +212,7 @@ const Analytics = () => {
         </CardContent>
       </Card>
       
-      <Card>
+      <Card className="w-full mb-6">
         <CardHeader className="pb-2 pt-4">
           <CardTitle className="text-lg">Gemiddeld fooi per uur</CardTitle>
         </CardHeader>
@@ -198,26 +221,28 @@ const Analytics = () => {
             Het gemiddelde fooi per uur wordt berekend op basis van de totale fooi en de gewerkte uren van het team.
           </p>
           {hasAnyPeriodWithTips ? (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {periodData.filter(period => period.total > 0)
-                // Reverse the array to show the latest period at the top
-                .reverse()
-                .map(period => (
-                  <div key={period.id} className="flex justify-between p-2 border rounded-md">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{period.name}</span>
-                      {period.isPaid && (
-                        <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
-                          Uitbetaald
-                        </span>
-                      )}
+            <ScrollArea className="h-64 w-full">
+              <div className="space-y-2 pr-2">
+                {periodData.filter(period => period.total > 0)
+                  // Reverse the array to show the latest period at the top
+                  .reverse()
+                  .map(period => (
+                    <div key={period.id} className="flex justify-between p-2 border rounded-md">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{period.name}</span>
+                        {period.isPaid && (
+                          <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
+                            Uitbetaald
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-medium text-sm">
+                        €{period.average.toFixed(2)}/uur
+                      </div>
                     </div>
-                    <div className="font-medium text-sm">
-                      €{period.average.toFixed(2)}/uur
-                    </div>
-                  </div>
-                ))}
-            </div>
+                  ))}
+              </div>
+            </ScrollArea>
           ) : (
             <div className="text-center py-6 text-muted-foreground">
               <p>Er zijn nog geen periodes met fooi gegevens.</p>

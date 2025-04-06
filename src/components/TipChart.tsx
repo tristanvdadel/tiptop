@@ -6,11 +6,12 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Legend } from 'rech
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const TipChart = () => {
-  const {
-    periods
-  } = useApp();
+  const { periods } = useApp();
+  const isMobile = useIsMobile();
 
   // Chart data calculation
   const chartData = useMemo(() => {
@@ -116,7 +117,7 @@ const TipChart = () => {
 
   // Always show the chart, even if there's no data in the last 7 days
   return (
-    <Card className="mb-6">
+    <Card className="mb-6 w-full">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg">Afgelopen 7 dagen</CardTitle>
       </CardHeader>
@@ -124,7 +125,7 @@ const TipChart = () => {
         {hasTipsInLastWeek ? (
           <div className="h-48">
             <ChartContainer config={chartConfig} className="h-full">
-              <BarChart data={chartData}>
+              <BarChart data={chartData} margin={{ top: 5, right: isMobile ? 5 : 20, bottom: 5, left: isMobile ? 5 : 20 }}>
                 <XAxis dataKey="name" />
                 <ChartTooltip 
                   content={({ active, payload }) => {
@@ -138,7 +139,18 @@ const TipChart = () => {
                     return null;
                   }}
                 />
-                <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ maxHeight: '50px', overflowY: 'auto' }} />
+                <Legend 
+                  layout="horizontal" 
+                  verticalAlign="bottom" 
+                  align="center" 
+                  wrapperStyle={{ 
+                    maxHeight: '50px', 
+                    overflowY: 'auto', 
+                    fontSize: isMobile ? '10px' : '12px',
+                    width: '100%',
+                    maxWidth: isMobile ? '300px' : 'none',
+                  }} 
+                />
                 {barComponents}
               </BarChart>
             </ChartContainer>

@@ -20,7 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 const presets = [5, 10, 20, 50, 100];
 
 const TipInput = () => {
-  const { addTip, currentPeriod } = useApp();
+  const { addTip, currentPeriod, startNewPeriod } = useApp();
   const [amount, setAmount] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [showNote, setShowNote] = useState<boolean>(false);
@@ -46,8 +46,23 @@ const TipInput = () => {
       return;
     }
     
-    addTip(parsedAmount, note.trim() || undefined, date.toISOString());
-    
+    // Check if there's an active period, if not, create one first
+    if (!currentPeriod) {
+      // Start a new period and then add the tip
+      startNewPeriod();
+      // We need to use setTimeout to ensure the period is created before adding the tip
+      setTimeout(() => {
+        addTip(parsedAmount, note.trim() || undefined, date.toISOString());
+        resetForm();
+      }, 100);
+    } else {
+      // Normal flow when period exists
+      addTip(parsedAmount, note.trim() || undefined, date.toISOString());
+      resetForm();
+    }
+  };
+
+  const resetForm = () => {
     setAmount('');
     setNote('');
     setShowNote(false);

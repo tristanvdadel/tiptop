@@ -3,7 +3,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { LogOut, Bell, Moon, User, CreditCard, Globe, Lock, Upload } from "lucide-react";
+import { LogOut, Bell, Moon, User, CreditCard, Globe, Lock, Upload, Calendar } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+
 const Settings = () => {
   const {
     theme,
@@ -26,7 +27,10 @@ const Settings = () => {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userName, setUserName] = useState("Gebruiker");
   const [userEmail] = useState("gebruiker@example.com");
+  const [periodDuration, setPeriodDuration] = useState("week");
+  const [autoClosePeriods, setAutoClosePeriods] = useState(true);
   const navigate = useNavigate();
+
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -43,6 +47,7 @@ const Settings = () => {
       reader.readAsDataURL(file);
     }
   };
+
   const handleProfileSave = (data: {
     name: string;
   }) => {
@@ -52,6 +57,7 @@ const Settings = () => {
       description: "Je profielgegevens zijn succesvol opgeslagen."
     });
   };
+
   const passwordForm = useForm({
     defaultValues: {
       currentPassword: "",
@@ -59,11 +65,13 @@ const Settings = () => {
       confirmPassword: ""
     }
   });
+
   const profileForm = useForm({
     defaultValues: {
       name: userName
     }
   });
+
   const onSubmitPassword = (data: {
     currentPassword: string;
     newPassword: string;
@@ -84,6 +92,7 @@ const Settings = () => {
     });
     passwordForm.reset();
   };
+
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut();
@@ -101,6 +110,7 @@ const Settings = () => {
       });
     }
   };
+
   return <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Instellingen</h1>
@@ -270,6 +280,45 @@ const Settings = () => {
 
       <Card>
         <CardHeader>
+          <CardTitle>Periodes</CardTitle>
+          <CardDescription>Instellingen voor je fooi periodes</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4" />
+              <Label htmlFor="periodDuration">Periode duur</Label>
+            </div>
+            <Select defaultValue={periodDuration} onValueChange={setPeriodDuration}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Selecteer duur" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">Wekelijks</SelectItem>
+                <SelectItem value="month">Maandelijks</SelectItem>
+                <SelectItem value="custom">Aangepast</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <Separator />
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4" />
+              <Label htmlFor="autoClosePeriods">Automatisch periodes afsluiten</Label>
+            </div>
+            <Switch 
+              id="autoClosePeriods" 
+              checked={autoClosePeriods} 
+              onCheckedChange={setAutoClosePeriods} 
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>App instellingen</CardTitle>
           <CardDescription>Pas je app-ervaring aan</CardDescription>
         </CardHeader>
@@ -315,4 +364,5 @@ const Settings = () => {
       </Card>
     </div>;
 };
+
 export default Settings;

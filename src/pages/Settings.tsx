@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -15,55 +14,56 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-
 const Settings = () => {
-  const { theme, toggleTheme } = useTheme();
-  const { toast } = useToast();
+  const {
+    theme,
+    toggleTheme
+  } = useTheme();
+  const {
+    toast
+  } = useToast();
   const [language, setLanguage] = useState("nl");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userName, setUserName] = useState("Gebruiker");
   const [userEmail] = useState("gebruiker@example.com");
   const navigate = useNavigate();
-  
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = e => {
         if (e.target?.result) {
           setProfileImage(e.target.result as string);
           toast({
             title: "Profielfoto bijgewerkt",
-            description: "Je nieuwe profielfoto is succesvol opgeslagen.",
+            description: "Je nieuwe profielfoto is succesvol opgeslagen."
           });
         }
       };
       reader.readAsDataURL(file);
     }
   };
-
-  const handleProfileSave = (data: { name: string }) => {
+  const handleProfileSave = (data: {
+    name: string;
+  }) => {
     setUserName(data.name);
     toast({
       title: "Profiel bijgewerkt",
-      description: "Je profielgegevens zijn succesvol opgeslagen.",
+      description: "Je profielgegevens zijn succesvol opgeslagen."
     });
   };
-
   const passwordForm = useForm({
     defaultValues: {
       currentPassword: "",
       newPassword: "",
-      confirmPassword: "",
-    },
+      confirmPassword: ""
+    }
   });
-
   const profileForm = useForm({
     defaultValues: {
-      name: userName,
-    },
+      name: userName
+    }
   });
-
   const onSubmitPassword = (data: {
     currentPassword: string;
     newPassword: string;
@@ -73,27 +73,23 @@ const Settings = () => {
       toast({
         title: "Fout",
         description: "De wachtwoorden komen niet overeen",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-    
     console.log("Wachtwoord wijzigen:", data);
-    
     toast({
       title: "Wachtwoord bijgewerkt",
-      description: "Je wachtwoord is succesvol gewijzigd.",
+      description: "Je wachtwoord is succesvol gewijzigd."
     });
-    
     passwordForm.reset();
   };
-  
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut();
       toast({
         title: "Uitgelogd",
-        description: "Je bent succesvol uitgelogd.",
+        description: "Je bent succesvol uitgelogd."
       });
       navigate('/splash');
     } catch (error) {
@@ -101,34 +97,28 @@ const Settings = () => {
       toast({
         title: 'Fout bij uitloggen',
         description: 'Er is een fout opgetreden bij het uitloggen.',
-        variant: 'destructive',
+        variant: 'destructive'
       });
     }
   };
-  
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Instellingen</h1>
-        <p className="text-muted-foreground">Beheer je account en app voorkeuren</p>
+        
       </div>
       
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle>Account</CardTitle>
-          <CardDescription>Beheer je account instellingen</CardDescription>
+          
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              {profileImage ? (
-                <Avatar className="h-14 w-14">
+              {profileImage ? <Avatar className="h-14 w-14">
                   <AvatarImage src={profileImage} alt="Profielfoto" />
                   <AvatarFallback>U</AvatarFallback>
-                </Avatar>
-              ) : (
-                <User className="h-14 w-14 p-2 rounded-full bg-muted text-muted-foreground" />
-              )}
+                </Avatar> : <User className="h-14 w-14 p-2 rounded-full bg-muted text-muted-foreground" />}
               <div>
                 <p className="font-medium">{userName}</p>
                 <p className="text-sm text-muted-foreground">{userEmail}</p>
@@ -158,21 +148,13 @@ const Settings = () => {
                   <div className="grid gap-4 py-4">
                     <div className="space-y-2">
                       <Label htmlFor="name">Naam</Label>
-                      <Input 
-                        id="name" 
-                        defaultValue={userName}
-                        {...profileForm.register("name", { required: true })}
-                      />
+                      <Input id="name" defaultValue={userName} {...profileForm.register("name", {
+                      required: true
+                    })} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="picture">Profielfoto</Label>
-                      <Input 
-                        id="picture" 
-                        type="file" 
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="w-full" 
-                      />
+                      <Input id="picture" type="file" accept="image/*" onChange={handleImageUpload} className="w-full" />
                     </div>
                   </div>
                   <DialogFooter>
@@ -208,27 +190,21 @@ const Settings = () => {
                   <div className="grid gap-4 py-4">
                     <div className="space-y-2">
                       <Label htmlFor="currentPassword">Huidig wachtwoord</Label>
-                      <Input 
-                        id="currentPassword" 
-                        type="password"
-                        {...passwordForm.register("currentPassword", { required: true })}
-                      />
+                      <Input id="currentPassword" type="password" {...passwordForm.register("currentPassword", {
+                      required: true
+                    })} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="newPassword">Nieuw wachtwoord</Label>
-                      <Input 
-                        id="newPassword" 
-                        type="password"
-                        {...passwordForm.register("newPassword", { required: true })}
-                      />
+                      <Input id="newPassword" type="password" {...passwordForm.register("newPassword", {
+                      required: true
+                    })} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="confirmPassword">Bevestig nieuw wachtwoord</Label>
-                      <Input 
-                        id="confirmPassword" 
-                        type="password"
-                        {...passwordForm.register("confirmPassword", { required: true })}
-                      />
+                      <Input id="confirmPassword" type="password" {...passwordForm.register("confirmPassword", {
+                      required: true
+                    })} />
                     </div>
                   </div>
                   <DialogFooter>
@@ -313,11 +289,7 @@ const Settings = () => {
               <Moon className="h-4 w-4" />
               <Label htmlFor="darkMode">Donkere modus</Label>
             </div>
-            <Switch 
-              id="darkMode" 
-              checked={theme === "dark"}
-              onCheckedChange={toggleTheme}
-            />
+            <Switch id="darkMode" checked={theme === "dark"} onCheckedChange={toggleTheme} />
           </div>
           
           <Separator />
@@ -341,8 +313,6 @@ const Settings = () => {
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 };
-
 export default Settings;

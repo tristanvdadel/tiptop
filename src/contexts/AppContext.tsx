@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -455,6 +454,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return sum + currentHours + savedHours;
     }, 0);
     
+    if (totalHours === 0 && totalTips > 0) {
+      const defaultHourlyRate = 10; // Assume 10 hours as default for calculation
+      return totalTips / defaultHourlyRate;
+    }
+    
     if (totalHours === 0) {
       return 0;
     }
@@ -641,7 +645,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         calculateAverageTipPerHour,
         markPeriodsAsPaid,
         hasReachedLimit,
-        hasReachedPeriodLimit, // Added to the provider
+        hasReachedPeriodLimit,
         getUnpaidPeriodsCount,
         deletePaidPeriods,
         deletePeriod,

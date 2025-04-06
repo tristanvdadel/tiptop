@@ -180,9 +180,7 @@ const Analytics = () => {
                       )}
                     </div>
                     <div className="font-medium text-sm">
-                      {period.average > 0 
-                        ? `€${period.average.toFixed(2)}/uur` 
-                        : 'Geen uren geregistreerd'}
+                      €{period.average.toFixed(2)}/uur
                     </div>
                   </div>
                 ))}

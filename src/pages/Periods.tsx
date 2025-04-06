@@ -14,7 +14,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
-
 const Periods = () => {
   const {
     periods,
@@ -53,7 +52,6 @@ const Periods = () => {
   const unpaidPeriodesCount = getUnpaidPeriodsCount();
   const paidPeriodesCount = periods.filter(p => p.isPaid).length;
   const averageTipPerHour = calculateAverageTipPerHour();
-
   const handleStartNewPeriod = () => {
     if (currentPeriod) {
       return; // Already have an active period
@@ -73,12 +71,10 @@ const Periods = () => {
       description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode."
     });
   };
-
   const handleDeletePaidPeriods = () => {
     setShowPaidPeriodesDialog(false);
     setShowDeleteConfirmDialog(true);
   };
-
   const confirmDeletePaidPeriods = () => {
     deletePaidPeriods();
     setShowDeleteConfirmDialog(false);
@@ -89,13 +85,11 @@ const Periods = () => {
       variant: "default"
     });
   };
-
   const handleUpgrade = () => {
     setShowUpgradeDialog(true);
     setShowPaidPeriodesDialog(false);
     setShowLimitDialog(false);
   };
-
   const doUpgrade = (newTier: 'pro') => {
     toast({
       title: `Upgraden naar ${newTier.toUpperCase()}`,
@@ -105,12 +99,10 @@ const Periods = () => {
     setShowUpgradeDialog(false);
     // In a real app, this would trigger a subscription change
   };
-
   const handleDeletePeriod = (periodId: string) => {
     setPeriodToDelete(periodId);
     setShowDeletePeriodDialog(true);
   };
-
   const confirmDeletePeriod = () => {
     if (periodToDelete) {
       deletePeriod(periodToDelete);
@@ -123,7 +115,6 @@ const Periods = () => {
       });
     }
   };
-
   const handleEditPeriod = (periodId: string) => {
     const period = periods.find(p => p.id === periodId);
     if (period) {
@@ -133,7 +124,6 @@ const Periods = () => {
       setShowEditPeriodDialog(true);
     }
   };
-
   const confirmEditPeriod = () => {
     if (periodToEdit) {
       updatePeriod(periodToEdit, {
@@ -149,7 +139,6 @@ const Periods = () => {
       });
     }
   };
-
   const goToTeamPayouts = () => {
     navigate('/team');
     toast({
@@ -157,18 +146,14 @@ const Periods = () => {
       description: "Selecteer perioden en teamleden om de fooi uit te betalen."
     });
   };
-
   const handleDeleteAllPaidPeriods = () => {
     setShowDeleteAllPaidDialog(true);
   };
-
   return <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Periodes</h1>
         <div className="flex items-center gap-2">
-          <Badge className="tier-free">
-            {periods.length}/totaal
-          </Badge>
+          
           <Button onClick={handleStartNewPeriod} disabled={!!currentPeriod} className="gold-button">
             <Plus size={16} className="mr-1" /> Nieuwe periode
           </Button>
@@ -547,17 +532,11 @@ const Periods = () => {
                 </Card>;
       })}
           
-          {paidPeriodesCount > 0 && (
-            <div className="pt-4 border-t border-border mt-8">
-              <Button 
-                variant="outline" 
-                className="w-full border-destructive/30 text-destructive hover:bg-destructive/10"
-                onClick={handleDeleteAllPaidPeriods}
-              >
+          {paidPeriodesCount > 0 && <div className="pt-4 border-t border-border mt-8">
+              <Button variant="outline" className="w-full border-destructive/30 text-destructive hover:bg-destructive/10" onClick={handleDeleteAllPaidPeriods}>
                 <Trash2 size={16} className="mr-2" /> Verwijder alle uitbetaalde periodes
               </Button>
-            </div>
-          )}
+            </div>}
         </div> : <Card>
           <CardContent className="p-6 text-center">
             <p className="text-muted-foreground">Nog geen periodes gestart.</p>
@@ -568,5 +547,4 @@ const Periods = () => {
         </Card>}
     </div>;
 };
-
 export default Periods;

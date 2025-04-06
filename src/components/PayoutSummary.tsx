@@ -9,11 +9,17 @@ import { PrinterIcon, ClipboardList, FileCheck, ArrowLeft, Download, Save, Info 
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Link } from 'react-router-dom';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { 
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle 
+} from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
 type PayoutSummaryProps = {
   onClose: () => void;
 };
+
 export const PayoutSummary = ({
   onClose
 }: PayoutSummaryProps) => {
@@ -24,9 +30,10 @@ export const PayoutSummary = ({
     updateTeamMemberBalance,
     clearTeamMemberHours
   } = useApp();
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const [actualPayouts, setActualPayouts] = useState<{
     [key: string]: number;
   }>({});
@@ -34,14 +41,30 @@ export const PayoutSummary = ({
     [key: string]: number;
   }>({});
   const [hasChanges, setHasChanges] = useState(false);
-  const [isConfirmed, setIsConfirmed] = useState(false);
   const [inputValues, setInputValues] = useState<{
     [key: string]: string;
   }>({});
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
+  const [showCopyDialog, setShowCopyDialog] = useState(false);
+  const [showDownloadDialog, setShowDownloadDialog] = useState(false);
+  const [copiedText, setCopiedText] = useState('');
+  
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    searchParams.set('payoutSummary', 'true');
+    navigate(`${location.pathname}?${searchParams.toString()}`, { replace: true });
+    
+    return () => {
+      const searchParams = new URLSearchParams(location.search);
+      searchParams.delete('payoutSummary');
+      navigate(`${location.pathname}?${searchParams.toString()}`, { replace: true });
+    };
+  }, []);
+  
   const roundDownToNearest = (value: number, nearest: number = 5): number => {
     return Math.floor(value / nearest) * nearest;
   };
+  
   useEffect(() => {
     if (mostRecentPayout) {
       const initialPayouts: {
@@ -70,6 +93,7 @@ export const PayoutSummary = ({
       setInputValues(initialInputValues);
     }
   }, [mostRecentPayout, teamMembers]);
+  
   if (!mostRecentPayout) {
     return <Card>
         <CardContent className="p-6 text-center">
@@ -80,9 +104,11 @@ export const PayoutSummary = ({
         </CardContent>
       </Card>;
   }
+  
   const payoutDate = format(new Date(mostRecentPayout.date), 'd MMMM yyyy', {
     locale: nl
   });
+  
   const periodData = periods.filter(period => mostRecentPayout.periodIds.includes(period.id)).map(period => {
     const startDate = format(new Date(period.startDate), 'd MMM', {
       locale: nl
@@ -97,7 +123,9 @@ export const PayoutSummary = ({
       total: totalTip
     };
   });
+  
   const totalPayout = mostRecentPayout.distribution.reduce((sum, item) => sum + item.amount, 0);
+  
   const memberPayouts = mostRecentPayout.distribution.map(item => {
     const member = teamMembers.find(m => m.id === item.memberId);
     const existingBalance = member?.balance || 0;
@@ -109,29 +137,47 @@ export const PayoutSummary = ({
       totalDue: item.amount + existingBalance
     };
   });
+  
   const handlePrint = () => {
     window.print();
   };
+  
   const handleCopyToClipboard = () => {
-    const payoutText = `Uitbetaling fooi: ${payoutDate}\n\n` + memberPayouts.map(member => {
-      const actualAmount = actualPayouts[member.id] || member.amount;
-      const carriedBalance = balances[member.id] || 0;
-      return `${member.name}: €${actualAmount.toFixed(2)}${carriedBalance !== 0 ? ` (€${Math.abs(carriedBalance).toFixed(2)} ${carriedBalance > 0 ? 'meegenomen' : 'teveel betaald'})` : ''}`;
-    }).join('\n') + `\n\nTotaal: €${Object.values(actualPayouts).reduce((sum, amount) => sum + amount, 0).toFixed(2)}`;
-    navigator.clipboard.writeText(payoutText).then(() => {
+    const payoutText = `Uitbetaling fooi: ${payoutDate}\n\n` + 
+      memberPayouts.map(member => {
+        const actualAmount = actualPayouts[member.id] || member.amount;
+        const carriedBalance = balances[member.id] || 0;
+        return `${member.name}: €${actualAmount.toFixed(2)}${carriedBalance !== 0 ? 
+          ` (€${Math.abs(carriedBalance).toFixed(2)} ${carriedBalance > 0 ? 'meegenomen' : 'teveel betaald'})` : ''}`;
+      }).join('\n') + 
+      `\n\nTotaal: €${Object.values(actualPayouts).reduce((sum, amount) => sum + amount, 0).toFixed(2)}`;
+    
+    setCopiedText(payoutText);
+    setShowCopyDialog(true);
+  };
+  
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(copiedText).then(() => {
       toast({
         title: "Gekopieerd naar klembord",
         description: "De uitbetalingsgegevens zijn gekopieerd naar het klembord."
       });
+      setShowCopyDialog(false);
     });
   };
+  
   const handleDownloadCSV = () => {
+    setShowDownloadDialog(true);
+  };
+  
+  const downloadCSV = () => {
     const headers = "Naam,Bedrag,Saldo\n";
     const rows = memberPayouts.map(member => {
       const actualAmount = actualPayouts[member.id] || member.amount;
       const carriedBalance = balances[member.id] || 0;
       return `${member.name},${actualAmount.toFixed(2)},${carriedBalance.toFixed(2)}`;
     }).join('\n');
+    
     const csv = headers + rows;
     const blob = new Blob([csv], {
       type: 'text/csv;charset=utf-8;'
@@ -144,11 +190,14 @@ export const PayoutSummary = ({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    
     toast({
       title: "CSV gedownload",
       description: "De uitbetalingsgegevens zijn gedownload als CSV-bestand."
     });
+    setShowDownloadDialog(false);
   };
+  
   const handleActualPayoutChange = (memberId: string, value: string) => {
     setInputValues(prev => ({
       ...prev,
@@ -175,33 +224,37 @@ export const PayoutSummary = ({
       }
     }
   };
+  
   const handleSaveBalancesAndClose = () => {
-    // Save the actual payout amounts in the payout object
     if (mostRecentPayout && hasChanges) {
-      // This would ideally update the payout record with actual amounts
-      // For now, we just save the balances
       Object.entries(balances).forEach(([memberId, balance]) => {
         updateTeamMemberBalance(memberId, balance);
       });
 
-      // Update distribution with actual amounts (if context supported it)
-      // For now, this is just conceptual
       const updatedDistribution = mostRecentPayout.distribution.map(item => ({
         ...item,
         actualAmount: actualPayouts[item.memberId] || item.amount,
         balance: balances[item.memberId] || 0
       }));
+      
       memberPayouts.forEach(member => {
         clearTeamMemberHours(member.id);
       });
+      
       toast({
         title: "Saldi opgeslagen",
         description: "De aangepaste uitbetaling en saldi zijn opgeslagen. Uren zijn gewist."
       });
       setHasChanges(false);
     }
+    
+    const searchParams = new URLSearchParams(location.search);
+    searchParams.delete('payoutSummary');
+    navigate(`${location.pathname}?${searchParams.toString()}`, { replace: true });
+    
     onClose();
   };
+  
   const handleBackButtonClick = () => {
     if (hasChanges) {
       setShowExitConfirmation(true);
@@ -209,6 +262,7 @@ export const PayoutSummary = ({
       onClose();
     }
   };
+  
   const getBalanceText = (balance: number) => {
     if (balance === 0) return "";
     if (balance > 0) {
@@ -217,10 +271,10 @@ export const PayoutSummary = ({
       return `€${Math.abs(balance).toFixed(2)} teveel betaald`;
     }
   };
+  
   return <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Uitbetaling samenvatting</h1>
-        
       </div>
       
       <Card className="border-green-200 bg-green-50/30">
@@ -331,7 +385,6 @@ export const PayoutSummary = ({
         
       </Card>
 
-      {/* Confirmation dialog when trying to exit with unsaved changes */}
       <AlertDialog open={showExitConfirmation} onOpenChange={setShowExitConfirmation}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -347,13 +400,45 @@ export const PayoutSummary = ({
               Opslaan en afsluiten
             </AlertDialogAction>
             <AlertDialogAction onClick={() => {
-            setShowExitConfirmation(false);
-            onClose();
-          }} className="bg-amber-600 hover:bg-amber-700">
+              setShowExitConfirmation(false);
+              onClose();
+            }} className="bg-amber-600 hover:bg-amber-700">
               Afsluiten zonder opslaan
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      <Dialog open={showCopyDialog} onOpenChange={setShowCopyDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Kopiëren naar klembord</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            <div className="bg-gray-50 p-4 rounded-md mb-4 whitespace-pre-wrap text-sm">
+              {copiedText}
+            </div>
+            <Button onClick={copyToClipboard} className="w-full">
+              <ClipboardList size={16} className="mr-1" /> Kopiëren naar klembord
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={showDownloadDialog} onOpenChange={setShowDownloadDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Download CSV bestand</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            <p className="mb-4">
+              Je staat op het punt een CSV-bestand te downloaden met de uitbetalingsgegevens voor {payoutDate}.
+            </p>
+            <Button onClick={downloadCSV} className="w-full">
+              <Download size={16} className="mr-1" /> Download CSV
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>;
 };

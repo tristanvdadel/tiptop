@@ -10,10 +10,13 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
   const isFastTip = location.pathname === '/fast-tip';
+  
+  // Check if we're in the payout summary view
+  const isPayoutSummary = location.pathname === '/team' && location.search.includes('payoutSummary=true');
 
   return (
     <div className="min-h-screen flex flex-col">
-      {!isFastTip && <Navbar />}
+      {!isFastTip && !isPayoutSummary && <Navbar />}
       <main className="flex-grow container mx-auto px-4 pb-20 pt-4 w-full">
         {children}
       </main>

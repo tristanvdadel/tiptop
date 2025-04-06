@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -328,13 +329,12 @@ export const PayoutSummary = ({
             <h3 className="text-sm font-medium mb-2">Verdeling per teamlid</h3>
             <div className="space-y-4">
               {memberPayouts.map(member => {
-              const totalDue = member.amount + (member.existingBalance || 0);
-              const actualPayout = actualPayouts[member.id] || roundDownToNearest(totalDue);
-              const carriedBalance = balances[member.id] || totalDue - actualPayout;
+              const actualPayout = actualPayouts[member.id] || roundDownToNearest(member.totalDue);
+              const carriedBalance = balances[member.id] || member.totalDue - actualPayout;
               return <div key={member.id} className="p-3 border rounded-md">
                     <div className="flex justify-between font-medium mb-2">
                       <span>{member.name}</span>
-                      <span>Te betalen: €{member.amount.toFixed(2)}</span>
+                      <span>Te betalen: €{member.totalDue.toFixed(2)}</span>
                     </div>
                     
                     {member.existingBalance !== 0 && <div className="flex justify-between text-sm mb-2 text-gray-600">

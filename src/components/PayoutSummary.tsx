@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -65,10 +64,6 @@ export const PayoutSummary = ({
     };
   }, []);
   
-  const roundDownToNearest = (value: number, nearest: number = 5): number => {
-    return Math.floor(value / nearest) * nearest;
-  };
-  
   useEffect(() => {
     if (mostRecentPayout) {
       const initialPayouts: {
@@ -84,12 +79,9 @@ export const PayoutSummary = ({
         const member = teamMembers.find(m => m.id === item.memberId);
         if (member) {
           const calculatedAmount = item.amount || 0;
-          const existingBalance = member.balance || 0;
-          const totalDue = calculatedAmount + existingBalance;
-          const roundedPayout = roundDownToNearest(totalDue);
-          initialPayouts[item.memberId] = roundedPayout;
-          initialBalances[item.memberId] = totalDue - roundedPayout;
-          initialInputValues[item.memberId] = roundedPayout.toString();
+          initialPayouts[item.memberId] = calculatedAmount;
+          initialBalances[item.memberId] = 0;
+          initialInputValues[item.memberId] = calculatedAmount.toString();
         }
       });
       setActualPayouts(initialPayouts);
@@ -138,13 +130,10 @@ export const PayoutSummary = ({
   
   const memberPayouts = mostRecentPayout.distribution.map(item => {
     const member = teamMembers.find(m => m.id === item.memberId);
-    const existingBalance = member?.balance || 0;
     return {
       id: item.memberId,
       name: member?.name || 'Onbekend lid',
-      amount: item.amount,
-      existingBalance,
-      totalDue: item.amount + existingBalance
+      amount: item.amount
     };
   });
   
@@ -222,10 +211,10 @@ export const PayoutSummary = ({
           [memberId]: amount
         };
         setActualPayouts(newActualPayouts);
-        const existingBalance = member.existingBalance || 0;
+        
         const calculatedAmount = member.amount || 0;
-        const totalDue = calculatedAmount + existingBalance;
-        const newBalance = totalDue - amount;
+        const newBalance = calculatedAmount - amount;
+        
         setBalances({
           ...balances,
           [memberId]: newBalance
@@ -335,18 +324,13 @@ export const PayoutSummary = ({
             <h3 className="text-sm font-medium mb-2">Verdeling per teamlid</h3>
             <div className="space-y-4">
               {memberPayouts.map(member => {
-              const actualPayout = actualPayouts[member.id] || roundDownToNearest(member.totalDue);
-              const carriedBalance = balances[member.id] || member.totalDue - actualPayout;
+              const actualPayout = actualPayouts[member.id] || member.amount;
+              const carriedBalance = balances[member.id] || 0;
               return <div key={member.id} className="p-3 border rounded-md">
                     <div className="flex justify-between font-medium mb-2">
                       <span>{member.name}</span>
                       <span>Te betalen: €{member.amount.toFixed(2)}</span>
                     </div>
-                    
-                    {member.existingBalance !== 0 && <div className="flex justify-between text-sm mb-2 text-gray-600">
-                        <span>Vorig saldo</span>
-                        <span>€{member.existingBalance.toFixed(2)}</span>
-                      </div>}
                     
                     <div className="flex items-center mt-3 space-x-2">
                       <div className="flex-1">

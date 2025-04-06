@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -16,9 +15,7 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useApp } from "@/contexts/AppContext";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/checkbox";
-import { cn } from "@/lib/utils";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const Settings = () => {
   const {
@@ -42,7 +39,7 @@ const Settings = () => {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userName, setUserName] = useState("Gebruiker");
   const [userEmail] = useState("gebruiker@example.com");
-  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
+  const [autoCloseFrequency, setAutoCloseFrequency] = useState("daily");
   const navigate = useNavigate();
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,26 +122,29 @@ const Settings = () => {
     }
   };
 
-  const handleToggleDay = (day: number) => {
-    if (!periodAutoCloseDays) {
-      setPeriodAutoCloseDays([day]);
-      return;
-    }
-
-    if (periodAutoCloseDays.includes(day)) {
-      setPeriodAutoCloseDays(periodAutoCloseDays.filter(d => d !== day));
-    } else {
-      setPeriodAutoCloseDays([...periodAutoCloseDays, day]);
+  const handleAutoCloseFrequencyChange = (value: string) => {
+    setAutoCloseFrequency(value);
+    
+    if (value === "daily") {
+      setPeriodAutoCloseDays([0, 1, 2, 3, 4, 5, 6]);
+    } else if (value === "weekly") {
+      setPeriodAutoCloseDays([0]);
+    } else if (value === "monthly") {
+      setPeriodAutoCloseDays([]);
     }
   };
 
-  const saveScheduleSettings = () => {
-    setIsScheduleDialogOpen(false);
-    toast({
-      title: "Schema bijgewerkt",
-      description: "Het automatisch afsluitschema is bijgewerkt."
-    });
-  };
+  useState(() => {
+    if (!periodAutoCloseDays) return;
+    
+    if (periodAutoCloseDays.length === 7) {
+      setAutoCloseFrequency("daily");
+    } else if (periodAutoCloseDays.length === 1 && periodAutoCloseDays[0] === 0) {
+      setAutoCloseFrequency("weekly");
+    } else if (periodAutoCloseDays.length === 0) {
+      setAutoCloseFrequency("monthly");
+    }
+  });
 
   return <div className="space-y-6">
       <div>
@@ -365,90 +365,39 @@ const Settings = () => {
                 />
               </div>
               
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Label>Sluitingsdagen</Label>
-                </div>
-                <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="w-[180px]">
-                      Schema aanpassen
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                      <DialogTitle>Sluitingsschema aanpassen</DialogTitle>
-                      <DialogDescription>
-                        Kies op welke dagen periodes automatisch worden afgesloten om {periodAutoCloseTime}.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4">
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="closeTime" className="mb-2 block">Sluitingstijd</Label>
-                          <Input
-                            id="closeTime"
-                            type="time"
-                            value={periodAutoCloseTime}
-                            onChange={(e) => setPeriodAutoCloseTime(e.target.value)}
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label className="mb-2 block">Dagen waarop periodes worden afgesloten</Label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {[
-                              { value: 1, label: 'Maandag' },
-                              { value: 2, label: 'Dinsdag' },
-                              { value: 3, label: 'Woensdag' },
-                              { value: 4, label: 'Donderdag' },
-                              { value: 5, label: 'Vrijdag' },
-                              { value: 6, label: 'Zaterdag' },
-                              { value: 0, label: 'Zondag' },
-                            ].map((day) => (
-                              <div key={day.value} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`day-${day.value}`}
-                                  checked={periodAutoCloseDays?.includes(day.value) || false}
-                                  onCheckedChange={() => handleToggleDay(day.value)}
-                                />
-                                <label 
-                                  htmlFor={`day-${day.value}`}
-                                  className={cn(
-                                    "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-                                    periodAutoCloseDays?.includes(day.value) ? "text-primary" : ""
-                                  )}
-                                >
-                                  {day.label}
-                                </label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setIsScheduleDialogOpen(false)}>
-                        Annuleren
-                      </Button>
-                      <Button onClick={saveScheduleSettings}>Opslaan</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+              <div>
+                <Label className="mb-2 block">Frequentie</Label>
+                <RadioGroup 
+                  value={autoCloseFrequency} 
+                  onValueChange={handleAutoCloseFrequencyChange}
+                  className="mt-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="daily" id="daily" />
+                    <Label htmlFor="daily">Dagelijks</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="weekly" id="weekly" />
+                    <Label htmlFor="weekly">Wekelijks (zondag)</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="monthly" id="monthly" />
+                    <Label htmlFor="monthly">Maandelijks (einde maand)</Label>
+                  </div>
+                </RadioGroup>
               </div>
                            
               <div className="text-sm text-muted-foreground space-y-1">
-                {periodAutoCloseDays && periodAutoCloseDays.length > 0 ? (
-                  <>
-                    <p>Periodes worden automatisch afgesloten om {periodAutoCloseTime} op de geselecteerde dagen.</p>
-                    <p>Dit voorkomt dat je per ongeluk in een oude periode blijft werken.</p>
-                  </>
-                ) : (
-                  <>
-                    <p>Periodes worden automatisch afgesloten om {periodAutoCloseTime} als ze vanaf een andere dag zijn gestart.</p>
-                    <p>Dit voorkomt dat je per ongeluk in een oude periode blijft werken.</p>
-                  </>
+                {autoCloseFrequency === "daily" && (
+                  <p>Periodes worden elke dag automatisch afgesloten om {periodAutoCloseTime}.</p>
                 )}
+                {autoCloseFrequency === "weekly" && (
+                  <p>Periodes worden elke zondag automatisch afgesloten om {periodAutoCloseTime}.</p>
+                )}
+                {autoCloseFrequency === "monthly" && (
+                  <p>Periodes worden aan het einde van elke maand automatisch afgesloten om {periodAutoCloseTime}.</p>
+                )}
+                <p>Dit voorkomt dat je per ongeluk in een oude periode blijft werken.</p>
               </div>
             </div>
           )}

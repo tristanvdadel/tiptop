@@ -184,11 +184,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             return; // Not a day to auto-close
           }
         } else {
-          const periodStartDay = new Date(currentPeriod.startDate).getDate();
-          const currentDay = now.getDate();
+          const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+          const isLastDayOfMonth = now.getDate() === lastDayOfMonth;
           
-          if (periodStartDay === currentDay) {
-            return; // Same day, don't auto-close
+          if (!isLastDayOfMonth) {
+            return;
           }
         }
         

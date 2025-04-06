@@ -38,7 +38,8 @@ const PayoutHistory = () => {
     const payoutDate = formatDate(selectedPayout.date);
     const memberDetails = selectedPayout.distribution.map(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
-      return `${member?.name || 'Onbekend lid'}: €${item.actualAmount?.toFixed(2) || item.amount.toFixed(2)}`;
+      // Use optional chaining to safely access actualAmount
+      return `${member?.name || 'Onbekend lid'}: €${(item.actualAmount || item.amount).toFixed(2)}`;
     }).join('\n');
 
     const totalAmount = selectedPayout.distribution.reduce(

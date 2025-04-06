@@ -28,7 +28,9 @@ export const PayoutSummary = ({
     teamMembers,
     periods,
     updateTeamMemberBalance,
-    clearTeamMemberHours
+    clearTeamMemberHours,
+    markPeriodsAsPaid,
+    setMostRecentPayout
   } = useApp();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -48,6 +50,7 @@ export const PayoutSummary = ({
   const [showCopyDialog, setShowCopyDialog] = useState(false);
   const [showDownloadDialog, setShowDownloadDialog] = useState(false);
   const [copiedText, setCopiedText] = useState('');
+  const [isPendingPayout, setIsPendingPayout] = useState(true);
   
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -226,13 +229,14 @@ export const PayoutSummary = ({
   };
   
   const handleSaveBalancesAndClose = () => {
-    if (mostRecentPayout && hasChanges) {
+    if (mostRecentPayout && isPendingPayout) {
       Object.entries(balances).forEach(([memberId, balance]) => {
         updateTeamMemberBalance(memberId, balance);
       });
-
+      
       const updatedDistribution = mostRecentPayout.distribution.map(item => ({
-        ...item,
+        memberId: item.memberId,
+        amount: item.amount,
         actualAmount: actualPayouts[item.memberId] || item.amount,
         balance: balances[item.memberId] || 0
       }));
@@ -241,11 +245,21 @@ export const PayoutSummary = ({
         clearTeamMemberHours(member.id);
       });
       
-      toast({
-        title: "Saldi opgeslagen",
-        description: "De aangepaste uitbetaling en saldi zijn opgeslagen. Uren zijn gewist."
+      if (mostRecentPayout.periodIds.length > 0) {
+        markPeriodsAsPaid(mostRecentPayout.periodIds, updatedDistribution);
+      }
+      
+      setMostRecentPayout({
+        ...mostRecentPayout,
+        distribution: updatedDistribution
       });
-      setHasChanges(false);
+      
+      setIsPendingPayout(false);
+      
+      toast({
+        title: "Uitbetaling voltooid",
+        description: "De uitbetaling is verwerkt, saldi bijgewerkt en uren gewist."
+      });
     }
     
     const searchParams = new URLSearchParams(location.search);
@@ -381,10 +395,6 @@ export const PayoutSummary = ({
         </CardFooter>
       </Card>
       
-      <Card>
-        
-      </Card>
-
       <AlertDialog open={showExitConfirmation} onOpenChange={setShowExitConfirmation}>
         <AlertDialogContent>
           <AlertDialogHeader>

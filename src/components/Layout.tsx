@@ -12,7 +12,7 @@ const Layout = ({ children }: LayoutProps) => {
   const isFastTip = location.pathname === '/fast-tip';
   
   // Check if we're in the payout summary view
-  const isPayoutSummary = location.pathname === '/team' && location.search.includes('payoutSummary=true');
+  const isPayoutSummary = location.search.includes('payoutSummary=true');
 
   return (
     <div className="min-h-screen flex flex-col">

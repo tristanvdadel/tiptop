@@ -44,6 +44,8 @@ export type PayoutData = {
   distribution: {
     memberId: string;
     amount: number;
+    actualAmount?: number;  // Added for tracking what was actually paid
+    balance?: number;       // Added for tracking the balance
   }[];
 };
 

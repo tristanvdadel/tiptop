@@ -139,14 +139,14 @@ const PeriodSummary = () => {
           <p className="text-sm text-muted-foreground mb-3">
             {currentPeriod.tips.length > 0 
               ? `${currentPeriod.tips.length} fooi invoer(en) in deze periode` 
-              : "Nog geen fooien in deze periode. Voeg fooien toe om ze hier te zien."}
+              : "Nog geen fooien in deze periode. Voeg fooien toe via het formulier."}
           </p>
           
           {currentPeriod.tips.length === 0 && (
             <Alert className="mt-2 bg-muted/50 border-muted">
               <Info className="h-4 w-4" />
               <AlertDescription>
-                Gebruik het invoerveld hierboven om fooien toe te voegen aan deze periode.
+                Je kunt fooien invoeren via het formulier hieronder.
               </AlertDescription>
             </Alert>
           )}

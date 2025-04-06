@@ -146,7 +146,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         });
         return;
       }
-      startNewPeriod();
+      
+      const newPeriodId = generateId();
+      const newPeriod: Period = {
+        id: newPeriodId,
+        startDate: new Date().toISOString(),
+        isActive: true,
+        tips: [],
+        isPaid: false,
+      };
+      
+      const newTip: TipEntry = {
+        id: generateId(),
+        amount,
+        date: customDate || new Date().toISOString(),
+        note,
+        addedBy: 'current-user',
+      };
+      
+      newPeriod.tips = [newTip];
+      
+      setPeriods(prev => [...prev, newPeriod]);
+      setCurrentPeriod(newPeriod);
+      return;
     }
     
     const newTip: TipEntry = {
@@ -158,8 +180,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
     
     const updatedPeriod = {
-      ...currentPeriod!,
-      tips: [...currentPeriod!.tips, newTip],
+      ...currentPeriod,
+      tips: [...currentPeriod.tips, newTip],
     };
     
     setCurrentPeriod(updatedPeriod);
@@ -258,16 +280,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setTeamMembers(prev => 
       prev.map(member => {
         if (member.id === memberId) {
-          // Copy the existing hour registrations to a savedRegistrations field
-          // that won't be displayed but will be used in calculations
           const savedRegistrations = member.hourRegistrations || [];
           
           return { 
             ...member,
-            hours: 0, // Reset hours to 0
-            hourRegistrations: [], // Clear hourRegistrations array
-            // Keep the previous registrations in a field that's not shown in the UI
-            // but is used for tip per hour calculations
+            hours: 0,
+            hourRegistrations: [],
             savedHourRegistrations: savedRegistrations
           };
         }
@@ -277,7 +295,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateTeamMemberName = (memberId: string, newName: string): boolean => {
-    // Validate input
     if (!newName.trim()) {
       toast({
         title: "Ongeldige naam",
@@ -287,7 +304,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
     
-    // Check if name already exists (case insensitive)
     const nameExists = teamMembers.some(
       member => member.id !== memberId && 
                 member.name.toLowerCase() === newName.trim().toLowerCase()
@@ -302,7 +318,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
     
-    // Update the name
     setTeamMembers(prev => 
       prev.map(member => 
         member.id === memberId 
@@ -320,11 +335,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const hasReachedLimit = () => {
-    return false; // No limits in the paid version
+    return false;
   };
   
   const hasReachedPeriodLimit = () => {
-    return false; // No limits in the paid version (added function)
+    return false;
   };
   
   const getUnpaidPeriodsCount = () => {
@@ -390,7 +405,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return [];
     }
     
-    // Advanced calculation modes are available for all users now
     let adjustmentFactor = 1;
     
     switch (calculationMode) {
@@ -455,7 +469,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }, 0);
     
     if (totalHours === 0 && totalTips > 0) {
-      const defaultHourlyRate = 10; // Assume 10 hours as default for calculation
+      const defaultHourlyRate = 10;
       return totalTips / defaultHourlyRate;
     }
     
@@ -463,7 +477,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return 0;
     }
     
-    // Advanced calculation modes are available for all users now
     let adjustmentFactor = 1;
     
     switch (calculationMode) {
@@ -502,7 +515,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
     
     setPayouts(prev => [...prev, newPayout]);
-    setMostRecentPayout(newPayout); // Set the most recent payout
+    setMostRecentPayout(newPayout);
     
     setPeriods(prev => 
       prev.map(period => 

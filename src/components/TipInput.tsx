@@ -48,13 +48,12 @@ const TipInput = () => {
     
     // Check if there's an active period, if not, create one first
     if (!currentPeriod) {
-      // Start a new period and then add the tip
+      // Start a new period
       startNewPeriod();
-      // We need to use setTimeout to ensure the period is created before adding the tip
-      setTimeout(() => {
-        addTip(parsedAmount, note.trim() || undefined, date.toISOString());
-        resetForm();
-      }, 100);
+      // Then immediately add the tip to the new period
+      // No need for setTimeout as startNewPeriod is synchronous
+      addTip(parsedAmount, note.trim() || undefined, date.toISOString());
+      resetForm();
     } else {
       // Normal flow when period exists
       addTip(parsedAmount, note.trim() || undefined, date.toISOString());

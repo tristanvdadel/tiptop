@@ -1,9 +1,10 @@
+
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Pencil, Plus, Info, ClipboardList, Clock } from 'lucide-react';
+import { Pencil, Plus, Info, ClipboardList, Clock, CalendarClock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
   Tooltip, 
@@ -31,7 +32,8 @@ const PeriodSummary = () => {
     startNewPeriod,
     hasReachedPeriodLimit,
     autoClosePeriods,
-    periodAutoCloseTime
+    periodAutoCloseTime,
+    periodAutoCloseDays
   } = useApp();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [periodName, setPeriodName] = useState('');
@@ -78,13 +80,42 @@ const PeriodSummary = () => {
     });
   };
 
-  const formattedAutoCloseTime = useMemo(() => {
+  const formattedAutoCloseMessage = useMemo(() => {
     if (!autoClosePeriods || !currentPeriod) return null;
     
+    const today = new Date().getDay();
     const [hours, minutes] = periodAutoCloseTime.split(':');
+    const timeString = `${hours}:${minutes}`;
     
-    return `${hours}:${minutes}`;
-  }, [autoClosePeriods, periodAutoCloseTime, currentPeriod]);
+    // If we have specific days configured, show that information
+    if (periodAutoCloseDays && periodAutoCloseDays.length > 0) {
+      const dayNames = {
+        0: 'zondag',
+        1: 'maandag',
+        2: 'dinsdag',
+        3: 'woensdag',
+        4: 'donderdag',
+        5: 'vrijdag',
+        6: 'zaterdag'
+      };
+      
+      // Check if today is in the auto-close days
+      const isTodayAutoClose = periodAutoCloseDays.includes(today);
+      
+      if (isTodayAutoClose) {
+        return `Deze periode wordt vandaag automatisch afgesloten om ${timeString}.`;
+      } else {
+        const daysText = periodAutoCloseDays
+          .map(day => dayNames[day as keyof typeof dayNames])
+          .join(', ');
+        
+        return `Deze periode wordt automatisch afgesloten om ${timeString} op: ${daysText}.`;
+      }
+    }
+    
+    // Default message if no specific days are set
+    return `Deze periode wordt automatisch afgesloten om ${timeString} als je hem vandaag niet handmatig afsluit.`;
+  }, [autoClosePeriods, periodAutoCloseTime, periodAutoCloseDays, currentPeriod]);
 
   if (!currentPeriod) {
     return (
@@ -160,11 +191,11 @@ const PeriodSummary = () => {
             </Alert>
           )}
           
-          {autoClosePeriods && formattedAutoCloseTime && (
+          {autoClosePeriods && formattedAutoCloseMessage && (
             <Alert className="mt-3 bg-amber-50/30 border-amber-200/30">
-              <Clock className="h-4 w-4 text-amber-500" />
+              <CalendarClock className="h-4 w-4 text-amber-500" />
               <AlertDescription className="text-amber-700">
-                Deze periode wordt automatisch afgesloten om {formattedAutoCloseTime} als je hem vandaag niet handmatig afsluit.
+                {formattedAutoCloseMessage}
               </AlertDescription>
             </Alert>
           )}

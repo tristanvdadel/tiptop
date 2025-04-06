@@ -1,9 +1,10 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { LogOut, Bell, Moon, User, CreditCard, Globe, Lock, Upload, Calendar } from "lucide-react";
+import { LogOut, Bell, Moon, User, CreditCard, Globe, Lock, Upload, Calendar, CalendarClock } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,9 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useApp } from "@/contexts/AppContext";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/checkbox";
+import { cn } from "@/lib/utils";
 
 const Settings = () => {
   const {
@@ -30,12 +34,15 @@ const Settings = () => {
     autoClosePeriods,
     setAutoClosePeriods,
     periodAutoCloseTime,
-    setPeriodAutoCloseTime
+    setPeriodAutoCloseTime,
+    periodAutoCloseDays,
+    setPeriodAutoCloseDays
   } = useApp();
   const [language, setLanguage] = useState("nl");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userName, setUserName] = useState("Gebruiker");
   const [userEmail] = useState("gebruiker@example.com");
+  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
   const navigate = useNavigate();
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -116,6 +123,27 @@ const Settings = () => {
         variant: 'destructive'
       });
     }
+  };
+
+  const handleToggleDay = (day: number) => {
+    if (!periodAutoCloseDays) {
+      setPeriodAutoCloseDays([day]);
+      return;
+    }
+
+    if (periodAutoCloseDays.includes(day)) {
+      setPeriodAutoCloseDays(periodAutoCloseDays.filter(d => d !== day));
+    } else {
+      setPeriodAutoCloseDays([...periodAutoCloseDays, day]);
+    }
+  };
+
+  const saveScheduleSettings = () => {
+    setIsScheduleDialogOpen(false);
+    toast({
+      title: "Schema bijgewerkt",
+      description: "Het automatisch afsluitschema is bijgewerkt."
+    });
   };
 
   return <div className="space-y-6">
@@ -312,7 +340,7 @@ const Settings = () => {
           
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4" />
+              <CalendarClock className="h-4 w-4" />
               <Label htmlFor="autoClosePeriods">Automatisch periodes afsluiten</Label>
             </div>
             <Switch 
@@ -323,24 +351,105 @@ const Settings = () => {
           </div>
           
           {autoClosePeriods && (
-            <div className="flex items-center justify-between pt-2 pl-6">
-              <div className="flex items-center space-x-2">
-                <Label htmlFor="periodAutoCloseTime">Sluitingstijd</Label>
+            <div className="pl-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Label htmlFor="periodAutoCloseTime">Sluitingstijd</Label>
+                </div>
+                <Input
+                  id="periodAutoCloseTime"
+                  type="time"
+                  value={periodAutoCloseTime}
+                  onChange={(e) => setPeriodAutoCloseTime(e.target.value)}
+                  className="w-[180px]"
+                />
               </div>
-              <Input
-                id="periodAutoCloseTime"
-                type="time"
-                value={periodAutoCloseTime}
-                onChange={(e) => setPeriodAutoCloseTime(e.target.value)}
-                className="w-[180px]"
-              />
-            </div>
-          )}
-          
-          {autoClosePeriods && (
-            <div className="pl-6 text-sm text-muted-foreground">
-              <p>Periodes worden automatisch afgesloten om {periodAutoCloseTime} als ze vanaf een andere dag zijn gestart.</p>
-              <p className="mt-1">Dit voorkomt dat je per ongeluk in een oude periode blijft werken.</p>
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Label>Sluitingsdagen</Label>
+                </div>
+                <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-[180px]">
+                      Schema aanpassen
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>Sluitingsschema aanpassen</DialogTitle>
+                      <DialogDescription>
+                        Kies op welke dagen periodes automatisch worden afgesloten om {periodAutoCloseTime}.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="closeTime" className="mb-2 block">Sluitingstijd</Label>
+                          <Input
+                            id="closeTime"
+                            type="time"
+                            value={periodAutoCloseTime}
+                            onChange={(e) => setPeriodAutoCloseTime(e.target.value)}
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label className="mb-2 block">Dagen waarop periodes worden afgesloten</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { value: 1, label: 'Maandag' },
+                              { value: 2, label: 'Dinsdag' },
+                              { value: 3, label: 'Woensdag' },
+                              { value: 4, label: 'Donderdag' },
+                              { value: 5, label: 'Vrijdag' },
+                              { value: 6, label: 'Zaterdag' },
+                              { value: 0, label: 'Zondag' },
+                            ].map((day) => (
+                              <div key={day.value} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`day-${day.value}`}
+                                  checked={periodAutoCloseDays?.includes(day.value) || false}
+                                  onCheckedChange={() => handleToggleDay(day.value)}
+                                />
+                                <label 
+                                  htmlFor={`day-${day.value}`}
+                                  className={cn(
+                                    "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+                                    periodAutoCloseDays?.includes(day.value) ? "text-primary" : ""
+                                  )}
+                                >
+                                  {day.label}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsScheduleDialogOpen(false)}>
+                        Annuleren
+                      </Button>
+                      <Button onClick={saveScheduleSettings}>Opslaan</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+                           
+              <div className="text-sm text-muted-foreground space-y-1">
+                {periodAutoCloseDays && periodAutoCloseDays.length > 0 ? (
+                  <>
+                    <p>Periodes worden automatisch afgesloten om {periodAutoCloseTime} op de geselecteerde dagen.</p>
+                    <p>Dit voorkomt dat je per ongeluk in een oude periode blijft werken.</p>
+                  </>
+                ) : (
+                  <>
+                    <p>Periodes worden automatisch afgesloten om {periodAutoCloseTime} als ze vanaf een andere dag zijn gestart.</p>
+                    <p>Dit voorkomt dat je per ongeluk in een oude periode blijft werken.</p>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </CardContent>

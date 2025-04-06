@@ -129,7 +129,10 @@ const Analytics = () => {
             Het gemiddelde fooi per uur wordt berekend op basis van de totale fooi en de gewerkte uren van het team.
           </p>
           {periodData.filter(period => period.average > 0).length > 0 ? <div className="space-y-2">
-              {periodData.filter(period => period.average > 0).map(period => <div key={period.id} className="flex justify-between p-2 border rounded-md">
+              {periodData.filter(period => period.average > 0)
+                // Reverse the array to show the latest period at the top
+                .reverse()
+                .map(period => <div key={period.id} className="flex justify-between p-2 border rounded-md">
                     <div>
                       <p className="font-medium text-sm">{period.name}</p>
                     </div>
@@ -146,4 +149,3 @@ const Analytics = () => {
 };
 
 export default Analytics;
-

@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -347,7 +346,7 @@ const Settings = () => {
               <SelectContent>
                 <SelectItem value="week">Wekelijks</SelectItem>
                 <SelectItem value="month">Maandelijks</SelectItem>
-                <SelectItem value="custom">Aangepast</SelectItem>
+                
               </SelectContent>
             </Select>
           </div>

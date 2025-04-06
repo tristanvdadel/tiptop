@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -9,9 +10,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+
 type PayoutSummaryProps = {
   onClose: () => void;
 };
+
 export const PayoutSummary = ({
   onClose
 }: PayoutSummaryProps) => {
@@ -40,9 +43,11 @@ export const PayoutSummary = ({
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const [attemptingNavigation, setAttemptingNavigation] = useState(false);
   const [navigationTarget, setNavigationTarget] = useState<string | null>(null);
+
   const roundDownToNearest = (value: number, nearest: number = 5): number => {
     return Math.floor(value / nearest) * nearest;
   };
+
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasChanges) {
@@ -56,6 +61,7 @@ export const PayoutSummary = ({
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [hasChanges]);
+
   useEffect(() => {
     const handleNavigation = e => {
       if (hasChanges) {
@@ -73,6 +79,7 @@ export const PayoutSummary = ({
       });
     };
   }, [hasChanges]);
+
   useEffect(() => {
     if (mostRecentPayout) {
       const initialPayouts: {
@@ -101,6 +108,7 @@ export const PayoutSummary = ({
       setInputValues(initialInputValues);
     }
   }, [mostRecentPayout, teamMembers]);
+
   if (!mostRecentPayout) {
     return <Card>
         <CardContent className="p-6 text-center">
@@ -111,9 +119,11 @@ export const PayoutSummary = ({
         </CardContent>
       </Card>;
   }
+
   const payoutDate = format(new Date(mostRecentPayout.date), 'd MMMM yyyy', {
     locale: nl
   });
+
   const periodData = periods.filter(period => mostRecentPayout.periodIds.includes(period.id)).map(period => {
     const startDate = format(new Date(period.startDate), 'd MMM', {
       locale: nl
@@ -128,7 +138,9 @@ export const PayoutSummary = ({
       total: totalTip
     };
   });
+
   const totalPayout = mostRecentPayout.distribution.reduce((sum, item) => sum + item.amount, 0);
+
   const memberPayouts = mostRecentPayout.distribution.map(item => {
     const member = teamMembers.find(m => m.id === item.memberId);
     const existingBalance = member?.balance || 0;
@@ -140,9 +152,11 @@ export const PayoutSummary = ({
       totalDue: item.amount + existingBalance
     };
   });
+
   const handlePrint = () => {
     window.print();
   };
+
   const handleCopyToClipboard = () => {
     const payoutText = `Uitbetaling fooi: ${payoutDate}\n\n` + memberPayouts.map(member => {
       const actualAmount = actualPayouts[member.id] || member.amount;
@@ -156,6 +170,7 @@ export const PayoutSummary = ({
       });
     });
   };
+
   const handleDownloadCSV = () => {
     const headers = "Naam,Bedrag,Saldo\n";
     const rows = memberPayouts.map(member => {
@@ -180,6 +195,7 @@ export const PayoutSummary = ({
       description: "De uitbetalingsgegevens zijn gedownload als CSV-bestand."
     });
   };
+
   const handleActualPayoutChange = (memberId: string, value: string) => {
     setInputValues(prev => ({
       ...prev,
@@ -206,6 +222,7 @@ export const PayoutSummary = ({
       }
     }
   };
+
   const handleSaveBalancesAndClose = () => {
     if (mostRecentPayout && hasChanges) {
       Object.entries(balances).forEach(([memberId, balance]) => {
@@ -227,6 +244,7 @@ export const PayoutSummary = ({
     }
     onClose();
   };
+
   const handleBackButtonClick = () => {
     if (hasChanges) {
       setShowExitConfirmation(true);
@@ -234,6 +252,7 @@ export const PayoutSummary = ({
       onClose();
     }
   };
+
   const handleContinueNavigation = () => {
     setHasChanges(false);
     if (navigationTarget) {
@@ -244,6 +263,7 @@ export const PayoutSummary = ({
     setAttemptingNavigation(false);
     setNavigationTarget(null);
   };
+
   const getBalanceText = (balance: number) => {
     if (balance === 0) return "";
     if (balance > 0) {
@@ -252,6 +272,7 @@ export const PayoutSummary = ({
       return `€${Math.abs(balance).toFixed(2)} teveel betaald`;
     }
   };
+
   return <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Uitbetaling samenvatting</h1>
@@ -322,10 +343,19 @@ export const PayoutSummary = ({
                           Daadwerkelijk uitbetaald
                         </label>
                         <div className="mt-1 flex items-center justify-between">
-                          <span>€{actualPayout.toFixed(2)}</span>
-                          {carriedBalance !== 0 && <span className={`ml-2 text-xs ${carriedBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                              {getBalanceText(carriedBalance)}
-                            </span>}
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={inputValues[member.id] || actualPayout.toString()}
+                              onChange={(e) => handleActualPayoutChange(member.id, e.target.value)}
+                              className="w-24 h-8 text-sm"
+                            />
+                            {carriedBalance !== 0 && 
+                              <span className={`text-xs ${carriedBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                {getBalanceText(carriedBalance)}
+                              </span>
+                            }
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -408,4 +438,5 @@ export const PayoutSummary = ({
       </AlertDialog>
     </div>;
 };
+
 export default PayoutSummary;

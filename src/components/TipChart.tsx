@@ -56,11 +56,14 @@ const TipChart = () => {
     const bars = [];
     periods.forEach((period, index) => {
       if (chartData.some(day => day[`period${index}`] !== undefined)) {
-        const periodName = period.isActive 
-          ? 'Actieve periode' 
-          : period.isPaid 
-            ? `Uitbetaalde periode (${format(new Date(period.startDate), 'd MMM', { locale: nl })})` 
-            : `Periode ${format(new Date(period.startDate), 'd MMM', { locale: nl })}`;
+        let periodName = 'Periode';
+        if (period.isActive) {
+          periodName = 'Actieve periode';
+        } else if (period.isPaid) {
+          periodName = `Uitbetaalde periode (${format(new Date(period.startDate), 'd MMM', { locale: nl })})`;
+        } else {
+          periodName = `Periode ${format(new Date(period.startDate), 'd MMM', { locale: nl })}`;
+        }
             
         bars.push(
           <Bar 
@@ -75,8 +78,13 @@ const TipChart = () => {
     return bars;
   }, [chartData, periods, chartColors]);
 
-  if (chartData.every(day => Object.keys(day).length <= 2)) {
-    // Only has name and date props, no data
+  // Only hide the chart if there's absolutely no data across all days and periods
+  const hasAnyData = chartData.some(day => {
+    // Check for any period data
+    return Object.keys(day).some(key => key.startsWith('period'));
+  });
+
+  if (!hasAnyData) {
     return null;
   }
 

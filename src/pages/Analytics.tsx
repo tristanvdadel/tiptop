@@ -59,7 +59,9 @@ const Analytics = () => {
   const getEmptyStateMessage = () => {
     const allPeriods = periods;
     const periodsWithTips = allPeriods.some(period => period.tips.length > 0);
-    const teamHasHours = teamMembers.some(member => member.hours > 0);
+    const teamHasHours = teamMembers.some(member => member.hours > 0 || 
+      (member.hourRegistrations && member.hourRegistrations.length > 0));
+    
     if (!periodsWithTips && !teamHasHours) {
       return "Er ontbreken uur gegevens en fooi gegevens. Voeg ze toe om een gemiddelde te zien.";
     } else if (!periodsWithTips) {
@@ -96,6 +98,12 @@ const Analytics = () => {
       </CardContent>
     </Card>;
 
+  // Check if we have any periods with average tip per hour data
+  const hasAverageData = periods.some(period => {
+    const avgForPeriod = calculateAverageTipPerHour(period.id);
+    return avgForPeriod > 0;
+  });
+
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold">Analyse</h1>
@@ -113,15 +121,18 @@ const Analytics = () => {
           <p className="text-muted-foreground mb-2 text-sm">
             Deze grafiek toont het verloop van de gemiddelde fooi per uur over verschillende periodes, inclusief uitbetaalde periodes.
           </p>
-          {periodData.filter(period => period.average > 0).length > 0 ? (
+          {hasAverageData ? (
             <div className="h-60">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={periodData.filter(period => period.average > 0)} margin={{
-                  top: 10,
-                  right: 20,
-                  left: 20,
-                  bottom: 5
-                }}>
+                <LineChart 
+                  data={periodData.filter(period => period.average > 0)} 
+                  margin={{
+                    top: 10,
+                    right: 20,
+                    left: 20,
+                    bottom: 5
+                  }}
+                >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />

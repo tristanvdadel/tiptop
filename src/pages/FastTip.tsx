@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -90,7 +91,7 @@ const FastTip = () => {
   };
   
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-b from-background to-amber-50/20">
+    <div className="h-screen flex flex-col bg-white dark:bg-black">
       <header className="bg-background p-4 flex items-center shadow-sm">
         <Button 
           variant="ghost" 
@@ -107,8 +108,8 @@ const FastTip = () => {
       </header>
       
       <div className="flex-grow flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white/90 backdrop-blur-md shadow-xl rounded-xl p-6 border border-amber-100 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-amber-50/40 to-transparent pointer-events-none"></div>
+        <div className="w-full max-w-md bg-white dark:bg-black/50 backdrop-blur-md shadow-xl rounded-xl p-6 border border-amber-100 dark:border-amber-900/50 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-amber-50/40 dark:from-amber-900/10 to-transparent pointer-events-none"></div>
           <div className="relative z-10">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-medium mb-2">Bedrag</h2>
@@ -196,7 +197,7 @@ const FastTip = () => {
             
             <Button 
               variant="goldGradient"
-              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg"
+              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg dark:bg-gradient-to-r dark:from-amber-400 dark:to-amber-300 dark:text-black"
               disabled={amount <= 0}
               onClick={handleSave}
             >
@@ -211,3 +212,4 @@ const FastTip = () => {
 };
 
 export default FastTip;
+

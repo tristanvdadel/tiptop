@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -91,7 +90,7 @@ const FastTip = () => {
   };
   
   return (
-    <div className="h-screen flex flex-col bg-white dark:bg-black">
+    <div className="h-screen flex flex-col bg-gradient-to-b from-amber-50 to-amber-100 dark:bg-black">
       <header className="bg-background p-4 flex items-center shadow-sm">
         <Button 
           variant="ghost" 
@@ -196,8 +195,8 @@ const FastTip = () => {
             </div>
             
             <Button 
-              variant="goldGradient"
-              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg dark:bg-gradient-to-r dark:from-amber-400 dark:to-amber-300 dark:text-black"
+              variant="default"
+              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg bg-white text-black hover:bg-amber-50 dark:bg-gradient-to-r dark:from-amber-400 dark:to-amber-300 dark:text-black dark:hover:from-amber-500 dark:hover:to-amber-400"
               disabled={amount <= 0}
               onClick={handleSave}
             >
@@ -212,4 +211,3 @@ const FastTip = () => {
 };
 
 export default FastTip;
-

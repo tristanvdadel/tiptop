@@ -1,3 +1,4 @@
+
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
@@ -6,15 +7,19 @@ import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const TipChart = () => {
   const { periods } = useApp();
   const isMobile = useIsMobile();
 
+  // Chart data calculation
   const chartData = useMemo(() => {
+    // Get periods data from the last 7 days, including paid periods
     const today = new Date();
     const data = [];
 
+    // Create data for last 7 days
     for (let i = 6; i >= 0; i--) {
       const date = subDays(today, i);
       const dateStart = startOfDay(date);
@@ -26,6 +31,7 @@ const TipChart = () => {
         date: date.toISOString()
       };
 
+      // Add data for each period, including paid periods
       periods.forEach((period, index) => {
         const periodTips = period.tips.filter(tip => {
           const tipDate = new Date(tip.date);
@@ -33,8 +39,10 @@ const TipChart = () => {
         });
         const totalAmount = periodTips.reduce((sum, tip) => sum + tip.amount, 0);
 
+        // Add to chart data with the period id as the key
         if (totalAmount > 0) {
           dayData[`period${index}`] = totalAmount;
+          // Store period id for reference
           dayData[`periodId${index}`] = period.id;
         }
       });
@@ -45,6 +53,7 @@ const TipChart = () => {
 
   const chartColors = ['#9b87f5', '#F97316', '#0EA5E9', '#D946EF', '#8B5CF6'];
 
+  // Create chart config for each period
   const chartConfig = useMemo(() => {
     const config = {};
     periods.forEach((period, index) => {
@@ -67,6 +76,7 @@ const TipChart = () => {
     return config;
   }, [chartData, periods, chartColors]);
 
+  // Create bar components for each period, limited to display most recent or active
   const barComponents = useMemo(() => {
     const bars = [];
     periods.forEach((period, index) => {
@@ -91,84 +101,62 @@ const TipChart = () => {
       }
     });
     
-    if (bars.length > 3) {
-      return bars.slice(-3);
+    // Limit to 5 most recent periods if there are more than 5
+    // The most recent periods are at the end of the array
+    if (bars.length > 5) {
+      return bars.slice(-5);
     }
     
     return bars;
   }, [chartData, periods, chartColors]);
 
+  // Check if there's any tip data in the last 7 days
   const hasTipsInLastWeek = chartData.some(day => 
     Object.keys(day).some(key => key.startsWith('period'))
   );
 
+  // Always show the chart, even if there's no data in the last 7 days
   return (
-    <Card className="mb-4 w-full">
-      <CardHeader className="pb-1 pt-3">
+    <Card className="mb-6 w-full">
+      <CardHeader className="pb-2">
         <CardTitle className="text-lg">Afgelopen 7 dagen</CardTitle>
       </CardHeader>
-      <CardContent className="p-2 sm:p-4">
+      <CardContent>
         {hasTipsInLastWeek ? (
-          <div className="h-48 relative">
+          <div className="h-48">
             <ChartContainer config={chartConfig} className="h-full">
-              <ResponsiveContainer width="99%" height="100%">
-                <BarChart 
-                  data={chartData} 
-                  margin={{ 
-                    top: 5, 
-                    right: 0, 
-                    bottom: 40,
-                    left: 0 
+              <BarChart data={chartData} margin={{ top: 5, right: isMobile ? 5 : 20, bottom: 5, left: isMobile ? 5 : 20 }}>
+                <XAxis dataKey="name" />
+                <ChartTooltip 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <ChartTooltipContent 
+                          formatter={(value: number) => [`€${value.toFixed(2)}`, payload[0].name]}
+                        />
+                      );
+                    }
+                    return null;
                   }}
-                >
-                  <XAxis 
-                    dataKey="name" 
-                    fontSize={isMobile ? 9 : 11}
-                    tick={{ fontSize: isMobile ? 9 : 11 }}
-                    tickMargin={5}
-                  />
-                  <ChartTooltip 
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <ChartTooltipContent 
-                            formatter={(value: number) => [`€${value.toFixed(2)}`, payload[0].name]}
-                          />
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Legend 
-                    layout="horizontal" 
-                    verticalAlign="bottom" 
-                    align="center" 
-                    wrapperStyle={{ 
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      height: '40px',
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      fontSize: isMobile ? '8px' : '10px',
-                      overflow: 'hidden'
-                    }}
-                    formatter={(value, entry) => {
-                      if (isMobile && value.length > 12) {
-                        return `${value.substring(0, 10)}...`;
-                      }
-                      return value;
-                    }}
-                  />
-                  {barComponents}
-                </BarChart>
-              </ResponsiveContainer>
+                />
+                <Legend 
+                  layout="horizontal" 
+                  verticalAlign="bottom" 
+                  align="center" 
+                  wrapperStyle={{ 
+                    maxHeight: '50px', 
+                    overflowY: 'auto', 
+                    fontSize: isMobile ? '10px' : '12px',
+                    width: '100%',
+                    maxWidth: isMobile ? '300px' : 'none',
+                  }} 
+                />
+                {barComponents}
+              </BarChart>
             </ChartContainer>
           </div>
         ) : (
-          <div className="text-center py-4 text-muted-foreground h-40 sm:h-48 flex items-center justify-center">
+          <div className="text-center py-4 text-muted-foreground h-48 flex items-center justify-center">
             <div>
               <p>Geen fooien in de afgelopen 7 dagen.</p>
             </div>

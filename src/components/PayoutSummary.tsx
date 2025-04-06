@@ -9,11 +9,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-
 type PayoutSummaryProps = {
   onClose: () => void;
 };
-
 export const PayoutSummary = ({
   onClose
 }: PayoutSummaryProps) => {
@@ -42,11 +40,9 @@ export const PayoutSummary = ({
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const [attemptingNavigation, setAttemptingNavigation] = useState(false);
   const [navigationTarget, setNavigationTarget] = useState<string | null>(null);
-
   const roundDownToNearest = (value: number, nearest: number = 5): number => {
     return Math.floor(value / nearest) * nearest;
   };
-
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasChanges) {
@@ -55,34 +51,28 @@ export const PayoutSummary = ({
         return '';
       }
     };
-
     window.addEventListener('beforeunload', handleBeforeUnload);
-    
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [hasChanges]);
-
   useEffect(() => {
-    const handleNavigation = (e) => {
+    const handleNavigation = e => {
       if (hasChanges) {
         e.preventDefault();
         setAttemptingNavigation(true);
         setNavigationTarget(e.target.pathname);
       }
     };
-
     document.querySelectorAll('a[href]').forEach(link => {
       link.addEventListener('click', handleNavigation);
     });
-
     return () => {
       document.querySelectorAll('a[href]').forEach(link => {
         link.removeEventListener('click', handleNavigation);
       });
     };
   }, [hasChanges]);
-
   useEffect(() => {
     if (mostRecentPayout) {
       const initialPayouts: {
@@ -94,7 +84,6 @@ export const PayoutSummary = ({
       const initialInputValues: {
         [key: string]: string;
       } = {};
-      
       mostRecentPayout.distribution.forEach(item => {
         const member = teamMembers.find(m => m.id === item.memberId);
         if (member) {
@@ -107,13 +96,11 @@ export const PayoutSummary = ({
           initialInputValues[item.memberId] = roundedPayout.toString();
         }
       });
-      
       setActualPayouts(initialPayouts);
       setBalances(initialBalances);
       setInputValues(initialInputValues);
     }
   }, [mostRecentPayout, teamMembers]);
-
   if (!mostRecentPayout) {
     return <Card>
         <CardContent className="p-6 text-center">
@@ -124,11 +111,9 @@ export const PayoutSummary = ({
         </CardContent>
       </Card>;
   }
-
   const payoutDate = format(new Date(mostRecentPayout.date), 'd MMMM yyyy', {
     locale: nl
   });
-
   const periodData = periods.filter(period => mostRecentPayout.periodIds.includes(period.id)).map(period => {
     const startDate = format(new Date(period.startDate), 'd MMM', {
       locale: nl
@@ -143,9 +128,7 @@ export const PayoutSummary = ({
       total: totalTip
     };
   });
-
   const totalPayout = mostRecentPayout.distribution.reduce((sum, item) => sum + item.amount, 0);
-
   const memberPayouts = mostRecentPayout.distribution.map(item => {
     const member = teamMembers.find(m => m.id === item.memberId);
     const existingBalance = member?.balance || 0;
@@ -157,11 +140,9 @@ export const PayoutSummary = ({
       totalDue: item.amount + existingBalance
     };
   });
-
   const handlePrint = () => {
     window.print();
   };
-
   const handleCopyToClipboard = () => {
     const payoutText = `Uitbetaling fooi: ${payoutDate}\n\n` + memberPayouts.map(member => {
       const actualAmount = actualPayouts[member.id] || member.amount;
@@ -175,7 +156,6 @@ export const PayoutSummary = ({
       });
     });
   };
-
   const handleDownloadCSV = () => {
     const headers = "Naam,Bedrag,Saldo\n";
     const rows = memberPayouts.map(member => {
@@ -200,13 +180,11 @@ export const PayoutSummary = ({
       description: "De uitbetalingsgegevens zijn gedownload als CSV-bestand."
     });
   };
-
   const handleActualPayoutChange = (memberId: string, value: string) => {
     setInputValues(prev => ({
       ...prev,
       [memberId]: value
     }));
-    
     const amount = parseFloat(value);
     if (!isNaN(amount)) {
       const member = memberPayouts.find(m => m.id === memberId);
@@ -228,23 +206,19 @@ export const PayoutSummary = ({
       }
     }
   };
-
   const handleSaveBalancesAndClose = () => {
     if (mostRecentPayout && hasChanges) {
       Object.entries(balances).forEach(([memberId, balance]) => {
         updateTeamMemberBalance(memberId, balance);
       });
-      
       const updatedDistribution = mostRecentPayout.distribution.map(item => ({
         ...item,
         actualAmount: actualPayouts[item.memberId] || item.amount,
         balance: balances[item.memberId] || 0
       }));
-      
       memberPayouts.forEach(member => {
         clearTeamMemberHours(member.id);
       });
-      
       toast({
         title: "Uitbetaling voltooid",
         description: "De aangepaste uitbetaling en saldi zijn opgeslagen. Uren zijn gewist."
@@ -253,7 +227,6 @@ export const PayoutSummary = ({
     }
     onClose();
   };
-
   const handleBackButtonClick = () => {
     if (hasChanges) {
       setShowExitConfirmation(true);
@@ -261,7 +234,6 @@ export const PayoutSummary = ({
       onClose();
     }
   };
-
   const handleContinueNavigation = () => {
     setHasChanges(false);
     if (navigationTarget) {
@@ -272,7 +244,6 @@ export const PayoutSummary = ({
     setAttemptingNavigation(false);
     setNavigationTarget(null);
   };
-
   const getBalanceText = (balance: number) => {
     if (balance === 0) return "";
     if (balance > 0) {
@@ -281,7 +252,6 @@ export const PayoutSummary = ({
       return `€${Math.abs(balance).toFixed(2)} teveel betaald`;
     }
   };
-
   return <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Uitbetaling samenvatting</h1>
@@ -388,17 +358,7 @@ export const PayoutSummary = ({
       </Card>
       
       <Card>
-        <CardContent className="p-6">
-          <p className="text-center text-muted-foreground mb-4">
-            De uitbetaalde periodes zijn nu opgeslagen in de geschiedenis. 
-            Je kunt altijd oude uitbetalingen terugvinden in het geschiedenis-overzicht.
-          </p>
-          <div className="flex justify-center">
-            <Button onClick={handleBackButtonClick} variant="goldGradient">
-              <ArrowLeft size={16} className="mr-1" /> Terug naar team
-            </Button>
-          </div>
-        </CardContent>
+        
       </Card>
 
       <AlertDialog open={showExitConfirmation} onOpenChange={setShowExitConfirmation}>
@@ -416,9 +376,9 @@ export const PayoutSummary = ({
               Opslaan en afsluiten
             </AlertDialogAction>
             <AlertDialogAction onClick={() => {
-              setShowExitConfirmation(false);
-              onClose();
-            }} className="bg-amber-600 hover:bg-amber-700">
+            setShowExitConfirmation(false);
+            onClose();
+          }} className="bg-amber-600 hover:bg-amber-700">
               Afsluiten zonder opslaan
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -448,5 +408,4 @@ export const PayoutSummary = ({
       </AlertDialog>
     </div>;
 };
-
 export default PayoutSummary;

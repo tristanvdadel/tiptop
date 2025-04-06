@@ -340,11 +340,17 @@ export const PayoutSummary = ({
                         <Input id={`actual-${member.id}`} type="number" value={inputValues[member.id] || ""} onChange={e => handleActualPayoutChange(member.id, e.target.value)} step="0.01" min="0" className="mt-1" />
                       </div>
                       
-                      {carriedBalance !== 0 && (
-                        <div className={`text-sm ${carriedBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {getBalanceText(carriedBalance)}
+                      <div className="flex-1">
+                        <Label htmlFor={`carried-${member.id}`} className="text-sm">
+                          Saldo
+                        </Label>
+                        <div className="mt-1 flex items-center">
+                          <Input id={`carried-${member.id}`} type="number" value={carriedBalance} readOnly className={`bg-gray-50 ${carriedBalance < 0 ? 'text-red-600' : carriedBalance > 0 ? 'text-green-600' : ''}`} />
+                          {carriedBalance !== 0 && <span className={`ml-2 text-xs ${carriedBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              {getBalanceText(carriedBalance)}
+                            </span>}
                         </div>
-                      )}
+                      </div>
                     </div>
                   </div>;
             })}

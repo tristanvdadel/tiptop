@@ -334,7 +334,7 @@ export const PayoutSummary = ({
               return <div key={member.id} className="p-3 border rounded-md">
                     <div className="flex justify-between font-medium mb-2">
                       <span>{member.name}</span>
-                      <span>Te betalen: €{totalDue.toFixed(2)}</span>
+                      <span>Te betalen: €{member.amount.toFixed(2)}</span>
                     </div>
                     
                     {member.existingBalance !== 0 && <div className="flex justify-between text-sm mb-2 text-gray-600">

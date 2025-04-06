@@ -17,10 +17,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 type PayoutSummaryProps = {
   onClose: () => void;
 };
+
+type RoundingMethod = 'none' | 'down' | 'multiple5' | 'multiple10';
 
 export const PayoutSummary = ({
   onClose
@@ -53,7 +56,7 @@ export const PayoutSummary = ({
   const [showDownloadDialog, setShowDownloadDialog] = useState(false);
   const [copiedText, setCopiedText] = useState('');
   const [isPendingPayout, setIsPendingPayout] = useState(true);
-  const [roundDown, setRoundDown] = useState(false);
+  const [roundingMethod, setRoundingMethod] = useState<RoundingMethod>('none');
   
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -93,16 +96,29 @@ export const PayoutSummary = ({
     }
   }, [mostRecentPayout, teamMembers]);
   
-  // Apply rounding down when the toggle changes
+  // Apply rounding when the method changes
   useEffect(() => {
-    if (mostRecentPayout && roundDown) {
+    if (mostRecentPayout && roundingMethod !== 'none') {
       const updatedPayouts = {...actualPayouts};
       const updatedBalances = {...balances};
       const updatedInputValues = {...inputValues};
       
       mostRecentPayout.distribution.forEach(item => {
         const originalAmount = item.amount || 0;
-        const roundedAmount = Math.floor(originalAmount);
+        let roundedAmount = originalAmount;
+        
+        switch (roundingMethod) {
+          case 'down':
+            roundedAmount = Math.floor(originalAmount);
+            break;
+          case 'multiple5':
+            roundedAmount = Math.floor(originalAmount / 5) * 5;
+            break;
+          case 'multiple10':
+            roundedAmount = Math.floor(originalAmount / 10) * 10;
+            break;
+        }
+        
         const difference = originalAmount - roundedAmount;
         
         updatedPayouts[item.memberId] = roundedAmount;
@@ -114,7 +130,7 @@ export const PayoutSummary = ({
       setBalances(updatedBalances);
       setInputValues(updatedInputValues);
       setHasChanges(true);
-    } else if (mostRecentPayout && !roundDown) {
+    } else if (mostRecentPayout && roundingMethod === 'none') {
       // Restore original values
       const updatedPayouts = {...actualPayouts};
       const updatedBalances = {...balances};
@@ -133,7 +149,7 @@ export const PayoutSummary = ({
       setInputValues(updatedInputValues);
       setHasChanges(false);
     }
-  }, [roundDown, mostRecentPayout]);
+  }, [roundingMethod, mostRecentPayout]);
   
   if (!mostRecentPayout) {
     return <Card>
@@ -365,14 +381,26 @@ export const PayoutSummary = ({
             </div>
           </div>
           
-          <div className="my-4 flex items-center justify-between bg-slate-50 p-3 rounded-md">
-            <div className="flex items-center gap-2">
-              <ArrowDown size={16} className="text-slate-500" />
-              <Label htmlFor="round-down" className="font-medium">
-                Afronden naar beneden
-              </Label>
-            </div>
-            <Switch id="round-down" checked={roundDown} onCheckedChange={setRoundDown} />
+          <div className="my-4 bg-slate-50 p-3 rounded-md">
+            <h3 className="text-sm font-medium mb-3">Bedragen afronden</h3>
+            <RadioGroup value={roundingMethod} onValueChange={(value) => setRoundingMethod(value as RoundingMethod)} className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="none" id="none" />
+                <Label htmlFor="none">Geen afronding</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="down" id="down" />
+                <Label htmlFor="down">Afronden naar beneden</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="multiple5" id="multiple5" />
+                <Label htmlFor="multiple5">Afronden naar veelvoud van 5</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="multiple10" id="multiple10" />
+                <Label htmlFor="multiple10">Afronden naar tiental</Label>
+              </div>
+            </RadioGroup>
           </div>
           
           <div className="mt-6">

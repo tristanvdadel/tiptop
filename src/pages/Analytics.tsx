@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import TipChart from '@/components/TipChart';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const Analytics = () => {
   const {
@@ -18,7 +19,7 @@ const Analytics = () => {
     payouts
   } = useApp();
 
-  // Calculate all-time average tip per hour
+  // Calculate all-time average tip per hour, include paid periods
   const averageTipPerHour = useMemo(() => {
     return calculateAverageTipPerHour();
   }, [calculateAverageTipPerHour]);
@@ -35,7 +36,8 @@ const Analytics = () => {
           locale: nl
         }) : 'Actief';
 
-        const averageTipPerHour = period.isActive ? 0 : calculateAverageTipPerHour(period.id);
+        // Always calculate average tip per hour for all periods, including paid ones
+        const averageTipPerHour = calculateAverageTipPerHour(period.id);
         
         // Add timestamp for sorting
         const timestamp = new Date(period.startDate).getTime();
@@ -55,12 +57,12 @@ const Analytics = () => {
 
   // Determine the empty state message
   const getEmptyStateMessage = () => {
-    const activePeriods = periods.filter(period => period.isActive);
-    const periodWithTips = activePeriods.some(period => period.tips.length > 0);
+    const allPeriods = periods;
+    const periodsWithTips = allPeriods.some(period => period.tips.length > 0);
     const teamHasHours = teamMembers.some(member => member.hours > 0);
-    if (!periodWithTips && !teamHasHours) {
+    if (!periodsWithTips && !teamHasHours) {
       return "Er ontbreken uur gegevens en fooi gegevens. Voeg ze toe om een gemiddelde te zien.";
-    } else if (!periodWithTips) {
+    } else if (!periodsWithTips) {
       return "Er ontbreken fooi gegevens. Voeg ze toe om een gemiddelde te zien.";
     } else if (!teamHasHours) {
       return "Er ontbreken uur gegevens. Voeg ze toe om een gemiddelde te zien.";
@@ -82,7 +84,7 @@ const Analytics = () => {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Gemiddelde berekend over alle periodes</p>
+                    <p>Gemiddelde berekend over alle periodes (incl. uitbetaald)</p>
                   </TooltipContent>
                 </UITooltip>
               </TooltipProvider>
@@ -138,9 +140,9 @@ const Analytics = () => {
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="text-center py-10 text-muted-foreground">
+            <div className="text-center py-6 text-muted-foreground">
               <p>Er zijn nog geen periodes met voldoende gegevens om een gemiddelde te berekenen.</p>
-              <p className="mt-2">Zorg dat er voor elke periode zowel uren als fooien zijn ingevoerd.</p>
+              <p className="mt-1">Zorg dat er voor elke periode zowel uren als fooien zijn ingevoerd.</p>
             </div>
           )}
         </CardContent>
@@ -154,20 +156,31 @@ const Analytics = () => {
           <p className="text-muted-foreground mb-2 text-sm">
             Het gemiddelde fooi per uur wordt berekend op basis van de totale fooi en de gewerkte uren van het team.
           </p>
-          {periodData.filter(period => period.average > 0).length > 0 ? <div className="space-y-2">
+          {periodData.filter(period => period.average > 0).length > 0 ? (
+            <div className="space-y-2">
               {periodData.filter(period => period.average > 0)
                 // Reverse the array to show the latest period at the top
                 .reverse()
-                .map(period => <div key={period.id} className="flex justify-between p-2 border rounded-md">
-                    <div>
-                      <p className="font-medium text-sm">{period.name}</p>
+                .map(period => (
+                  <div key={period.id} className="flex justify-between p-2 border rounded-md">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{period.name}</span>
+                      {period.isPaid && (
+                        <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
+                          Uitbetaald
+                        </span>
+                      )}
                     </div>
                     <div className="font-medium text-sm">€{period.average.toFixed(2)}/uur</div>
-                  </div>)}
-            </div> : <div className="text-center py-6 text-muted-foreground">
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <div className="text-center py-6 text-muted-foreground">
               <p>Er zijn nog geen periodes met voldoende gegevens om een gemiddelde te berekenen.</p>
               <p className="mt-1">Zorg dat er voor elke periode zowel uren als fooien zijn ingevoerd.</p>
-            </div>}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -5,17 +5,15 @@ import { useApp } from '@/contexts/AppContext';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { useNavigate } from 'react-router-dom';
 
 const TipChart = () => {
   const {
     periods
   } = useApp();
-  const navigate = useNavigate();
 
   // Chart data calculation
   const chartData = useMemo(() => {
-    // Get periods data from the last 7 days, regardless of whether there is an active period
+    // Get periods data from the last 7 days, including paid periods
     const today = new Date();
     const data = [];
 
@@ -31,7 +29,7 @@ const TipChart = () => {
         date: date.toISOString()
       };
 
-      // Add data for each period
+      // Add data for each period, including paid periods
       periods.forEach((period, index) => {
         const periodTips = period.tips.filter(tip => {
           const tipDate = new Date(tip.date);
@@ -58,13 +56,17 @@ const TipChart = () => {
     const bars = [];
     periods.forEach((period, index) => {
       if (chartData.some(day => day[`period${index}`] !== undefined)) {
+        const periodName = period.isActive 
+          ? 'Actieve periode' 
+          : period.isPaid 
+            ? `Uitbetaalde periode (${format(new Date(period.startDate), 'd MMM', { locale: nl })})` 
+            : `Periode ${format(new Date(period.startDate), 'd MMM', { locale: nl })}`;
+            
         bars.push(
           <Bar 
             key={period.id} 
             dataKey={`period${index}`} 
-            name={period.isActive ? 'Actieve periode' : `Periode ${format(new Date(period.startDate), 'd MMM', {
-              locale: nl
-            })}`} 
+            name={periodName} 
             fill={chartColors[index % chartColors.length]} 
           />
         );
@@ -74,7 +76,7 @@ const TipChart = () => {
   }, [chartData, periods, chartColors]);
 
   if (chartData.every(day => Object.keys(day).length <= 2)) {
-    // Only has name and date props
+    // Only has name and date props, no data
     return null;
   }
 

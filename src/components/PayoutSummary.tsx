@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import { PrinterIcon, ClipboardList, FileCheck, ArrowLeft, Download, Save, Info 
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 type PayoutSummaryProps = {
@@ -30,6 +29,7 @@ export const PayoutSummary = ({
   const {
     toast
   } = useToast();
+  const navigate = useNavigate();
   const [actualPayouts, setActualPayouts] = useState<{
     [key: string]: number;
   }>({});
@@ -42,10 +42,48 @@ export const PayoutSummary = ({
     [key: string]: string;
   }>({});
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
+  const [attemptingNavigation, setAttemptingNavigation] = useState(false);
+  const [navigationTarget, setNavigationTarget] = useState<string | null>(null);
 
   const roundDownToNearest = (value: number, nearest: number = 5): number => {
     return Math.floor(value / nearest) * nearest;
   };
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasChanges]);
+
+  useEffect(() => {
+    const handleNavigation = (e) => {
+      if (hasChanges) {
+        e.preventDefault();
+        setAttemptingNavigation(true);
+        setNavigationTarget(e.target.pathname);
+      }
+    };
+
+    document.querySelectorAll('a[href]').forEach(link => {
+      link.addEventListener('click', handleNavigation);
+    });
+
+    return () => {
+      document.querySelectorAll('a[href]').forEach(link => {
+        link.removeEventListener('click', handleNavigation);
+      });
+    };
+  }, [hasChanges]);
 
   useEffect(() => {
     if (mostRecentPayout) {
@@ -194,16 +232,11 @@ export const PayoutSummary = ({
   };
 
   const handleSaveBalancesAndClose = () => {
-    // Save the actual payout amounts in the payout object
     if (mostRecentPayout && hasChanges) {
-      // This would ideally update the payout record with actual amounts
-      // For now, we just save the balances
       Object.entries(balances).forEach(([memberId, balance]) => {
         updateTeamMemberBalance(memberId, balance);
       });
       
-      // Update distribution with actual amounts (if context supported it)
-      // For now, this is just conceptual
       const updatedDistribution = mostRecentPayout.distribution.map(item => ({
         ...item,
         actualAmount: actualPayouts[item.memberId] || item.amount,
@@ -215,7 +248,7 @@ export const PayoutSummary = ({
       });
       
       toast({
-        title: "Saldi opgeslagen",
+        title: "Uitbetaling voltooid",
         description: "De aangepaste uitbetaling en saldi zijn opgeslagen. Uren zijn gewist."
       });
       setHasChanges(false);
@@ -229,6 +262,17 @@ export const PayoutSummary = ({
     } else {
       onClose();
     }
+  };
+
+  const handleContinueNavigation = () => {
+    setHasChanges(false);
+    if (navigationTarget) {
+      navigate(navigationTarget);
+    } else {
+      onClose();
+    }
+    setAttemptingNavigation(false);
+    setNavigationTarget(null);
   };
 
   const getBalanceText = (balance: number) => {
@@ -339,12 +383,12 @@ export const PayoutSummary = ({
           
           {hasChanges && <Alert className="mt-4 bg-amber-50">
               <AlertDescription>
-                <strong>Let op:</strong> Je hebt aanpassingen gemaakt in de uitbetaling. Klik op 'Saldi opslaan en afsluiten' hieronder om deze op te slaan voordat je verder gaat.
+                <strong>Let op:</strong> Je hebt aanpassingen gemaakt in de uitbetaling. Klik op 'Saldi opslaan en markeren als uitbetaald' hieronder om deze op te slaan voordat je verder gaat.
               </AlertDescription>
             </Alert>}
           
           <Button onClick={handleSaveBalancesAndClose} className="w-full" variant="goldGradient">
-            <Save size={16} className="mr-1" /> Saldi opslaan en afsluiten
+            <Save size={16} className="mr-1" /> Saldi opslaan en markeren als uitbetaald
           </Button>
         </CardContent>
         <CardFooter className="flex-col sm:flex-row gap-2">
@@ -374,7 +418,6 @@ export const PayoutSummary = ({
         </CardContent>
       </Card>
 
-      {/* Confirmation dialog when trying to exit with unsaved changes */}
       <AlertDialog open={showExitConfirmation} onOpenChange={setShowExitConfirmation}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -394,6 +437,28 @@ export const PayoutSummary = ({
               onClose();
             }} className="bg-amber-600 hover:bg-amber-700">
               Afsluiten zonder opslaan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={attemptingNavigation} onOpenChange={setAttemptingNavigation}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Uitbetaling niet afgerond</AlertDialogTitle>
+            <AlertDialogDescription>
+              Je probeert weg te navigeren terwijl de uitbetaling niet is afgerond.
+              De periode is al als uitbetaald gemarkeerd, maar de uren staan nog ingevoerd.
+              Wil je eerst de uitbetaling afronden?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setAttemptingNavigation(false)}>Annuleren</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSaveBalancesAndClose} className="bg-green-600 hover:bg-green-700">
+              Uitbetaling afronden
+            </AlertDialogAction>
+            <AlertDialogAction onClick={handleContinueNavigation} className="bg-amber-600 hover:bg-amber-700">
+              Doorgaan zonder afronden
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

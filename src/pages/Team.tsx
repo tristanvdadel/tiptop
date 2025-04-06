@@ -504,7 +504,7 @@ const Team = () => {
         </div>}
       
       {availablePeriods.length > 0 && <Button variant="goldGradient" onClick={() => setIsPayoutModalOpen(true)} disabled={selectedPeriods.length === 0} className="w-full md:w-auto">
-          Markeer als uitbetaald
+          Ga naar uitbetalen
         </Button>}
       
       <AlertDialog open={isPayoutModalOpen} onOpenChange={setIsPayoutModalOpen}>
@@ -515,7 +515,7 @@ const Team = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setIsPayoutModalOpen(false)}>Annuleren</AlertDialogCancel>
-            <AlertDialogAction onClick={handlePayout}>Markeer als uitbetaald</AlertDialogAction>
+            <AlertDialogAction onClick={handlePayout}>Ga naar uitbetalen</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

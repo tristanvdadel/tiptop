@@ -38,11 +38,12 @@ const PayoutHistory = () => {
     const payoutDate = formatDate(selectedPayout.date);
     const memberDetails = selectedPayout.distribution.map(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
-      return `${member?.name || 'Onbekend lid'}: €${item.actualAmount?.toFixed(2) || item.amount.toFixed(2)}`;
+      const actualAmount = item.actualAmount !== undefined ? item.actualAmount : item.amount;
+      return `${member?.name || 'Onbekend lid'}: €${actualAmount.toFixed(2)}`;
     }).join('\n');
 
     const totalAmount = selectedPayout.distribution.reduce(
-      (sum, dist) => sum + (dist.actualAmount || dist.amount), 
+      (sum, dist) => sum + (dist.actualAmount !== undefined ? dist.actualAmount : dist.amount), 
       0
     );
 
@@ -62,7 +63,8 @@ const PayoutHistory = () => {
     const headers = "Naam,Berekend bedrag,Daadwerkelijk uitbetaald,Saldo\n";
     const rows = selectedPayout.distribution.map(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
-      return `${member?.name || 'Onbekend lid'},${item.amount.toFixed(2)},${(item.actualAmount || item.amount).toFixed(2)},${(item.balance || 0).toFixed(2)}`;
+      const actualAmount = item.actualAmount !== undefined ? item.actualAmount : item.amount;
+      return `${member?.name || 'Onbekend lid'},${item.amount.toFixed(2)},${actualAmount.toFixed(2)},${(item.balance || 0).toFixed(2)}`;
     }).join('\n');
     
     const csv = headers + rows;
@@ -113,7 +115,7 @@ const PayoutHistory = () => {
                     );
                     
                     const actualAmount = payout.distribution.reduce(
-                      (sum, dist) => sum + (dist.actualAmount || dist.amount), 
+                      (sum, dist) => sum + (dist.actualAmount !== undefined ? dist.actualAmount : dist.amount), 
                       0
                     );
                     
@@ -208,12 +210,13 @@ const PayoutHistory = () => {
                     <TableBody>
                       {selectedPayout.distribution.map((item, idx) => {
                         const member = teamMembers.find(m => m.id === item.memberId);
+                        const actualAmount = item.actualAmount !== undefined ? item.actualAmount : item.amount;
                         return (
                           <TableRow key={idx}>
                             <TableCell>{member?.name || 'Onbekend lid'}</TableCell>
                             <TableCell className="text-right">€{item.amount.toFixed(2)}</TableCell>
                             <TableCell className="text-right font-medium">
-                              €{(item.actualAmount || item.amount).toFixed(2)}
+                              €{actualAmount.toFixed(2)}
                             </TableCell>
                             <TableCell className={`text-right ${item.balance > 0 ? 'text-green-600' : item.balance < 0 ? 'text-red-600' : ''}`}>
                               {item.balance ? `€${Math.abs(item.balance).toFixed(2)} ${item.balance > 0 ? '+' : '-'}` : '-'}
@@ -229,7 +232,7 @@ const PayoutHistory = () => {
                           €{selectedPayout.distribution.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}
                         </td>
                         <td className="p-2 text-right font-bold">
-                          €{selectedPayout.distribution.reduce((sum, item) => sum + (item.actualAmount || item.amount), 0).toFixed(2)}
+                          €{selectedPayout.distribution.reduce((sum, item) => sum + (item.actualAmount !== undefined ? item.actualAmount : item.amount), 0).toFixed(2)}
                         </td>
                         <td className="p-2"></td>
                       </tr>

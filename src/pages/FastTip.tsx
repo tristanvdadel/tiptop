@@ -200,9 +200,9 @@ const FastTip = () => {
           <div className="absolute inset-0 bg-gradient-to-b from-amber-400/40 dark:from-amber-500/10 to-transparent pointer-events-none"></div>
           <div className="relative z-10">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-medium mb-2 text-white">Bedrag</h2>
+              <h2 className="text-2xl font-medium mb-2 text-amber-900 dark:text-amber-100">Bedrag</h2>
               <div className="relative inline-block">
-                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-2xl text-amber-800">€</span>
+                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-2xl text-amber-800 dark:text-amber-200">€</span>
                 <Input
                   type="number"
                   value={amount === 0 ? '' : amount}
@@ -219,7 +219,7 @@ const FastTip = () => {
                 <Button 
                   key={value}
                   variant="outline" 
-                  className="text-lg py-6 border-amber-300 text-amber-900 hover:bg-amber-400 hover:text-white transition-all dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-500 dark:hover:text-white" 
+                  className="text-lg py-6 bg-amber-100 border-amber-300 text-amber-900 hover:bg-amber-400 hover:text-white transition-all dark:bg-amber-800/70 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-500 dark:hover:text-white" 
                   onClick={() => handleAddAmount(value)}
                 >
                   +{value}
@@ -228,7 +228,7 @@ const FastTip = () => {
             </div>
             
             <div className="w-full mb-6">
-              <h3 className="text-base font-medium mb-2 text-white">Datum</h3>
+              <h3 className="text-base font-medium mb-2 text-amber-900 dark:text-amber-100">Datum</h3>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -254,14 +254,14 @@ const FastTip = () => {
                 </PopoverContent>
               </Popover>
               {showDateWarning && (
-                <p className="text-xs text-amber-100 mt-1">
+                <p className="text-xs text-amber-500 mt-1 font-medium">
                   Deze datum valt buiten de huidige periode.
                 </p>
               )}
             </div>
             
             <div className="w-full mb-6">
-              <h3 className="text-base font-medium mb-2 text-white">Notitie</h3>
+              <h3 className="text-base font-medium mb-2 text-amber-900 dark:text-amber-100">Notitie</h3>
               <Textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
@@ -280,13 +280,13 @@ const FastTip = () => {
                   onCheckedChange={setKeepOpen}
                   className="data-[state=checked]:bg-white data-[state=checked]:text-amber-500"
                 />
-                <Label htmlFor="keep-open" className="text-white">Blijf op deze pagina na invoer</Label>
+                <Label htmlFor="keep-open" className="text-amber-900 dark:text-amber-100">Blijf op deze pagina na invoer</Label>
               </div>
             </div>
             
             <Button 
               variant="default"
-              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg bg-white text-amber-900 hover:bg-amber-50"
+              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg bg-white text-amber-700 hover:bg-amber-50 hover:text-amber-800"
               disabled={amount <= 0}
               onClick={handleSave}
             >

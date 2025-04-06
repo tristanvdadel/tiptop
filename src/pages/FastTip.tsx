@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -218,7 +219,7 @@ const FastTip = () => {
                 <Button 
                   key={value}
                   variant="outline" 
-                  className="text-lg py-6 border-amber-300 text-white hover:bg-amber-400 hover:text-amber-900 transition-all dark:border-amber-700 dark:hover:bg-amber-500" 
+                  className="text-lg py-6 border-amber-300 text-amber-900 hover:bg-amber-400 hover:text-white transition-all dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-500 dark:hover:text-white" 
                   onClick={() => handleAddAmount(value)}
                 >
                   +{value}

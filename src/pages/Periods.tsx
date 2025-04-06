@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Plus, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileText, DollarSign } from 'lucide-react';
+import { Plus, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileText, DollarSign, Crown } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -39,6 +39,7 @@ const Periods = () => {
   const [editPeriodName, setEditPeriodName] = useState('');
   const [editPeriodNotes, setEditPeriodNotes] = useState('');
   const [showDeleteAllPaidDialog, setShowDeleteAllPaidDialog] = useState(false);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const {
     toast
   } = useToast();

@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -7,7 +8,7 @@ import { LogOut, Bell, Moon, User, CreditCard, Globe, Lock, Upload, Calendar, Ca
 import { useTheme } from "@/contexts/ThemeContext";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +42,19 @@ const Settings = () => {
   const [userEmail] = useState("gebruiker@example.com");
   const [autoCloseFrequency, setAutoCloseFrequency] = useState("daily");
   const navigate = useNavigate();
+
+  // Initialize autoCloseFrequency based on periodAutoCloseDays
+  useEffect(() => {
+    if (!periodAutoCloseDays) return;
+    
+    if (periodAutoCloseDays.length === 7) {
+      setAutoCloseFrequency("daily");
+    } else if (periodAutoCloseDays.length === 1 && periodAutoCloseDays[0] === 0) {
+      setAutoCloseFrequency("weekly");
+    } else if (periodAutoCloseDays.length === 0) {
+      setAutoCloseFrequency("monthly");
+    }
+  }, [periodAutoCloseDays]);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -134,17 +148,19 @@ const Settings = () => {
     }
   };
 
-  useState(() => {
-    if (!periodAutoCloseDays) return;
+  const handleAutoCloseToggle = (checked: boolean) => {
+    setAutoClosePeriods(checked);
     
-    if (periodAutoCloseDays.length === 7) {
-      setAutoCloseFrequency("daily");
-    } else if (periodAutoCloseDays.length === 1 && periodAutoCloseDays[0] === 0) {
-      setAutoCloseFrequency("weekly");
-    } else if (periodAutoCloseDays.length === 0) {
-      setAutoCloseFrequency("monthly");
+    // Set default values when turning on auto-close
+    if (checked && !periodAutoCloseTime) {
+      setPeriodAutoCloseTime("23:00");
     }
-  });
+    
+    // Set default frequency if not already set
+    if (checked && (!periodAutoCloseDays || periodAutoCloseDays.length === 0)) {
+      handleAutoCloseFrequencyChange("daily");
+    }
+  };
 
   return <div className="space-y-6">
       <div>
@@ -346,7 +362,7 @@ const Settings = () => {
             <Switch 
               id="autoClosePeriods" 
               checked={autoClosePeriods} 
-              onCheckedChange={setAutoClosePeriods} 
+              onCheckedChange={handleAutoCloseToggle} 
             />
           </div>
           

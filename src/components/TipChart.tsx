@@ -7,7 +7,6 @@ import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 const TipChart = () => {
   const { periods } = useApp();
@@ -101,10 +100,10 @@ const TipChart = () => {
       }
     });
     
-    // Limit to 5 most recent periods if there are more than 5
+    // Limit to 3 most recent periods if there are more than 3
     // The most recent periods are at the end of the array
-    if (bars.length > 5) {
-      return bars.slice(-5);
+    if (bars.length > 3) {
+      return bars.slice(-3);
     }
     
     return bars;
@@ -125,34 +124,47 @@ const TipChart = () => {
         {hasTipsInLastWeek ? (
           <div className="h-48">
             <ChartContainer config={chartConfig} className="h-full">
-              <BarChart data={chartData} margin={{ top: 5, right: isMobile ? 5 : 20, bottom: 5, left: isMobile ? 5 : 20 }}>
-                <XAxis dataKey="name" />
-                <ChartTooltip 
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <ChartTooltipContent 
-                          formatter={(value: number) => [`€${value.toFixed(2)}`, payload[0].name]}
-                        />
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Legend 
-                  layout="horizontal" 
-                  verticalAlign="bottom" 
-                  align="center" 
-                  wrapperStyle={{ 
-                    maxHeight: '50px', 
-                    overflowY: 'auto', 
-                    fontSize: isMobile ? '10px' : '12px',
-                    width: '100%',
-                    maxWidth: isMobile ? '300px' : 'none',
-                  }} 
-                />
-                {barComponents}
-              </BarChart>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 5, right: isMobile ? 0 : 20, bottom: 5, left: isMobile ? 0 : 20 }}>
+                  <XAxis 
+                    dataKey="name" 
+                    fontSize={isMobile ? 10 : 12}
+                    tick={{ fontSize: isMobile ? 10 : 12 }}
+                  />
+                  <ChartTooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <ChartTooltipContent 
+                            formatter={(value: number) => [`€${value.toFixed(2)}`, payload[0].name]}
+                          />
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend 
+                    layout="horizontal" 
+                    verticalAlign="bottom" 
+                    align="center" 
+                    wrapperStyle={{ 
+                      maxHeight: isMobile ? '60px' : '50px', 
+                      overflowY: 'auto', 
+                      fontSize: isMobile ? '10px' : '12px',
+                      width: '100%',
+                      padding: isMobile ? '0 5px' : '0',
+                    }}
+                    formatter={(value, entry) => {
+                      // Truncate long period names on mobile
+                      if (isMobile && value.length > 15) {
+                        return `${value.substring(0, 12)}...`;
+                      }
+                      return value;
+                    }}
+                  />
+                  {barComponents}
+                </BarChart>
+              </ResponsiveContainer>
             </ChartContainer>
           </div>
         ) : (

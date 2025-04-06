@@ -404,7 +404,34 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
     
     if (totalHours === 0) {
-      return [];
+      // If no hours, distribute evenly but consider existing balances
+      const membersWithBalances = teamMembers.filter(member => 
+        (member.balance !== undefined && member.balance !== 0) || member.hours > 0
+      );
+      
+      if (membersWithBalances.length === 0) {
+        return [];
+      }
+      
+      // First, calculate total of existing balances
+      const totalBalances = membersWithBalances.reduce(
+        (sum, member) => sum + (member.balance || 0), 
+        0
+      );
+      
+      // Distribute remaining tip amount (after subtracting balances) evenly
+      const remainingTip = totalTip - totalBalances;
+      const evenShare = remainingTip > 0 ? remainingTip / membersWithBalances.length : 0;
+      
+      return teamMembers.map(member => {
+        const existingBalance = member.balance || 0;
+        const tipShare = membersWithBalances.includes(member) ? evenShare : 0;
+        
+        return {
+          ...member,
+          tipAmount: parseFloat((tipShare + existingBalance).toFixed(2)),
+        };
+      });
     }
     
     let adjustmentFactor = 1;
@@ -421,20 +448,51 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         break;
     }
     
-    return teamMembers.map(member => {
-      let tipShare = totalHours > 0 
-        ? (member.hours / totalHours) * totalTip 
+    // First, reserve the existing balances
+    const totalBalances = teamMembers.reduce(
+      (sum, member) => sum + (member.balance || 0), 
+      0
+    );
+    
+    // Calculate the tip amount that should be distributed based on hours
+    const tipToDistribute = totalTip;
+    
+    // Calculate the distribution based on hours
+    const initialDistribution = teamMembers.map(member => {
+      const hourShare = totalHours > 0 
+        ? (member.hours / totalHours) * tipToDistribute 
         : 0;
       
+      let adjustedShare = hourShare;
       if (member.hours > 10) {
-        tipShare = tipShare * adjustmentFactor;
+        adjustedShare = hourShare * adjustmentFactor;
       }
       
       const existingBalance = member.balance || 0;
-        
+      
       return {
         ...member,
-        tipAmount: parseFloat((tipShare + existingBalance).toFixed(2)),
+        hourShare: adjustedShare,
+        tipAmount: parseFloat((adjustedShare + existingBalance).toFixed(2)),
+      };
+    });
+    
+    // Calculate the total after adjustment
+    const totalAfterAdjustment = initialDistribution.reduce(
+      (sum, member) => sum + (member.hourShare || 0), 
+      0
+    );
+    
+    // Apply a scaling factor to ensure the total matches the original tip amount
+    const scalingFactor = totalTip / totalAfterAdjustment;
+    
+    return initialDistribution.map(member => {
+      const scaledHourShare = member.hourShare * scalingFactor;
+      const existingBalance = member.balance || 0;
+      
+      return {
+        ...member,
+        tipAmount: parseFloat((scaledHourShare + existingBalance).toFixed(2)),
       };
     });
   };

@@ -17,6 +17,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useNavigate } from 'react-router-dom';
+
 const Team = () => {
   const {
     teamMembers,
@@ -48,9 +49,11 @@ const Team = () => {
     toast
   } = useToast();
   const navigate = useNavigate();
+
   useEffect(() => {
     setSelectedPeriods([]);
   }, []);
+
   useEffect(() => {
     const initialHours: {
       [key: string]: string;
@@ -60,6 +63,7 @@ const Team = () => {
     });
     setHoursInputs(initialHours);
   }, [teamMembers]);
+
   const handleAddMember = () => {
     if (newMemberName.trim() !== '') {
       const nameExists = teamMembers.some(member => member.name.toLowerCase() === newMemberName.trim().toLowerCase());
@@ -75,15 +79,18 @@ const Team = () => {
       setNewMemberName('');
     }
   };
+
   const handleRemoveMember = (id: string) => {
     removeTeamMember(id);
   };
+
   const handleHoursChange = (id: string, value: string) => {
     setHoursInputs(prev => ({
       ...prev,
       [id]: value
     }));
   };
+
   const handleHoursSubmit = (id: string) => {
     const value = hoursInputs[id];
     if (value !== undefined) {
@@ -107,15 +114,18 @@ const Team = () => {
       }
     }
   };
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>, id: string) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleHoursSubmit(id);
     }
   };
+
   const handleDeleteRegistration = (memberId: string, registrationId: string) => {
     deleteHourRegistration(memberId, registrationId);
   };
+
   const togglePeriodSelection = (periodId: string) => {
     setSelectedPeriods(prev => {
       if (prev.includes(periodId)) {
@@ -125,6 +135,7 @@ const Team = () => {
       }
     });
   };
+
   const calculateDistributionForSelectedPeriods = useCallback(() => {
     if (selectedPeriods.length === 0 || teamMembers.length === 0) {
       setDistribution([]);
@@ -133,19 +144,23 @@ const Team = () => {
     const calculatedDistribution = calculateTipDistribution(selectedPeriods);
     setDistribution(calculatedDistribution);
   }, [selectedPeriods, calculateTipDistribution, teamMembers.length]);
+
   useEffect(() => {
     calculateDistributionForSelectedPeriods();
   }, [selectedPeriods, calculateDistributionForSelectedPeriods]);
+
   const toggleMemberDetails = (memberId: string) => {
     setOpenMemberDetails(prev => ({
       ...prev,
       [memberId]: !prev[memberId]
     }));
   };
+
   const startEditMemberName = (member: TeamMember) => {
     setEditingMember(member.id);
     setEditMemberName(member.name);
   };
+
   const handleUpdateMemberName = () => {
     if (!editingMember) return;
     if (updateTeamMemberName(editingMember, editMemberName)) {
@@ -153,6 +168,7 @@ const Team = () => {
       setEditMemberName('');
     }
   };
+
   const setTeamMembers = (members: TeamMember[]) => {
     console.log("Team members would be updated to:", members);
     toast({
@@ -162,6 +178,7 @@ const Team = () => {
     });
     setEditingMember(null);
   };
+
   const handlePayout = () => {
     if (selectedPeriods.length === 0) {
       toast({
@@ -202,21 +219,26 @@ const Team = () => {
     setIsPayoutModalOpen(false);
     setShowPayoutSummary(true);
   };
+
   const formatDate = (dateString: string): string => {
     return format(new Date(dateString), 'd MMM yyyy HH:mm', {
       locale: nl
     });
   };
+
   const unpaidPeriods = periods.filter(period => !period.isPaid && !period.isActive);
   const availablePeriods = unpaidPeriods;
+
   const formatBalance = (balance?: number): string => {
     if (balance === undefined || balance === 0) return '';
     return balance > 0 ? `+€${balance.toFixed(2)}` : `-€${Math.abs(balance).toFixed(2)}`;
   };
+
   const getBalanceClass = (balance?: number): string => {
     if (balance === undefined || balance === 0) return '';
     return balance > 0 ? 'text-green-600' : 'text-red-600';
   };
+
   const calculateTotalTipsAndHours = useCallback(() => {
     if (selectedPeriods.length === 0) {
       return {
@@ -224,6 +246,7 @@ const Team = () => {
         totalHours: 0
       };
     }
+    
     const totalTips = selectedPeriods.reduce((sum, periodId) => {
       const period = periods.find(p => p.id === periodId);
       if (period) {
@@ -231,16 +254,17 @@ const Team = () => {
       }
       return sum;
     }, 0);
+    
     const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+    
     return {
       totalTips,
       totalHours
     };
   }, [selectedPeriods, periods, teamMembers]);
-  const {
-    totalTips,
-    totalHours
-  } = calculateTotalTipsAndHours();
+
+  const { totalTips, totalHours } = calculateTotalTipsAndHours();
+
   const handleViewPayoutHistory = () => {
     navigate('/management', {
       state: {
@@ -248,6 +272,7 @@ const Team = () => {
       }
     });
   };
+
   if (showPayoutSummary) {
     return <div>
         <PayoutSummary onClose={() => setShowPayoutSummary(false)} />
@@ -256,6 +281,7 @@ const Team = () => {
         </div>
       </div>;
   }
+
   return <div className="pb-20 min-h-[calc(100vh-100px)]">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <div className="flex items-center gap-2">
@@ -485,4 +511,5 @@ const Team = () => {
       </AlertDialog>
     </div>;
 };
+
 export default Team;

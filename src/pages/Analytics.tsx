@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Info } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useMemo } from 'react';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -14,7 +14,8 @@ const Analytics = () => {
   const {
     periods,
     calculateAverageTipPerHour,
-    teamMembers
+    teamMembers,
+    payouts
   } = useApp();
 
   // Calculate all-time average tip per hour
@@ -22,23 +23,34 @@ const Analytics = () => {
     return calculateAverageTipPerHour();
   }, [calculateAverageTipPerHour]);
 
-  // Create period data for charts
+  // Create period data for charts, including all periods (active, inactive, and paid)
   const periodData = useMemo(() => {
-    return periods.map(period => {
-      const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
-      const startDate = format(new Date(period.startDate), 'd MMM', {
-        locale: nl
-      });
-      const endDate = period.endDate ? format(new Date(period.endDate), 'd MMM', {
-        locale: nl
-      }) : 'Actief';
-      return {
-        name: `${startDate} - ${endDate}`,
-        total: totalTips,
-        average: period.isActive ? 0 : calculateAverageTipPerHour(period.id),
-        id: period.id
-      };
-    });
+    return periods
+      .map(period => {
+        const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
+        const startDate = format(new Date(period.startDate), 'd MMM', {
+          locale: nl
+        });
+        const endDate = period.endDate ? format(new Date(period.endDate), 'd MMM', {
+          locale: nl
+        }) : 'Actief';
+
+        const averageTipPerHour = period.isActive ? 0 : calculateAverageTipPerHour(period.id);
+        
+        // Add timestamp for sorting
+        const timestamp = new Date(period.startDate).getTime();
+        
+        return {
+          name: `${startDate} - ${endDate}`,
+          total: totalTips,
+          average: averageTipPerHour,
+          id: period.id,
+          isPaid: period.isPaid,
+          timestamp: timestamp
+        };
+      })
+      // Sort periods by start date
+      .sort((a, b) => a.timestamp - b.timestamp);
   }, [periods, calculateAverageTipPerHour]);
 
   // Determine the empty state message
@@ -93,30 +105,44 @@ const Analytics = () => {
       
       <Card>
         <CardHeader className="pb-2 pt-4">
-          <CardTitle className="text-lg">Fooi per periode</CardTitle>
+          <CardTitle className="text-lg">Verloop van fooi per uur</CardTitle>
         </CardHeader>
         <CardContent className="pb-4">
-          {periodData.length > 0 ? <div className="h-60">
+          <p className="text-muted-foreground mb-2 text-sm">
+            Deze grafiek toont het verloop van de gemiddelde fooi per uur over verschillende periodes, inclusief uitbetaalde periodes.
+          </p>
+          {periodData.filter(period => period.average > 0).length > 0 ? (
+            <div className="h-60">
               <ResponsiveContainer width="100%" height="100%">
-                <RechartsBarChart data={periodData} margin={{
-              top: 10,
-              right: 20,
-              left: 20,
-              bottom: 5
-            }}>
+                <LineChart data={periodData.filter(period => period.average > 0)} margin={{
+                  top: 10,
+                  right: 20,
+                  left: 20,
+                  bottom: 5
+                }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
-                  <Tooltip formatter={(value: number) => [`€${value.toFixed(2)}`, '']} />
+                  <Tooltip formatter={(value: number) => [`€${value.toFixed(2)}`, 'Gem. fooi per uur']} />
                   <Legend />
-                  <Bar dataKey="total" name="Totaal fooi" fill="#9b87f5" />
-                  <Bar dataKey="average" name="Gem. per uur" fill="#33C3F0" />
-                </RechartsBarChart>
+                  <Line 
+                    type="monotone" 
+                    dataKey="average" 
+                    name="Gem. fooi per uur" 
+                    stroke="#33C3F0" 
+                    strokeWidth={2} 
+                    dot={{r: 5}} 
+                    activeDot={{r: 8}}
+                  />
+                </LineChart>
               </ResponsiveContainer>
-            </div> : <div className="text-center py-10 text-muted-foreground">
-              <p>Er zijn nog geen periodes met fooi gegevens beschikbaar.</p>
-              <p className="mt-2">Voeg fooien toe aan periodes om hier een grafiek te zien.</p>
-            </div>}
+            </div>
+          ) : (
+            <div className="text-center py-10 text-muted-foreground">
+              <p>Er zijn nog geen periodes met voldoende gegevens om een gemiddelde te berekenen.</p>
+              <p className="mt-2">Zorg dat er voor elke periode zowel uren als fooien zijn ingevoerd.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
       

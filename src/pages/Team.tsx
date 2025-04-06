@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const Team = () => {
   const {
@@ -49,11 +49,10 @@ const Team = () => {
     toast
   } = useToast();
   const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
     setSelectedPeriods([]);
-  }, [location.key]);
+  }, []);
 
   useEffect(() => {
     const initialHours: {
@@ -272,11 +271,7 @@ const Team = () => {
   if (showPayoutSummary) {
     return (
       <div>
-        <PayoutSummary onClose={() => {
-          setShowPayoutSummary(false);
-          setSelectedPeriods([]);
-          setDistribution([]);
-        }} />
+        <PayoutSummary onClose={() => setShowPayoutSummary(false)} />
         <div className="mt-4 flex justify-center">
           <Button 
             variant="outline"
@@ -509,7 +504,7 @@ const Team = () => {
         </div>}
       
       {availablePeriods.length > 0 && <Button variant="goldGradient" onClick={() => setIsPayoutModalOpen(true)} disabled={selectedPeriods.length === 0} className="w-full md:w-auto">
-          Ga naar uitbetalen
+          Markeer als uitbetaald
         </Button>}
       
       <AlertDialog open={isPayoutModalOpen} onOpenChange={setIsPayoutModalOpen}>
@@ -520,7 +515,7 @@ const Team = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setIsPayoutModalOpen(false)}>Annuleren</AlertDialogCancel>
-            <AlertDialogAction onClick={handlePayout}>Ga naar uitbetalen</AlertDialogAction>
+            <AlertDialogAction onClick={handlePayout}>Markeer als uitbetaald</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,23 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
-interface PayoutDistributionItem {
-  memberId: string;
-  amount: number;
-  actualAmount?: number;
-  balance?: number;
-}
-
-interface Payout {
-  date: string;
-  periodIds: string[];
-  distribution: PayoutDistributionItem[];
-}
-
 const PayoutHistory = () => {
   const { payouts, teamMembers } = useApp();
   const { toast } = useToast();
-  const [selectedPayout, setSelectedPayout] = useState<Payout | null>(null);
+  const [selectedPayout, setSelectedPayout] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   
   const formatDate = (dateString: string): string => {
@@ -39,7 +27,7 @@ const PayoutHistory = () => {
     }
   };
 
-  const handleRowClick = (payout: Payout) => {
+  const handleRowClick = (payout) => {
     setSelectedPayout(payout);
     setDetailsOpen(true);
   };
@@ -50,15 +38,11 @@ const PayoutHistory = () => {
     const payoutDate = formatDate(selectedPayout.date);
     const memberDetails = selectedPayout.distribution.map(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
-      const displayAmount = (item as any).actualAmount !== undefined ? (item as any).actualAmount : item.amount;
-      return `${member?.name || 'Onbekend lid'}: €${displayAmount.toFixed(2)}`;
+      return `${member?.name || 'Onbekend lid'}: €${item.actualAmount?.toFixed(2) || item.amount.toFixed(2)}`;
     }).join('\n');
 
     const totalAmount = selectedPayout.distribution.reduce(
-      (sum, dist) => {
-        const amount = (dist as any).actualAmount !== undefined ? (dist as any).actualAmount : dist.amount;
-        return sum + amount;
-      }, 
+      (sum, dist) => sum + (dist.actualAmount || dist.amount), 
       0
     );
 
@@ -78,8 +62,7 @@ const PayoutHistory = () => {
     const headers = "Naam,Berekend bedrag,Daadwerkelijk uitbetaald,Saldo\n";
     const rows = selectedPayout.distribution.map(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
-      const displayAmount = (item as any).actualAmount !== undefined ? (item as any).actualAmount : item.amount;
-      return `${member?.name || 'Onbekend lid'},${item.amount.toFixed(2)},${displayAmount.toFixed(2)},${((item as any).balance || 0).toFixed(2)}`;
+      return `${member?.name || 'Onbekend lid'},${item.amount.toFixed(2)},${(item.actualAmount || item.amount).toFixed(2)},${(item.balance || 0).toFixed(2)}`;
     }).join('\n');
     
     const csv = headers + rows;
@@ -130,10 +113,7 @@ const PayoutHistory = () => {
                     );
                     
                     const actualAmount = payout.distribution.reduce(
-                      (sum, dist) => {
-                        const amount = (dist as any).actualAmount !== undefined ? (dist as any).actualAmount : dist.amount;
-                        return sum + amount;
-                      }, 
+                      (sum, dist) => sum + (dist.actualAmount || dist.amount), 
                       0
                     );
                     
@@ -228,16 +208,15 @@ const PayoutHistory = () => {
                     <TableBody>
                       {selectedPayout.distribution.map((item, idx) => {
                         const member = teamMembers.find(m => m.id === item.memberId);
-                        const displayAmount = (item as any).actualAmount !== undefined ? (item as any).actualAmount : item.amount;
                         return (
                           <TableRow key={idx}>
                             <TableCell>{member?.name || 'Onbekend lid'}</TableCell>
                             <TableCell className="text-right">€{item.amount.toFixed(2)}</TableCell>
                             <TableCell className="text-right font-medium">
-                              €{displayAmount.toFixed(2)}
+                              €{(item.actualAmount || item.amount).toFixed(2)}
                             </TableCell>
-                            <TableCell className={`text-right ${(item as any).balance > 0 ? 'text-green-600' : (item as any).balance < 0 ? 'text-red-600' : ''}`}>
-                              {(item as any).balance ? `€${Math.abs((item as any).balance).toFixed(2)} ${(item as any).balance > 0 ? '+' : '-'}` : '-'}
+                            <TableCell className={`text-right ${item.balance > 0 ? 'text-green-600' : item.balance < 0 ? 'text-red-600' : ''}`}>
+                              {item.balance ? `€${Math.abs(item.balance).toFixed(2)} ${item.balance > 0 ? '+' : '-'}` : '-'}
                             </TableCell>
                           </TableRow>
                         );
@@ -250,10 +229,7 @@ const PayoutHistory = () => {
                           €{selectedPayout.distribution.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}
                         </td>
                         <td className="p-2 text-right font-bold">
-                          €{selectedPayout.distribution.reduce((sum, item) => {
-                            const amount = (item as any).actualAmount !== undefined ? (item as any).actualAmount : item.amount;
-                            return sum + amount;
-                          }, 0).toFixed(2)}
+                          €{selectedPayout.distribution.reduce((sum, item) => sum + (item.actualAmount || item.amount), 0).toFixed(2)}
                         </td>
                         <td className="p-2"></td>
                       </tr>

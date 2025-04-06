@@ -8,8 +8,9 @@ import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { PrinterIcon, ClipboardList, FileCheck, ArrowLeft, Download, Save, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 type PayoutSummaryProps = {
@@ -29,7 +30,6 @@ export const PayoutSummary = ({
   const {
     toast
   } = useToast();
-  const navigate = useNavigate();
   const [actualPayouts, setActualPayouts] = useState<{
     [key: string]: number;
   }>({});
@@ -42,44 +42,10 @@ export const PayoutSummary = ({
     [key: string]: string;
   }>({});
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
-  const [attemptingNavigation, setAttemptingNavigation] = useState(false);
-  const [navigationTarget, setNavigationTarget] = useState<string | null>(null);
 
   const roundDownToNearest = (value: number, nearest: number = 5): number => {
     return Math.floor(value / nearest) * nearest;
   };
-
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasChanges) {
-        e.preventDefault();
-        e.returnValue = '';
-        return '';
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [hasChanges]);
-
-  useEffect(() => {
-    const handleNavigation = e => {
-      if (hasChanges) {
-        e.preventDefault();
-        setAttemptingNavigation(true);
-        setNavigationTarget(e.target.pathname);
-      }
-    };
-    document.querySelectorAll('a[href]').forEach(link => {
-      link.addEventListener('click', handleNavigation);
-    });
-    return () => {
-      document.querySelectorAll('a[href]').forEach(link => {
-        link.removeEventListener('click', handleNavigation);
-      });
-    };
-  }, [hasChanges]);
 
   useEffect(() => {
     if (mostRecentPayout) {
@@ -92,6 +58,7 @@ export const PayoutSummary = ({
       const initialInputValues: {
         [key: string]: string;
       } = {};
+      
       mostRecentPayout.distribution.forEach(item => {
         const member = teamMembers.find(m => m.id === item.memberId);
         if (member) {
@@ -104,6 +71,7 @@ export const PayoutSummary = ({
           initialInputValues[item.memberId] = roundedPayout.toString();
         }
       });
+      
       setActualPayouts(initialPayouts);
       setBalances(initialBalances);
       setInputValues(initialInputValues);
@@ -202,6 +170,7 @@ export const PayoutSummary = ({
       ...prev,
       [memberId]: value
     }));
+    
     const amount = parseFloat(value);
     if (!isNaN(amount)) {
       const member = memberPayouts.find(m => m.id === memberId);
@@ -225,35 +194,33 @@ export const PayoutSummary = ({
   };
 
   const handleSaveBalancesAndClose = () => {
+    // Save the actual payout amounts in the payout object
     if (mostRecentPayout && hasChanges) {
-      // Update balances for each team member
+      // This would ideally update the payout record with actual amounts
+      // For now, we just save the balances
       Object.entries(balances).forEach(([memberId, balance]) => {
         updateTeamMemberBalance(memberId, balance);
       });
-
-      // Clear hours for all team members in the distribution
-      mostRecentPayout.distribution.forEach(item => {
-        clearTeamMemberHours(item.memberId);
-      });
-
-      // Update the distribution with actual amounts and balances
+      
+      // Update distribution with actual amounts (if context supported it)
+      // For now, this is just conceptual
       const updatedDistribution = mostRecentPayout.distribution.map(item => ({
         ...item,
         actualAmount: actualPayouts[item.memberId] || item.amount,
         balance: balances[item.memberId] || 0
       }));
-
+      
+      memberPayouts.forEach(member => {
+        clearTeamMemberHours(member.id);
+      });
+      
       toast({
-        title: "Uitbetaling voltooid",
+        title: "Saldi opgeslagen",
         description: "De aangepaste uitbetaling en saldi zijn opgeslagen. Uren zijn gewist."
       });
       setHasChanges(false);
-      
-      // Force a navigation to reload the team page with cleared data
-      navigate('/team', { replace: true });
-    } else {
-      onClose();
     }
+    onClose();
   };
 
   const handleBackButtonClick = () => {
@@ -262,17 +229,6 @@ export const PayoutSummary = ({
     } else {
       onClose();
     }
-  };
-
-  const handleContinueNavigation = () => {
-    setHasChanges(false);
-    if (navigationTarget) {
-      navigate(navigationTarget);
-    } else {
-      onClose();
-    }
-    setAttemptingNavigation(false);
-    setNavigationTarget(null);
   };
 
   const getBalanceText = (balance: number) => {
@@ -350,23 +306,29 @@ export const PayoutSummary = ({
                     
                     <div className="flex items-center mt-3 space-x-2">
                       <div className="flex-1">
-                        <label className="text-sm">
+                        <Label htmlFor={`actual-${member.id}`} className="text-sm">
                           Daadwerkelijk uitbetaald
-                        </label>
-                        <div className="mt-1 flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              type="number"
-                              value={inputValues[member.id] || actualPayout.toString()}
-                              onChange={(e) => handleActualPayoutChange(member.id, e.target.value)}
-                              className="w-24 h-8 text-sm"
-                            />
-                            {carriedBalance !== 0 && 
-                              <span className={`text-xs ${carriedBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                {getBalanceText(carriedBalance)}
-                              </span>
-                            }
-                          </div>
+                        </Label>
+                        <Input 
+                          id={`actual-${member.id}`} 
+                          type="number" 
+                          value={inputValues[member.id] || ""} 
+                          onChange={e => handleActualPayoutChange(member.id, e.target.value)} 
+                          step="0.01" 
+                          min="0" 
+                          className="mt-1" 
+                        />
+                      </div>
+                      
+                      <div className="flex-1">
+                        <Label htmlFor={`carried-${member.id}`} className="text-sm">
+                          Saldo
+                        </Label>
+                        <div className="mt-1 flex items-center">
+                          <Input id={`carried-${member.id}`} type="number" value={carriedBalance} readOnly className={`bg-gray-50 ${carriedBalance < 0 ? 'text-red-600' : carriedBalance > 0 ? 'text-green-600' : ''}`} />
+                          {carriedBalance !== 0 && <span className={`ml-2 text-xs ${carriedBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              {getBalanceText(carriedBalance)}
+                            </span>}
                         </div>
                       </div>
                     </div>
@@ -377,12 +339,12 @@ export const PayoutSummary = ({
           
           {hasChanges && <Alert className="mt-4 bg-amber-50">
               <AlertDescription>
-                <strong>Let op:</strong> Je hebt aanpassingen gemaakt in de uitbetaling. Klik op 'Saldi opslaan' hieronder om deze op te slaan voordat je verder gaat.
+                <strong>Let op:</strong> Je hebt aanpassingen gemaakt in de uitbetaling. Klik op 'Saldi opslaan en afsluiten' hieronder om deze op te slaan voordat je verder gaat.
               </AlertDescription>
             </Alert>}
           
           <Button onClick={handleSaveBalancesAndClose} className="w-full" variant="goldGradient">
-            <Save size={16} className="mr-1" /> Saldi opslaan
+            <Save size={16} className="mr-1" /> Saldi opslaan en afsluiten
           </Button>
         </CardContent>
         <CardFooter className="flex-col sm:flex-row gap-2">
@@ -399,9 +361,20 @@ export const PayoutSummary = ({
       </Card>
       
       <Card>
-        
+        <CardContent className="p-6">
+          <p className="text-center text-muted-foreground mb-4">
+            De uitbetaalde periodes zijn nu opgeslagen in de geschiedenis. 
+            Je kunt altijd oude uitbetalingen terugvinden in het geschiedenis-overzicht.
+          </p>
+          <div className="flex justify-center">
+            <Button onClick={handleBackButtonClick} variant="goldGradient">
+              <ArrowLeft size={16} className="mr-1" /> Terug naar team
+            </Button>
+          </div>
+        </CardContent>
       </Card>
 
+      {/* Confirmation dialog when trying to exit with unsaved changes */}
       <AlertDialog open={showExitConfirmation} onOpenChange={setShowExitConfirmation}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -417,37 +390,13 @@ export const PayoutSummary = ({
               Opslaan en afsluiten
             </AlertDialogAction>
             <AlertDialogAction onClick={() => {
-            setShowExitConfirmation(false);
-            onClose();
-          }} className="bg-amber-600 hover:bg-amber-700">
+              setShowExitConfirmation(false);
+              onClose();
+            }} className="bg-amber-600 hover:bg-amber-700">
               Afsluiten zonder opslaan
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={attemptingNavigation} onOpenChange={setAttemptingNavigation}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Uitbetaling niet afgerond</AlertDialogTitle>
-            <AlertDialogDescription>
-              Je probeert weg te navigeren terwijl de uitbetaling niet is afgerond.
-              De periode is al als uitbetaald gemarkeerd, maar de uren staan nog ingevoerd.
-              Wil je eerst de uitbetaling afronden?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setAttemptingNavigation(false)}>Annuleren</AlertDialogCancel>
-            <AlertDialogAction onClick={handleSaveBalancesAndClose} className="bg-green-600 hover:bg-green-700">
-              Uitbetaling afronden
-            </AlertDialogAction>
-            <AlertDialogAction onClick={handleContinueNavigation} className="bg-amber-600 hover:bg-amber-700">
-              Doorgaan zonder afronden
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>;
 };
-
-export default PayoutSummary;

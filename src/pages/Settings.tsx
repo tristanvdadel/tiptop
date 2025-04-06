@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useApp } from "@/contexts/AppContext";
 
 const Settings = () => {
   const {
@@ -23,12 +24,18 @@ const Settings = () => {
   const {
     toast
   } = useToast();
+  const {
+    periodDuration,
+    setPeriodDuration,
+    autoClosePeriods,
+    setAutoClosePeriods,
+    periodAutoCloseTime,
+    setPeriodAutoCloseTime
+  } = useApp();
   const [language, setLanguage] = useState("nl");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userName, setUserName] = useState("Gebruiker");
   const [userEmail] = useState("gebruiker@example.com");
-  const [periodDuration, setPeriodDuration] = useState("week");
-  const [autoClosePeriods, setAutoClosePeriods] = useState(true);
   const navigate = useNavigate();
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -289,7 +296,7 @@ const Settings = () => {
               <Calendar className="h-4 w-4" />
               <Label htmlFor="periodDuration">Periode duur</Label>
             </div>
-            <Select defaultValue={periodDuration} onValueChange={setPeriodDuration}>
+            <Select value={periodDuration} onValueChange={setPeriodDuration}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Selecteer duur" />
               </SelectTrigger>
@@ -314,6 +321,28 @@ const Settings = () => {
               onCheckedChange={setAutoClosePeriods} 
             />
           </div>
+          
+          {autoClosePeriods && (
+            <div className="flex items-center justify-between pt-2 pl-6">
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="periodAutoCloseTime">Sluitingstijd</Label>
+              </div>
+              <Input
+                id="periodAutoCloseTime"
+                type="time"
+                value={periodAutoCloseTime}
+                onChange={(e) => setPeriodAutoCloseTime(e.target.value)}
+                className="w-[180px]"
+              />
+            </div>
+          )}
+          
+          {autoClosePeriods && (
+            <div className="pl-6 text-sm text-muted-foreground">
+              <p>Periodes worden automatisch afgesloten om {periodAutoCloseTime} als ze vanaf een andere dag zijn gestart.</p>
+              <p className="mt-1">Dit voorkomt dat je per ongeluk in een oude periode blijft werken.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

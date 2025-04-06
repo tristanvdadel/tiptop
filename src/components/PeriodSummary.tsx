@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Pencil, Plus, Info, ClipboardList } from 'lucide-react';
+import { Pencil, Plus, Info, ClipboardList, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
   Tooltip, 
@@ -29,7 +29,9 @@ const PeriodSummary = () => {
     currentPeriod,
     updatePeriod,
     startNewPeriod,
-    hasReachedPeriodLimit
+    hasReachedPeriodLimit,
+    autoClosePeriods,
+    periodAutoCloseTime
   } = useApp();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [periodName, setPeriodName] = useState('');
@@ -75,6 +77,14 @@ const PeriodSummary = () => {
       description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode.",
     });
   };
+
+  const formattedAutoCloseTime = useMemo(() => {
+    if (!autoClosePeriods || !currentPeriod) return null;
+    
+    const [hours, minutes] = periodAutoCloseTime.split(':');
+    
+    return `${hours}:${minutes}`;
+  }, [autoClosePeriods, periodAutoCloseTime, currentPeriod]);
 
   if (!currentPeriod) {
     return (
@@ -146,6 +156,15 @@ const PeriodSummary = () => {
               <Info className="h-4 w-4" />
               <AlertDescription>
                 Gebruik het invoerveld hierboven om fooien toe te voegen aan deze periode.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {autoClosePeriods && formattedAutoCloseTime && (
+            <Alert className="mt-3 bg-amber-50/30 border-amber-200/30">
+              <Clock className="h-4 w-4 text-amber-500" />
+              <AlertDescription className="text-amber-700">
+                Deze periode wordt automatisch afgesloten om {formattedAutoCloseTime} als je hem vandaag niet handmatig afsluit.
               </AlertDescription>
             </Alert>
           )}

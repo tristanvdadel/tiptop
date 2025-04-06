@@ -5,6 +5,7 @@ import { useApp } from '@/contexts/AppContext';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { nl } from 'date-fns/locale';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 const TipChart = () => {
   const {
@@ -51,7 +52,30 @@ const TipChart = () => {
 
   const chartColors = ['#9b87f5', '#F97316', '#0EA5E9', '#D946EF', '#8B5CF6'];
 
-  // Create bar components for each period
+  // Create chart config for each period
+  const chartConfig = useMemo(() => {
+    const config = {};
+    periods.forEach((period, index) => {
+      if (chartData.some(day => day[`period${index}`] !== undefined)) {
+        let periodName = 'Periode';
+        if (period.isActive) {
+          periodName = 'Actieve periode';
+        } else if (period.isPaid) {
+          periodName = `Uitbetaald (${format(new Date(period.startDate), 'd MMM', { locale: nl })})`;
+        } else {
+          periodName = `Periode ${format(new Date(period.startDate), 'd MMM', { locale: nl })}`;
+        }
+            
+        config[`period${index}`] = {
+          label: periodName,
+          color: chartColors[index % chartColors.length]
+        };
+      }
+    });
+    return config;
+  }, [chartData, periods, chartColors]);
+
+  // Create bar components for each period, limited to display most recent or active
   const barComponents = useMemo(() => {
     const bars = [];
     periods.forEach((period, index) => {
@@ -60,7 +84,7 @@ const TipChart = () => {
         if (period.isActive) {
           periodName = 'Actieve periode';
         } else if (period.isPaid) {
-          periodName = `Uitbetaalde periode (${format(new Date(period.startDate), 'd MMM', { locale: nl })})`;
+          periodName = `Uitbetaald (${format(new Date(period.startDate), 'd MMM', { locale: nl })})`;
         } else {
           periodName = `Periode ${format(new Date(period.startDate), 'd MMM', { locale: nl })}`;
         }
@@ -75,6 +99,13 @@ const TipChart = () => {
         );
       }
     });
+    
+    // Limit to 5 most recent periods if there are more than 5
+    // The most recent periods are at the end of the array
+    if (bars.length > 5) {
+      return bars.slice(-5);
+    }
+    
     return bars;
   }, [chartData, periods, chartColors]);
 
@@ -92,14 +123,25 @@ const TipChart = () => {
       <CardContent>
         {hasTipsInLastWeek ? (
           <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
+            <ChartContainer config={chartConfig} className="h-full">
               <BarChart data={chartData}>
                 <XAxis dataKey="name" />
-                <Tooltip formatter={(value: number, name: string) => [`€${value.toFixed(2)}`, name]} labelFormatter={label => `${label}`} />
-                <Legend />
+                <ChartTooltip 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <ChartTooltipContent 
+                          formatter={(value: number) => [`€${value.toFixed(2)}`, payload[0].name]}
+                        />
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ maxHeight: '50px', overflowY: 'auto' }} />
                 {barComponents}
               </BarChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </div>
         ) : (
           <div className="text-center py-4 text-muted-foreground h-48 flex items-center justify-center">

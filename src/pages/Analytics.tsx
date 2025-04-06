@@ -10,6 +10,7 @@ import { nl } from 'date-fns/locale';
 import TipChart from '@/components/TipChart';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 const Analytics = () => {
   const {
@@ -54,6 +55,25 @@ const Analytics = () => {
       // Sort periods by start date
       .sort((a, b) => a.timestamp - b.timestamp);
   }, [periods, calculateAverageTipPerHour]);
+
+  // Get the data for the line chart, limit to 10 most recent periods if more than 10
+  const lineChartData = useMemo(() => {
+    const filteredData = periodData.filter(period => period.total > 0);
+    if (filteredData.length > 10) {
+      return filteredData.slice(-10);
+    }
+    return filteredData;
+  }, [periodData]);
+
+  // Create chart config for the line chart
+  const chartConfig = useMemo(() => {
+    return {
+      average: {
+        label: 'Gem. fooi per uur',
+        color: '#33C3F0'
+      }
+    };
+  }, []);
 
   // Determine the empty state message
   const getEmptyStateMessage = () => {
@@ -117,12 +137,14 @@ const Analytics = () => {
         <CardContent className="pb-4">
           <p className="text-muted-foreground mb-2 text-sm">
             Deze grafiek toont het verloop van de gemiddelde fooi per uur over verschillende periodes, inclusief uitbetaalde periodes.
+            {lineChartData.length < periodData.filter(period => period.total > 0).length && 
+              ` (Laatste ${lineChartData.length} periodes weergegeven)`}
           </p>
           {hasAnyPeriodWithTips ? (
             <div className="h-60">
-              <ResponsiveContainer width="100%" height="100%">
+              <ChartContainer config={chartConfig} className="h-full">
                 <LineChart 
-                  data={periodData.filter(period => period.total > 0)} 
+                  data={lineChartData} 
                   margin={{
                     top: 10,
                     right: 20,
@@ -131,9 +153,20 @@ const Analytics = () => {
                   }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
+                  <XAxis dataKey="name" tickMargin={5} height={60} tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" />
                   <YAxis />
-                  <Tooltip formatter={(value: number) => [`€${value.toFixed(2)}`, 'Gem. fooi per uur']} />
+                  <ChartTooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <ChartTooltipContent 
+                            formatter={(value: number) => [`€${value.toFixed(2)}`, 'Gem. fooi per uur']}
+                          />
+                        );
+                      }
+                      return null;
+                    }}
+                  />
                   <Legend />
                   <Line 
                     type="monotone" 
@@ -145,7 +178,7 @@ const Analytics = () => {
                     activeDot={{r: 8}}
                   />
                 </LineChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </div>
           ) : (
             <div className="text-center py-6 text-muted-foreground">
@@ -165,7 +198,7 @@ const Analytics = () => {
             Het gemiddelde fooi per uur wordt berekend op basis van de totale fooi en de gewerkte uren van het team.
           </p>
           {hasAnyPeriodWithTips ? (
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-96 overflow-y-auto">
               {periodData.filter(period => period.total > 0)
                 // Reverse the array to show the latest period at the top
                 .reverse()

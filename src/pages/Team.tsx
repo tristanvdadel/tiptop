@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const Team = () => {
   const {
@@ -49,10 +49,11 @@ const Team = () => {
     toast
   } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     setSelectedPeriods([]);
-  }, []);
+  }, [location.key]);
 
   useEffect(() => {
     const initialHours: {
@@ -271,7 +272,11 @@ const Team = () => {
   if (showPayoutSummary) {
     return (
       <div>
-        <PayoutSummary onClose={() => setShowPayoutSummary(false)} />
+        <PayoutSummary onClose={() => {
+          setShowPayoutSummary(false);
+          setSelectedPeriods([]);
+          setDistribution([]);
+        }} />
         <div className="mt-4 flex justify-center">
           <Button 
             variant="outline"

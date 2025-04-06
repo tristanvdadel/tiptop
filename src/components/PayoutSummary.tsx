@@ -231,7 +231,7 @@ export const PayoutSummary = ({
         updateTeamMemberBalance(memberId, balance);
       });
 
-      // This is the key fix: We need to clear hours for all team members in the distribution
+      // Clear hours for all team members in the distribution
       mostRecentPayout.distribution.forEach(item => {
         clearTeamMemberHours(item.memberId);
       });
@@ -248,8 +248,12 @@ export const PayoutSummary = ({
         description: "De aangepaste uitbetaling en saldi zijn opgeslagen. Uren zijn gewist."
       });
       setHasChanges(false);
+      
+      // Force a navigation to reload the team page with cleared data
+      navigate('/team', { replace: true });
+    } else {
+      onClose();
     }
-    onClose();
   };
 
   const handleBackButtonClick = () => {

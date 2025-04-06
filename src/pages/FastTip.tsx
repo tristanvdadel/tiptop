@@ -143,7 +143,7 @@ const FastTip = () => {
   };
   
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-b from-amber-50 to-amber-100 dark:bg-black">
+    <div className="h-screen flex flex-col bg-gradient-to-b from-amber-500/10 to-amber-500/20 dark:bg-gradient-to-b dark:from-amber-900/20 dark:to-amber-900/30">
       <header className="bg-amber-500 dark:bg-amber-600 p-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center">
           <Button 
@@ -195,7 +195,7 @@ const FastTip = () => {
       </header>
       
       <div className="flex-grow flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-md bg-amber-500 dark:bg-amber-600 shadow-xl rounded-xl p-6 border border-amber-400 dark:border-amber-700/50 relative overflow-hidden">
+        <div className="w-full max-w-md bg-amber-500/20 dark:bg-amber-900/30 shadow-xl rounded-xl p-6 border border-amber-400/50 dark:border-amber-700/30 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-amber-400/40 dark:from-amber-500/10 to-transparent pointer-events-none"></div>
           <div className="relative z-10">
             <div className="text-center mb-8">
@@ -284,12 +284,12 @@ const FastTip = () => {
             </div>
             
             <Button 
-              variant="goldGradient"
-              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg text-black"
+              variant="default"
+              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg bg-white text-amber-900 hover:bg-amber-50"
               disabled={amount <= 0}
               onClick={handleSave}
             >
-              <Sparkles size={20} className="mr-2 text-black/70 animate-pulse" /> 
+              <Sparkles size={20} className="mr-2 text-amber-700 animate-pulse" /> 
               <span className="relative z-10">Top Tip</span>
             </Button>
           </div>

@@ -20,37 +20,41 @@ import Splash from "./pages/Splash";
 import Management from "./pages/Management";
 import AuthGuard from "./components/AuthGuard";
 
+// Create the query client outside of the component
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+const App = () => {
+  // Initialize everything at the component level for clarity
+  return (
+    <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AppProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              {/* Public routes */}
-              <Route path="/splash" element={<Splash />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/fast-tip" element={<FastTip />} />
-              
-              {/* Protected routes */}
-              <Route path="/" element={<AuthGuard><Layout><Index /></Layout></AuthGuard>} />
-              <Route path="/periods" element={<AuthGuard><Layout><Periods /></Layout></AuthGuard>} />
-              <Route path="/team" element={<AuthGuard><Layout><Team /></Layout></AuthGuard>} />
-              <Route path="/management" element={<AuthGuard><Layout><Management /></Layout></AuthGuard>} />
-              <Route path="/my-overview" element={<AuthGuard><Layout><MyOverview /></Layout></AuthGuard>} />
-              <Route path="/analytics" element={<AuthGuard><Layout><Analytics /></Layout></AuthGuard>} />
-              <Route path="/settings" element={<AuthGuard><Layout><Settings /></Layout></AuthGuard>} />
-              <Route path="*" element={<AuthGuard><Layout><NotFound /></Layout></AuthGuard>} />
-            </Routes>
-          </BrowserRouter>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                {/* Public routes */}
+                <Route path="/splash" element={<Splash />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/fast-tip" element={<FastTip />} />
+                
+                {/* Protected routes */}
+                <Route path="/" element={<AuthGuard><Layout><Index /></Layout></AuthGuard>} />
+                <Route path="/periods" element={<AuthGuard><Layout><Periods /></Layout></AuthGuard>} />
+                <Route path="/team" element={<AuthGuard><Layout><Team /></Layout></AuthGuard>} />
+                <Route path="/management" element={<AuthGuard><Layout><Management /></Layout></AuthGuard>} />
+                <Route path="/my-overview" element={<AuthGuard><Layout><MyOverview /></Layout></AuthGuard>} />
+                <Route path="/analytics" element={<AuthGuard><Layout><Analytics /></Layout></AuthGuard>} />
+                <Route path="/settings" element={<AuthGuard><Layout><Settings /></Layout></AuthGuard>} />
+                <Route path="*" element={<AuthGuard><Layout><NotFound /></Layout></AuthGuard>} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
         </AppProvider>
       </ThemeProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+    </QueryClientProvider>
+  );
+};
 
 export default App;

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -51,7 +50,6 @@ const FastTip = () => {
   );
   
   useEffect(() => {
-    // Load quick amounts from localStorage if available
     const savedQuickAmounts = localStorage.getItem('quickAmounts');
     if (savedQuickAmounts) {
       try {
@@ -286,12 +284,12 @@ const FastTip = () => {
             </div>
             
             <Button 
-              variant="default"
-              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg bg-white text-amber-900 hover:bg-amber-50 dark:bg-white dark:text-amber-900 dark:hover:bg-amber-100"
+              variant="goldGradient"
+              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg text-black"
               disabled={amount <= 0}
               onClick={handleSave}
             >
-              <Sparkles size={20} className="mr-2 text-amber-700 animate-pulse" /> 
+              <Sparkles size={20} className="mr-2 text-black/70 animate-pulse" /> 
               <span className="relative z-10">Top Tip</span>
             </Button>
           </div>

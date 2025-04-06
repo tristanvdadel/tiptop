@@ -11,12 +11,10 @@ const TipChart = () => {
   const { periods } = useApp();
   const isMobile = useIsMobile();
 
-  // Chart data calculation
   const chartData = useMemo(() => {
     const today = new Date();
     const data = [];
 
-    // Create data for last 7 days
     for (let i = 6; i >= 0; i--) {
       const date = subDays(today, i);
       const dateStart = startOfDay(date);
@@ -28,7 +26,6 @@ const TipChart = () => {
         date: date.toISOString()
       };
 
-      // Add data for each period, including paid periods
       periods.forEach((period, index) => {
         const periodTips = period.tips.filter(tip => {
           const tipDate = new Date(tip.date);
@@ -36,10 +33,8 @@ const TipChart = () => {
         });
         const totalAmount = periodTips.reduce((sum, tip) => sum + tip.amount, 0);
 
-        // Add to chart data with the period id as the key
         if (totalAmount > 0) {
           dayData[`period${index}`] = totalAmount;
-          // Store period id for reference
           dayData[`periodId${index}`] = period.id;
         }
       });
@@ -50,7 +45,6 @@ const TipChart = () => {
 
   const chartColors = ['#9b87f5', '#F97316', '#0EA5E9', '#D946EF', '#8B5CF6'];
 
-  // Create chart config for each period
   const chartConfig = useMemo(() => {
     const config = {};
     periods.forEach((period, index) => {
@@ -73,7 +67,6 @@ const TipChart = () => {
     return config;
   }, [chartData, periods, chartColors]);
 
-  // Create bar components for each period, limited to display most recent or active
   const barComponents = useMemo(() => {
     const bars = [];
     periods.forEach((period, index) => {
@@ -98,8 +91,6 @@ const TipChart = () => {
       }
     });
     
-    // Limit to 3 most recent periods if there are more than 3
-    // The most recent periods are at the end of the array
     if (bars.length > 3) {
       return bars.slice(-3);
     }
@@ -107,12 +98,10 @@ const TipChart = () => {
     return bars;
   }, [chartData, periods, chartColors]);
 
-  // Check if there's any tip data in the last 7 days
   const hasTipsInLastWeek = chartData.some(day => 
     Object.keys(day).some(key => key.startsWith('period'))
   );
 
-  // Always show the chart, even if there's no data in the last 7 days
   return (
     <Card className="mb-4 w-full">
       <CardHeader className="pb-1 pt-3">
@@ -120,7 +109,7 @@ const TipChart = () => {
       </CardHeader>
       <CardContent className="p-2 sm:p-4">
         {hasTipsInLastWeek ? (
-          <div className="h-40 sm:h-48 w-full">
+          <div className="h-48 relative">
             <ChartContainer config={chartConfig} className="h-full">
               <ResponsiveContainer width="99%" height="100%">
                 <BarChart 
@@ -128,7 +117,7 @@ const TipChart = () => {
                   margin={{ 
                     top: 5, 
                     right: 0, 
-                    bottom: isMobile ? 40 : 20, 
+                    bottom: 40,
                     left: 0 
                   }}
                 >
@@ -155,17 +144,18 @@ const TipChart = () => {
                     verticalAlign="bottom" 
                     align="center" 
                     wrapperStyle={{ 
-                      maxHeight: isMobile ? '40px' : '50px', 
-                      overflowY: 'auto', 
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      height: '40px',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
                       fontSize: isMobile ? '8px' : '10px',
-                      width: '98%',
-                      margin: '0 auto',
-                      padding: '0',
-                      position: 'relative',
-                      bottom: isMobile ? '-5px' : '0'
+                      overflow: 'hidden'
                     }}
                     formatter={(value, entry) => {
-                      // Truncate long period names on mobile
                       if (isMobile && value.length > 12) {
                         return `${value.substring(0, 10)}...`;
                       }

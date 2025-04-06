@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { PrinterIcon, ClipboardList, FileCheck, ArrowLeft, Download, Save, Info } from 'lucide-react';
+import { PrinterIcon, ClipboardList, FileCheck, ArrowLeft, Download, Save, Info, ArrowDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -15,6 +16,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 
 type PayoutSummaryProps = {
   onClose: () => void;
@@ -51,6 +53,7 @@ export const PayoutSummary = ({
   const [showDownloadDialog, setShowDownloadDialog] = useState(false);
   const [copiedText, setCopiedText] = useState('');
   const [isPendingPayout, setIsPendingPayout] = useState(true);
+  const [roundDown, setRoundDown] = useState(false);
   
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -89,6 +92,48 @@ export const PayoutSummary = ({
       setInputValues(initialInputValues);
     }
   }, [mostRecentPayout, teamMembers]);
+  
+  // Apply rounding down when the toggle changes
+  useEffect(() => {
+    if (mostRecentPayout && roundDown) {
+      const updatedPayouts = {...actualPayouts};
+      const updatedBalances = {...balances};
+      const updatedInputValues = {...inputValues};
+      
+      mostRecentPayout.distribution.forEach(item => {
+        const originalAmount = item.amount || 0;
+        const roundedAmount = Math.floor(originalAmount);
+        const difference = originalAmount - roundedAmount;
+        
+        updatedPayouts[item.memberId] = roundedAmount;
+        updatedBalances[item.memberId] = difference;
+        updatedInputValues[item.memberId] = roundedAmount.toString();
+      });
+      
+      setActualPayouts(updatedPayouts);
+      setBalances(updatedBalances);
+      setInputValues(updatedInputValues);
+      setHasChanges(true);
+    } else if (mostRecentPayout && !roundDown) {
+      // Restore original values
+      const updatedPayouts = {...actualPayouts};
+      const updatedBalances = {...balances};
+      const updatedInputValues = {...inputValues};
+      
+      mostRecentPayout.distribution.forEach(item => {
+        const originalAmount = item.amount || 0;
+        
+        updatedPayouts[item.memberId] = originalAmount;
+        updatedBalances[item.memberId] = 0;
+        updatedInputValues[item.memberId] = originalAmount.toString();
+      });
+      
+      setActualPayouts(updatedPayouts);
+      setBalances(updatedBalances);
+      setInputValues(updatedInputValues);
+      setHasChanges(false);
+    }
+  }, [roundDown, mostRecentPayout]);
   
   if (!mostRecentPayout) {
     return <Card>
@@ -320,6 +365,16 @@ export const PayoutSummary = ({
             </div>
           </div>
           
+          <div className="my-4 flex items-center justify-between bg-slate-50 p-3 rounded-md">
+            <div className="flex items-center gap-2">
+              <ArrowDown size={16} className="text-slate-500" />
+              <Label htmlFor="round-down" className="font-medium">
+                Afronden naar beneden
+              </Label>
+            </div>
+            <Switch id="round-down" checked={roundDown} onCheckedChange={setRoundDown} />
+          </div>
+          
           <div className="mt-6">
             <h3 className="text-sm font-medium mb-2">Verdeling per teamlid</h3>
             <div className="space-y-4">
@@ -341,15 +396,9 @@ export const PayoutSummary = ({
                       </div>
                       
                       <div className="flex-1">
-                        <Label htmlFor={`carried-${member.id}`} className="text-sm">
-                          Saldo
-                        </Label>
-                        <div className="mt-1 flex items-center">
-                          <Input id={`carried-${member.id}`} type="number" value={carriedBalance} readOnly className={`bg-gray-50 ${carriedBalance < 0 ? 'text-red-600' : carriedBalance > 0 ? 'text-green-600' : ''}`} />
-                          {carriedBalance !== 0 && <span className={`ml-2 text-xs ${carriedBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                              {getBalanceText(carriedBalance)}
-                            </span>}
-                        </div>
+                        {carriedBalance !== 0 && <span className={`text-xs ${carriedBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {getBalanceText(carriedBalance)}
+                        </span>}
                       </div>
                     </div>
                   </div>;

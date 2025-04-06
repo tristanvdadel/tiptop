@@ -1,4 +1,3 @@
-
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
@@ -14,7 +13,6 @@ const TipChart = () => {
 
   // Chart data calculation
   const chartData = useMemo(() => {
-    // Get periods data from the last 7 days, including paid periods
     const today = new Date();
     const data = [];
 
@@ -116,20 +114,29 @@ const TipChart = () => {
 
   // Always show the chart, even if there's no data in the last 7 days
   return (
-    <Card className="mb-6 w-full">
-      <CardHeader className="pb-2">
+    <Card className="mb-4 w-full">
+      <CardHeader className="pb-1 pt-3">
         <CardTitle className="text-lg">Afgelopen 7 dagen</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-2 sm:p-4">
         {hasTipsInLastWeek ? (
-          <div className="h-48">
+          <div className="h-40 sm:h-48 w-full">
             <ChartContainer config={chartConfig} className="h-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 5, right: isMobile ? 0 : 20, bottom: 5, left: isMobile ? 0 : 20 }}>
+              <ResponsiveContainer width="99%" height="100%">
+                <BarChart 
+                  data={chartData} 
+                  margin={{ 
+                    top: 5, 
+                    right: 0, 
+                    bottom: isMobile ? 40 : 20, 
+                    left: 0 
+                  }}
+                >
                   <XAxis 
                     dataKey="name" 
-                    fontSize={isMobile ? 10 : 12}
-                    tick={{ fontSize: isMobile ? 10 : 12 }}
+                    fontSize={isMobile ? 9 : 11}
+                    tick={{ fontSize: isMobile ? 9 : 11 }}
+                    tickMargin={5}
                   />
                   <ChartTooltip 
                     content={({ active, payload }) => {
@@ -148,16 +155,19 @@ const TipChart = () => {
                     verticalAlign="bottom" 
                     align="center" 
                     wrapperStyle={{ 
-                      maxHeight: isMobile ? '60px' : '50px', 
+                      maxHeight: isMobile ? '40px' : '50px', 
                       overflowY: 'auto', 
-                      fontSize: isMobile ? '10px' : '12px',
-                      width: '100%',
-                      padding: isMobile ? '0 5px' : '0',
+                      fontSize: isMobile ? '8px' : '10px',
+                      width: '98%',
+                      margin: '0 auto',
+                      padding: '0',
+                      position: 'relative',
+                      bottom: isMobile ? '-5px' : '0'
                     }}
                     formatter={(value, entry) => {
                       // Truncate long period names on mobile
-                      if (isMobile && value.length > 15) {
-                        return `${value.substring(0, 12)}...`;
+                      if (isMobile && value.length > 12) {
+                        return `${value.substring(0, 10)}...`;
                       }
                       return value;
                     }}
@@ -168,7 +178,7 @@ const TipChart = () => {
             </ChartContainer>
           </div>
         ) : (
-          <div className="text-center py-4 text-muted-foreground h-48 flex items-center justify-center">
+          <div className="text-center py-4 text-muted-foreground h-40 sm:h-48 flex items-center justify-center">
             <div>
               <p>Geen fooien in de afgelopen 7 dagen.</p>
             </div>

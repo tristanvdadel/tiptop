@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,11 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Link } from 'react-router-dom';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-
 type PayoutSummaryProps = {
   onClose: () => void;
 };
-
 export const PayoutSummary = ({
   onClose
 }: PayoutSummaryProps) => {
@@ -42,11 +39,9 @@ export const PayoutSummary = ({
     [key: string]: string;
   }>({});
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
-
   const roundDownToNearest = (value: number, nearest: number = 5): number => {
     return Math.floor(value / nearest) * nearest;
   };
-
   useEffect(() => {
     if (mostRecentPayout) {
       const initialPayouts: {
@@ -58,7 +53,6 @@ export const PayoutSummary = ({
       const initialInputValues: {
         [key: string]: string;
       } = {};
-      
       mostRecentPayout.distribution.forEach(item => {
         const member = teamMembers.find(m => m.id === item.memberId);
         if (member) {
@@ -71,13 +65,11 @@ export const PayoutSummary = ({
           initialInputValues[item.memberId] = roundedPayout.toString();
         }
       });
-      
       setActualPayouts(initialPayouts);
       setBalances(initialBalances);
       setInputValues(initialInputValues);
     }
   }, [mostRecentPayout, teamMembers]);
-
   if (!mostRecentPayout) {
     return <Card>
         <CardContent className="p-6 text-center">
@@ -88,11 +80,9 @@ export const PayoutSummary = ({
         </CardContent>
       </Card>;
   }
-
   const payoutDate = format(new Date(mostRecentPayout.date), 'd MMMM yyyy', {
     locale: nl
   });
-
   const periodData = periods.filter(period => mostRecentPayout.periodIds.includes(period.id)).map(period => {
     const startDate = format(new Date(period.startDate), 'd MMM', {
       locale: nl
@@ -107,9 +97,7 @@ export const PayoutSummary = ({
       total: totalTip
     };
   });
-
   const totalPayout = mostRecentPayout.distribution.reduce((sum, item) => sum + item.amount, 0);
-
   const memberPayouts = mostRecentPayout.distribution.map(item => {
     const member = teamMembers.find(m => m.id === item.memberId);
     const existingBalance = member?.balance || 0;
@@ -121,11 +109,9 @@ export const PayoutSummary = ({
       totalDue: item.amount + existingBalance
     };
   });
-
   const handlePrint = () => {
     window.print();
   };
-
   const handleCopyToClipboard = () => {
     const payoutText = `Uitbetaling fooi: ${payoutDate}\n\n` + memberPayouts.map(member => {
       const actualAmount = actualPayouts[member.id] || member.amount;
@@ -139,7 +125,6 @@ export const PayoutSummary = ({
       });
     });
   };
-
   const handleDownloadCSV = () => {
     const headers = "Naam,Bedrag,Saldo\n";
     const rows = memberPayouts.map(member => {
@@ -164,13 +149,11 @@ export const PayoutSummary = ({
       description: "De uitbetalingsgegevens zijn gedownload als CSV-bestand."
     });
   };
-
   const handleActualPayoutChange = (memberId: string, value: string) => {
     setInputValues(prev => ({
       ...prev,
       [memberId]: value
     }));
-    
     const amount = parseFloat(value);
     if (!isNaN(amount)) {
       const member = memberPayouts.find(m => m.id === memberId);
@@ -192,7 +175,6 @@ export const PayoutSummary = ({
       }
     }
   };
-
   const handleSaveBalancesAndClose = () => {
     // Save the actual payout amounts in the payout object
     if (mostRecentPayout && hasChanges) {
@@ -201,7 +183,7 @@ export const PayoutSummary = ({
       Object.entries(balances).forEach(([memberId, balance]) => {
         updateTeamMemberBalance(memberId, balance);
       });
-      
+
       // Update distribution with actual amounts (if context supported it)
       // For now, this is just conceptual
       const updatedDistribution = mostRecentPayout.distribution.map(item => ({
@@ -209,11 +191,9 @@ export const PayoutSummary = ({
         actualAmount: actualPayouts[item.memberId] || item.amount,
         balance: balances[item.memberId] || 0
       }));
-      
       memberPayouts.forEach(member => {
         clearTeamMemberHours(member.id);
       });
-      
       toast({
         title: "Saldi opgeslagen",
         description: "De aangepaste uitbetaling en saldi zijn opgeslagen. Uren zijn gewist."
@@ -222,7 +202,6 @@ export const PayoutSummary = ({
     }
     onClose();
   };
-
   const handleBackButtonClick = () => {
     if (hasChanges) {
       setShowExitConfirmation(true);
@@ -230,7 +209,6 @@ export const PayoutSummary = ({
       onClose();
     }
   };
-
   const getBalanceText = (balance: number) => {
     if (balance === 0) return "";
     if (balance > 0) {
@@ -239,13 +217,10 @@ export const PayoutSummary = ({
       return `€${Math.abs(balance).toFixed(2)} teveel betaald`;
     }
   };
-
   return <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Uitbetaling samenvatting</h1>
-        <Button variant="outline" onClick={handleBackButtonClick}>
-          <ArrowLeft size={16} className="mr-1" /> Terug
-        </Button>
+        
       </div>
       
       <Card className="border-green-200 bg-green-50/30">
@@ -309,15 +284,7 @@ export const PayoutSummary = ({
                         <Label htmlFor={`actual-${member.id}`} className="text-sm">
                           Daadwerkelijk uitbetaald
                         </Label>
-                        <Input 
-                          id={`actual-${member.id}`} 
-                          type="number" 
-                          value={inputValues[member.id] || ""} 
-                          onChange={e => handleActualPayoutChange(member.id, e.target.value)} 
-                          step="0.01" 
-                          min="0" 
-                          className="mt-1" 
-                        />
+                        <Input id={`actual-${member.id}`} type="number" value={inputValues[member.id] || ""} onChange={e => handleActualPayoutChange(member.id, e.target.value)} step="0.01" min="0" className="mt-1" />
                       </div>
                       
                       <div className="flex-1">
@@ -361,17 +328,7 @@ export const PayoutSummary = ({
       </Card>
       
       <Card>
-        <CardContent className="p-6">
-          <p className="text-center text-muted-foreground mb-4">
-            De uitbetaalde periodes zijn nu opgeslagen in de geschiedenis. 
-            Je kunt altijd oude uitbetalingen terugvinden in het geschiedenis-overzicht.
-          </p>
-          <div className="flex justify-center">
-            <Button onClick={handleBackButtonClick} variant="goldGradient">
-              <ArrowLeft size={16} className="mr-1" /> Terug naar team
-            </Button>
-          </div>
-        </CardContent>
+        
       </Card>
 
       {/* Confirmation dialog when trying to exit with unsaved changes */}
@@ -390,9 +347,9 @@ export const PayoutSummary = ({
               Opslaan en afsluiten
             </AlertDialogAction>
             <AlertDialogAction onClick={() => {
-              setShowExitConfirmation(false);
-              onClose();
-            }} className="bg-amber-600 hover:bg-amber-700">
+            setShowExitConfirmation(false);
+            onClose();
+          }} className="bg-amber-600 hover:bg-amber-700">
               Afsluiten zonder opslaan
             </AlertDialogAction>
           </AlertDialogFooter>

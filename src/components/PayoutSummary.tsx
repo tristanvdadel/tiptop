@@ -366,12 +366,12 @@ export const PayoutSummary = ({
           
           {hasChanges && <Alert className="mt-4 bg-amber-50">
               <AlertDescription>
-                <strong>Let op:</strong> Je hebt aanpassingen gemaakt in de uitbetaling. Klik op 'Saldi opslaan en markeren als uitbetaald' hieronder om deze op te slaan voordat je verder gaat.
+                <strong>Let op:</strong> Je hebt aanpassingen gemaakt in de uitbetaling. Klik op 'Saldi opslaan' hieronder om deze op te slaan voordat je verder gaat.
               </AlertDescription>
             </Alert>}
           
           <Button onClick={handleSaveBalancesAndClose} className="w-full" variant="goldGradient">
-            <Save size={16} className="mr-1" /> Saldi opslaan en markeren als uitbetaald
+            <Save size={16} className="mr-1" /> Saldi opslaan
           </Button>
         </CardContent>
         <CardFooter className="flex-col sm:flex-row gap-2">

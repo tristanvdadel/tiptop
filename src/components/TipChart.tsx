@@ -78,13 +78,15 @@ const TipChart = () => {
     return bars;
   }, [chartData, periods, chartColors]);
 
-  // Only hide the chart if there's absolutely no data across all days and periods
-  const hasAnyData = chartData.some(day => {
-    // Check for any period data
-    return Object.keys(day).some(key => key.startsWith('period'));
-  });
+  // Only hide the chart if there's absolutely no data to show
+  const hasAnyPeriodWithTips = periods.some(period => period.tips.length > 0);
+  
+  // Check if there's any tip data in the last 7 days
+  const hasTipsInLastWeek = chartData.some(day => 
+    Object.keys(day).some(key => key.startsWith('period'))
+  );
 
-  if (!hasAnyData) {
+  if (!hasAnyPeriodWithTips) {
     return null;
   }
 
@@ -94,16 +96,24 @@ const TipChart = () => {
         <CardTitle className="text-lg">Afgelopen 7 dagen</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
-              <XAxis dataKey="name" />
-              <Tooltip formatter={(value: number, name: string) => [`€${value.toFixed(2)}`, name]} labelFormatter={label => `${label}`} />
-              <Legend />
-              {barComponents}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        {hasTipsInLastWeek ? (
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <XAxis dataKey="name" />
+                <Tooltip formatter={(value: number, name: string) => [`€${value.toFixed(2)}`, name]} labelFormatter={label => `${label}`} />
+                <Legend />
+                {barComponents}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="text-center py-4 text-muted-foreground h-48 flex items-center justify-center">
+            <div>
+              <p>Geen fooien in de afgelopen 7 dagen.</p>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

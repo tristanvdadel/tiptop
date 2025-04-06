@@ -98,11 +98,8 @@ const Analytics = () => {
       </CardContent>
     </Card>;
 
-  // Check if we have any periods with average tip per hour data
-  const hasAverageData = periods.some(period => {
-    const avgForPeriod = calculateAverageTipPerHour(period.id);
-    return avgForPeriod > 0;
-  });
+  // Check if we have any periods with tips
+  const hasAnyPeriodWithTips = periods.some(period => period.tips.length > 0);
 
   return (
     <div className="space-y-4">
@@ -121,11 +118,11 @@ const Analytics = () => {
           <p className="text-muted-foreground mb-2 text-sm">
             Deze grafiek toont het verloop van de gemiddelde fooi per uur over verschillende periodes, inclusief uitbetaalde periodes.
           </p>
-          {hasAverageData ? (
+          {hasAnyPeriodWithTips ? (
             <div className="h-60">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart 
-                  data={periodData.filter(period => period.average > 0)} 
+                  data={periodData.filter(period => period.total > 0)} 
                   margin={{
                     top: 10,
                     right: 20,
@@ -152,8 +149,8 @@ const Analytics = () => {
             </div>
           ) : (
             <div className="text-center py-6 text-muted-foreground">
-              <p>Er zijn nog geen periodes met voldoende gegevens om een gemiddelde te berekenen.</p>
-              <p className="mt-1">Zorg dat er voor elke periode zowel uren als fooien zijn ingevoerd.</p>
+              <p>Er zijn nog geen periodes met fooi gegevens.</p>
+              <p className="mt-1">Voeg fooi toe aan een periode om deze grafiek te zien.</p>
             </div>
           )}
         </CardContent>
@@ -167,9 +164,9 @@ const Analytics = () => {
           <p className="text-muted-foreground mb-2 text-sm">
             Het gemiddelde fooi per uur wordt berekend op basis van de totale fooi en de gewerkte uren van het team.
           </p>
-          {periodData.filter(period => period.average > 0).length > 0 ? (
+          {hasAnyPeriodWithTips ? (
             <div className="space-y-2">
-              {periodData.filter(period => period.average > 0)
+              {periodData.filter(period => period.total > 0)
                 // Reverse the array to show the latest period at the top
                 .reverse()
                 .map(period => (
@@ -182,14 +179,18 @@ const Analytics = () => {
                         </span>
                       )}
                     </div>
-                    <div className="font-medium text-sm">€{period.average.toFixed(2)}/uur</div>
+                    <div className="font-medium text-sm">
+                      {period.average > 0 
+                        ? `€${period.average.toFixed(2)}/uur` 
+                        : 'Geen uren geregistreerd'}
+                    </div>
                   </div>
                 ))}
             </div>
           ) : (
             <div className="text-center py-6 text-muted-foreground">
-              <p>Er zijn nog geen periodes met voldoende gegevens om een gemiddelde te berekenen.</p>
-              <p className="mt-1">Zorg dat er voor elke periode zowel uren als fooien zijn ingevoerd.</p>
+              <p>Er zijn nog geen periodes met fooi gegevens.</p>
+              <p className="mt-1">Voeg fooi toe aan een periode om deze lijst te zien.</p>
             </div>
           )}
         </CardContent>

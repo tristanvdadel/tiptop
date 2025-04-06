@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,10 +12,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
+interface PayoutDistributionItem {
+  memberId: string;
+  amount: number;
+  actualAmount?: number;
+  balance?: number;
+}
+
+interface Payout {
+  date: string;
+  periodIds: string[];
+  distribution: PayoutDistributionItem[];
+}
+
 const PayoutHistory = () => {
   const { payouts, teamMembers } = useApp();
   const { toast } = useToast();
-  const [selectedPayout, setSelectedPayout] = useState(null);
+  const [selectedPayout, setSelectedPayout] = useState<Payout | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   
   const formatDate = (dateString: string): string => {
@@ -27,7 +39,7 @@ const PayoutHistory = () => {
     }
   };
 
-  const handleRowClick = (payout) => {
+  const handleRowClick = (payout: Payout) => {
     setSelectedPayout(payout);
     setDetailsOpen(true);
   };

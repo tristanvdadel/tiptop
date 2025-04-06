@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -225,17 +226,23 @@ export const PayoutSummary = ({
 
   const handleSaveBalancesAndClose = () => {
     if (mostRecentPayout && hasChanges) {
+      // Update balances for each team member
       Object.entries(balances).forEach(([memberId, balance]) => {
         updateTeamMemberBalance(memberId, balance);
       });
+
+      // This is the key fix: We need to clear hours for all team members in the distribution
+      mostRecentPayout.distribution.forEach(item => {
+        clearTeamMemberHours(item.memberId);
+      });
+
+      // Update the distribution with actual amounts and balances
       const updatedDistribution = mostRecentPayout.distribution.map(item => ({
         ...item,
         actualAmount: actualPayouts[item.memberId] || item.amount,
         balance: balances[item.memberId] || 0
       }));
-      memberPayouts.forEach(member => {
-        clearTeamMemberHours(member.id);
-      });
+
       toast({
         title: "Uitbetaling voltooid",
         description: "De aangepaste uitbetaling en saldi zijn opgeslagen. Uren zijn gewist."

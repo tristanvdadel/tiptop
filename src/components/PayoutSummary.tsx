@@ -14,10 +14,11 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle 
-} from '@/components/ui/alert-dialog';
+} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { supabase } from "@/integrations/supabase/client";
 
 type PayoutSummaryProps = {
   onClose: () => void;
@@ -57,6 +58,34 @@ export const PayoutSummary = ({
   const [copiedText, setCopiedText] = useState('');
   const [isPendingPayout, setIsPendingPayout] = useState(true);
   const [roundingMethod, setRoundingMethod] = useState<RoundingMethod>('none');
+  const [hasPayoutPermission, setHasPayoutPermission] = useState(false);
+  
+  useEffect(() => {
+    const checkPermissions = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        
+        const { data: teamMemberships } = await supabase
+          .from('team_members')
+          .select('permissions, role')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (teamMemberships) {
+          // Admin always has permission, otherwise check manage_payouts permission
+          const isAdmin = teamMemberships.role === 'admin';
+          const canManagePayouts = teamMemberships.permissions?.manage_payouts === true;
+          
+          setHasPayoutPermission(isAdmin || canManagePayouts);
+        }
+      } catch (error) {
+        console.error('Error checking permissions:', error);
+      }
+    };
+    
+    checkPermissions();
+  }, []);
   
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -155,6 +184,17 @@ export const PayoutSummary = ({
     return <Card>
         <CardContent className="p-6 text-center">
           <p>Geen recente uitbetaling gevonden.</p>
+          <Button className="mt-4" onClick={onClose} variant="goldGradient">
+            <ArrowLeft size={16} className="mr-1" /> Terug
+          </Button>
+        </CardContent>
+      </Card>;
+  }
+  
+  if (!hasPayoutPermission) {
+    return <Card>
+        <CardContent className="p-6 text-center">
+          <p>Je hebt geen toestemming om uitbetalingen te beheren.</p>
           <Button className="mt-4" onClick={onClose} variant="goldGradient">
             <ArrowLeft size={16} className="mr-1" /> Terug
           </Button>

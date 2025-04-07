@@ -1,118 +1,89 @@
 
 import { useState, useEffect } from 'react';
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { Shield, ShieldCheck, ShieldX, UserCheck } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, TeamMember } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Loader2, Save, Shield, UserCheck, UserX } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 
-interface TeamMember {
-  id: string;
-  user_id: string;
-  team_id: string;
-  role: string;
-  permissions: {
-    add_tips: boolean;
-    add_hours: boolean;
-    view_team: boolean;
-    view_reports: boolean;
-  };
-  profile?: {
-    first_name: string | null;
-    last_name: string | null;
-    avatar_url: string | null;
-  };
-  email?: string;
-}
-
-interface TeamMemberPermissionsProps {
+type TeamMemberPermissionsProps = {
   teamId: string | null;
   isAdmin: boolean;
-}
+};
 
 const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [savingMemberId, setSavingMemberId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Fetch team members when component loads or team ID changes
   useEffect(() => {
-    if (!teamId) {
-      setTeamMembers([]);
-      setLoading(false);
-      return;
-    }
-
-    const fetchTeamMembers = async () => {
-      setLoading(true);
-      setError(null);
-      
-      try {
-        // Fetch team members with their permissions
-        const { data: members, error: membersError } = await supabase
-          .from('team_members')
-          .select('*')
-          .eq('team_id', teamId);
-          
-        if (membersError) {
-          throw membersError;
-        }
-        
-        // Get user profiles and emails for the team members
-        const enhancedMembers = await Promise.all(members.map(async (member) => {
-          try {
-            // Get user profile if exists
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('first_name, last_name, avatar_url')
-              .eq('id', member.user_id)
-              .single();
-              
-            // Get user email from auth
-            const { data: userData } = await supabase.auth.admin.getUserById(member.user_id);
-            
-            return {
-              ...member,
-              profile: profileData || null,
-              email: userData?.user?.email || 'No email found'
-            };
-          } catch (error) {
-            console.error('Error fetching user details:', error);
-            return member;
-          }
-        }));
-        
-        setTeamMembers(enhancedMembers);
-      } catch (error) {
-        console.error('Error fetching team members:', error);
-        setError('Error loading team members. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchTeamMembers();
   }, [teamId]);
 
-  // Handle permission changes
+  const fetchTeamMembers = async () => {
+    if (!teamId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Fetch team members
+      const { data: members, error: membersError } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('team_id', teamId);
+        
+      if (membersError) throw membersError;
+      
+      // For each team member, fetch user profile
+      const enrichedMembers = await Promise.all((members || []).map(async (member) => {
+        // Get profile
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('first_name, last_name, avatar_url')
+          .eq('id', member.user_id)
+          .single();
+          
+        // Get email
+        const { data: userData } = await supabase.auth.admin.getUserById(member.user_id);
+        
+        // Convert Json to strongly typed permissions object
+        const typedPermissions = {
+          add_tips: member.permissions?.add_tips === true,
+          add_hours: member.permissions?.add_hours === true,
+          view_team: member.permissions?.view_team === true,
+          view_reports: member.permissions?.view_reports === true,
+          edit_tips: member.permissions?.edit_tips === true || false,
+          close_periods: member.permissions?.close_periods === true || false,
+          manage_payouts: member.permissions?.manage_payouts === true || false
+        };
+        
+        return {
+          ...member,
+          permissions: typedPermissions,
+          profile: profileData,
+          email: userData?.user?.email
+        } as TeamMember;
+      }));
+      
+      setTeamMembers(enrichedMembers);
+    } catch (err) {
+      console.error('Error fetching team members:', err);
+      setError(err instanceof Error ? err.message : 'Er is een fout opgetreden bij het ophalen van de teamleden.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePermissionChange = (memberId: string, permission: keyof TeamMember['permissions'], value: boolean) => {
-    setTeamMembers(prevMembers => 
-      prevMembers.map(member => {
+    setTeamMembers(prev => 
+      prev.map(member => {
         if (member.id === memberId) {
           return {
             ...member,
@@ -127,212 +98,204 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
     );
   };
 
-  // Save updated permissions
-  const savePermissions = async (member: TeamMember) => {
-    if (!isAdmin) {
-      toast({
-        title: "Niet toegestaan",
-        description: "Je hebt geen rechten om bevoegdheden te wijzigen.",
-        variant: "destructive"
-      });
-      return;
-    }
+  const savePermissions = async () => {
+    if (!teamId) return;
     
-    setSavingMemberId(member.id);
+    setSaving(true);
     
     try {
-      const { error } = await supabase
-        .from('team_members')
-        .update({ permissions: member.permissions })
-        .eq('id', member.id);
-        
-      if (error) throw error;
+      for (const member of teamMembers) {
+        const { error } = await supabase
+          .from('team_members')
+          .update({ permissions: member.permissions })
+          .eq('id', member.id);
+          
+        if (error) throw error;
+      }
       
       toast({
-        title: "Bevoegdheden bijgewerkt",
-        description: "De bevoegdheden zijn succesvol bijgewerkt.",
+        title: "Bevoegdheden opgeslagen",
+        description: "De bevoegdheden van teamleden zijn bijgewerkt."
       });
-    } catch (error) {
-      console.error('Error updating permissions:', error);
+    } catch (err) {
+      console.error('Error saving permissions:', err);
       toast({
-        title: "Fout bij bijwerken",
-        description: "Er is een fout opgetreden bij het bijwerken van de bevoegdheden.",
+        title: "Fout bij opslaan",
+        description: err instanceof Error ? err.message : 'Er is een fout opgetreden bij het opslaan van de bevoegdheden.',
         variant: "destructive"
       });
     } finally {
-      setSavingMemberId(null);
+      setSaving(false);
     }
   };
 
   if (!teamId) {
     return (
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Geen team geselecteerd</AlertTitle>
-        <AlertDescription>
-          Selecteer eerst een team om de bevoegdheden van teamleden te beheren.
-        </AlertDescription>
-      </Alert>
+      <Card>
+        <CardContent className="p-6">
+          <p className="text-center text-muted-foreground">Selecteer eerst een team om bevoegdheden te beheren.</p>
+        </CardContent>
+      </Card>
     );
   }
   
-  if (loading) {
-    return <div className="flex justify-center py-8">Laden...</div>;
-  }
-  
-  if (error) {
+  if (!isAdmin) {
     return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Fout bij laden van teamleden</AlertTitle>
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
+      <Card>
+        <CardContent className="p-6">
+          <p className="text-center text-muted-foreground">Je hebt geen toestemming om bevoegdheden te beheren.</p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center">
-          <Shield className="mr-2 h-5 w-5" />
-          Teambevoegdheden
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {teamMembers.length === 0 ? (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Geen teamleden gevonden</AlertTitle>
-            <AlertDescription>
-              Er zijn geen teamleden gevonden voor dit team.
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <div className="space-y-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Teamlid</TableHead>
-                  <TableHead>Rol</TableHead>
-                  <TableHead>Fooi toevoegen</TableHead>
-                  <TableHead>Uren registreren</TableHead>
-                  <TableHead>Team bekijken</TableHead>
-                  <TableHead>Rapporten bekijken</TableHead>
-                  <TableHead>Actie</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {teamMembers.map(member => (
-                  <TableRow key={member.id}>
-                    <TableCell className="font-medium">
-                      {member.profile?.first_name && member.profile?.last_name 
-                        ? `${member.profile.first_name} ${member.profile.last_name}`
-                        : member.email || 'Onbekend'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        {member.role === 'admin' ? (
-                          <ShieldCheck className="mr-1 h-4 w-4 text-green-500" />
-                        ) : (
-                          <UserCheck className="mr-1 h-4 w-4 text-blue-500" />
-                        )}
-                        {member.role === 'admin' ? 'Admin' : 'Lid'}
-                      </div>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Checkbox 
-                        checked={member.permissions.add_tips}
-                        disabled={!isAdmin || member.role === 'admin'}
-                        onCheckedChange={(checked) => 
-                          handlePermissionChange(member.id, 'add_tips', !!checked)
-                        }
-                      />
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Checkbox 
-                        checked={member.permissions.add_hours}
-                        disabled={!isAdmin || member.role === 'admin'}
-                        onCheckedChange={(checked) => 
-                          handlePermissionChange(member.id, 'add_hours', !!checked)
-                        }
-                      />
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Checkbox 
-                        checked={member.permissions.view_team}
-                        disabled={!isAdmin || member.role === 'admin'}
-                        onCheckedChange={(checked) => 
-                          handlePermissionChange(member.id, 'view_team', !!checked)
-                        }
-                      />
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Checkbox 
-                        checked={member.permissions.view_reports}
-                        disabled={!isAdmin || member.role === 'admin'}
-                        onCheckedChange={(checked) => 
-                          handlePermissionChange(member.id, 'view_reports', !!checked)
-                        }
-                      />
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        disabled={
-                          !isAdmin || 
-                          member.role === 'admin' || 
-                          savingMemberId === member.id
-                        }
-                        onClick={() => savePermissions(member)}
-                      >
-                        {savingMemberId === member.id ? 'Opslaan...' : 'Opslaan'}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            
-            <Separator />
-            
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Bevoegdhedeninformatie</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-start space-x-2">
-                  <div className="pt-0.5">
-                    <ShieldCheck className="h-5 w-5 text-green-500" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Admin</p>
-                    <p className="text-sm text-muted-foreground">
-                      Beheerders hebben altijd alle bevoegdheden en kunnen niet worden beperkt.
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-2">
-                  <div className="pt-0.5">
-                    <ShieldX className="h-5 w-5 text-red-500" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Beperkingen</p>
-                    <p className="text-sm text-muted-foreground">
-                      Bevoegdheden bepalen welke acties teamleden kunnen uitvoeren in de app.
-                    </p>
-                  </div>
-                </div>
-              </div>
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Teambevoegdheden beheren
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Fout</AlertTitle>
+              <AlertDescription>
+                {error}
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          ) : teamMembers.length === 0 ? (
+            <p className="text-center text-muted-foreground py-4">Geen teamleden gevonden.</p>
+          ) : (
+            <div className="space-y-6">
+              {teamMembers.map(member => (
+                <div key={member.id} className="border rounded-lg p-4">
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <h3 className="font-medium">
+                        {member.profile?.first_name ? 
+                          `${member.profile.first_name} ${member.profile.last_name || ''}` : 
+                          member.email || 'Onbekende gebruiker'}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {member.role === 'admin' ? (
+                          <span className="flex items-center gap-1 text-amber-600">
+                            <Shield className="h-3 w-3" /> Admin
+                          </span>
+                        ) : (
+                          <span>Teamlid</span>
+                        )}
+                      </p>
+                    </div>
+                    
+                    {member.role === 'admin' && (
+                      <div className="bg-amber-50 text-amber-800 px-3 py-1 rounded-full text-xs">
+                        Admins hebben altijd alle rechten
+                      </div>
+                    )}
+                  </div>
+                  
+                  {member.role !== 'admin' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="flex items-center justify-between space-x-2 border p-2 rounded">
+                        <Label htmlFor={`add-tips-${member.id}`} className="text-sm">
+                          Fooi toevoegen
+                        </Label>
+                        <Switch 
+                          id={`add-tips-${member.id}`}
+                          checked={member.permissions.add_tips}
+                          onCheckedChange={(checked) => handlePermissionChange(member.id, 'add_tips', checked)}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between space-x-2 border p-2 rounded">
+                        <Label htmlFor={`edit-tips-${member.id}`} className="text-sm">
+                          Fooi wijzigen
+                        </Label>
+                        <Switch 
+                          id={`edit-tips-${member.id}`}
+                          checked={member.permissions.edit_tips}
+                          onCheckedChange={(checked) => handlePermissionChange(member.id, 'edit_tips', checked)}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between space-x-2 border p-2 rounded">
+                        <Label htmlFor={`add-hours-${member.id}`} className="text-sm">
+                          Uren toevoegen
+                        </Label>
+                        <Switch 
+                          id={`add-hours-${member.id}`}
+                          checked={member.permissions.add_hours}
+                          onCheckedChange={(checked) => handlePermissionChange(member.id, 'add_hours', checked)}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between space-x-2 border p-2 rounded">
+                        <Label htmlFor={`view-team-${member.id}`} className="text-sm">
+                          Team bekijken
+                        </Label>
+                        <Switch 
+                          id={`view-team-${member.id}`}
+                          checked={member.permissions.view_team}
+                          onCheckedChange={(checked) => handlePermissionChange(member.id, 'view_team', checked)}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between space-x-2 border p-2 rounded">
+                        <Label htmlFor={`view-reports-${member.id}`} className="text-sm">
+                          Rapportages bekijken
+                        </Label>
+                        <Switch 
+                          id={`view-reports-${member.id}`}
+                          checked={member.permissions.view_reports}
+                          onCheckedChange={(checked) => handlePermissionChange(member.id, 'view_reports', checked)}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between space-x-2 border p-2 rounded">
+                        <Label htmlFor={`close-periods-${member.id}`} className="text-sm">
+                          Periodes afronden
+                        </Label>
+                        <Switch 
+                          id={`close-periods-${member.id}`}
+                          checked={member.permissions.close_periods}
+                          onCheckedChange={(checked) => handlePermissionChange(member.id, 'close_periods', checked)}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between space-x-2 border p-2 rounded">
+                        <Label htmlFor={`manage-payouts-${member.id}`} className="text-sm">
+                          Uitbetalingen beheren
+                        </Label>
+                        <Switch 
+                          id={`manage-payouts-${member.id}`}
+                          checked={member.permissions.manage_payouts}
+                          onCheckedChange={(checked) => handlePermissionChange(member.id, 'manage_payouts', checked)}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              
+              <Button onClick={savePermissions} disabled={saving} className="mt-4">
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Bevoegdheden opslaan
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

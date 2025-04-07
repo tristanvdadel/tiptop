@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import EditTipDialog from './EditTipDialog';
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TipCardProps {
   tip: TipEntry;
@@ -28,6 +29,7 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
   const { currentPeriod, deleteTip, updateTip } = useApp();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [hasEditPermission, setHasEditPermission] = useState(false);
   const { toast } = useToast();
   
   const actualPeriodId = periodId || (currentPeriod ? currentPeriod.id : '');
@@ -36,6 +38,33 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
     addSuffix: true,
     locale: nl,
   });
+
+  useEffect(() => {
+    const checkPermissions = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        
+        const { data: teamMemberships } = await supabase
+          .from('team_members')
+          .select('permissions, role')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (teamMemberships) {
+          // Admin always has permission, otherwise check edit_tips permission
+          const isAdmin = teamMemberships.role === 'admin';
+          const canEditTips = teamMemberships.permissions?.edit_tips === true;
+          
+          setHasEditPermission(isAdmin || canEditTips);
+        }
+      } catch (error) {
+        console.error('Error checking permissions:', error);
+      }
+    };
+    
+    checkPermissions();
+  }, []);
 
   const handleDelete = () => {
     if (!actualPeriodId) {
@@ -65,26 +94,28 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
               {tip.note && <p className="text-sm mt-1">{tip.note}</p>}
             </div>
             
-            <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8" 
-                onClick={() => setIsEditDialogOpen(true)}
-                aria-label="Bewerk fooi"
-              >
-                <Pencil size={16} />
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 text-destructive hover:text-destructive" 
-                onClick={() => setIsDeleteDialogOpen(true)}
-                aria-label="Verwijder fooi"
-              >
-                <Trash2 size={16} />
-              </Button>
-            </div>
+            {hasEditPermission && (
+              <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8" 
+                  onClick={() => setIsEditDialogOpen(true)}
+                  aria-label="Bewerk fooi"
+                >
+                  <Pencil size={16} />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 text-destructive hover:text-destructive" 
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  aria-label="Verwijder fooi"
+                >
+                  <Trash2 size={16} />
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

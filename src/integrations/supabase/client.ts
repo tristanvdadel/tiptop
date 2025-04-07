@@ -40,6 +40,9 @@ export interface TeamMember {
     add_hours: boolean;
     view_team: boolean;
     view_reports: boolean;
+    edit_tips: boolean;     // New permission for editing tips
+    close_periods: boolean; // New permission for closing periods
+    manage_payouts: boolean; // New permission for managing payouts
   };
   created_at: string;
   profile?: {
@@ -63,5 +66,8 @@ export interface Invite {
     add_hours: boolean;
     view_team: boolean;
     view_reports: boolean;
+    edit_tips: boolean;     // New permission for editing tips
+    close_periods: boolean; // New permission for closing periods
+    manage_payouts: boolean; // New permission for managing payouts
   };
 }

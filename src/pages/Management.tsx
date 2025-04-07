@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -180,6 +181,14 @@ const Management = () => {
       const code = Math.random().toString(36).substring(2, 10).toUpperCase();
       const expiresAt = addDays(new Date(), 7).toISOString();
       
+      // Add new permissions
+      const fullPermissions = {
+        ...permissions,
+        edit_tips: role === 'admin' || false,
+        close_periods: role === 'admin' || false,
+        manage_payouts: role === 'admin' || false
+      };
+      
       const { error } = await supabase
         .from('invites')
         .insert([
@@ -188,7 +197,7 @@ const Management = () => {
             code, 
             created_by: user.id,
             role,
-            permissions,
+            permissions: fullPermissions,
             expires_at: expiresAt
           }
         ]);

@@ -60,21 +60,21 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
       }
 
       try {
+        // First fetch team members without the join that was causing issues
         const { data: members, error } = await supabase
           .from('team_members')
           .select(`
             id, 
             user_id, 
             role, 
-            permissions,
-            profiles:user_id(first_name, last_name)
+            permissions
           `)
           .eq('team_id', teamId);
 
         if (error) throw error;
 
-        // Fetch email addresses for each user
-        const membersWithEmail = await Promise.all(
+        // Then fetch user profiles and merge them with the team members data
+        const membersWithProfiles = await Promise.all(
           (members || []).map(async (member) => {
             // Safely cast the JSON permissions to our type with default values
             const safePermissions = { ...defaultPermissions };
@@ -90,18 +90,36 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
               });
             }
             
-            // Get user's email from auth
-            const { data } = await supabase.auth.admin.getUserById(member.user_id);
+            // Get user profile separately
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('first_name, last_name')
+              .eq('id', member.user_id)
+              .single();
+            
+            if (profileError && profileError.code !== 'PGRST116') {
+              console.error('Error fetching profile:', profileError);
+            }
+            
+            // Try to get user email 
+            let userEmail;
+            try {
+              const { data } = await supabase.auth.admin.getUserById(member.user_id);
+              userEmail = data?.user?.email;
+            } catch (error) {
+              console.error('Error fetching user email:', error);
+            }
+
             return {
               ...member,
               permissions: safePermissions,
-              email: data?.user?.email,
-              profile: member.profiles as any
+              email: userEmail,
+              profile: profileData || { first_name: null, last_name: null }
             };
           })
         );
 
-        setTeamMembers(membersWithEmail);
+        setTeamMembers(membersWithProfiles);
       } catch (error: any) {
         console.error('Error fetching team members:', error);
         toast({

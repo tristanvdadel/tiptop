@@ -8,12 +8,12 @@ import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Users, Calendar } from "lucide-react";
+import { AlertCircle, Users } from "lucide-react";
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
 const Index = () => {
-  const { currentPeriod, autoClosePeriods } = useApp();
+  const { currentPeriod } = useApp();
   const [hasTeam, setHasTeam] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -96,13 +96,6 @@ const Index = () => {
                 </span>
               )}
             </div>
-            
-            {currentPeriod && autoClosePeriods && currentPeriod.autoCloseDate && (
-              <div className="text-sm flex items-center text-muted-foreground">
-                <Calendar className="h-4 w-4 mr-1" />
-                Sluit op: {formatPeriodDate(currentPeriod.autoCloseDate)}
-              </div>
-            )}
           </h2>
           
           {currentPeriod && currentPeriod.tips.length > 0 ? (

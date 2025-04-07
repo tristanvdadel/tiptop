@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Pencil, Plus, Info, ClipboardList } from 'lucide-react';
+import { Pencil, Plus, Info, ClipboardList, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
   Tooltip, 
@@ -18,8 +18,19 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogClose
+  DialogClose,
+  DialogDescription
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -30,9 +41,12 @@ const PeriodSummary = () => {
     currentPeriod,
     updatePeriod,
     startNewPeriod,
-    hasReachedPeriodLimit
+    endCurrentPeriod,
+    hasReachedPeriodLimit,
+    autoClosePeriods
   } = useApp();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCloseConfirmDialogOpen, setIsCloseConfirmDialogOpen] = useState(false);
   const [periodName, setPeriodName] = useState('');
   const { toast } = useToast();
 
@@ -74,6 +88,35 @@ const PeriodSummary = () => {
     toast({
       title: "Nieuwe periode gestart",
       description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode.",
+    });
+  };
+
+  const handleClosePeriod = () => {
+    if (currentPeriod && autoClosePeriods && currentPeriod.autoCloseDate) {
+      setIsCloseConfirmDialogOpen(true);
+    } else {
+      doClosePeriod();
+    }
+  };
+
+  const doClosePeriod = () => {
+    endCurrentPeriod();
+    setIsCloseConfirmDialogOpen(false);
+    toast({
+      title: "Periode afgerond",
+      description: "De periode is succesvol afgerond.",
+    });
+  };
+
+  const formatPeriodDate = (date: string) => {
+    return format(new Date(date), 'd MMMM yyyy', {
+      locale: nl
+    });
+  };
+
+  const formatPeriodDateTime = (date: string) => {
+    return format(new Date(date), 'd MMMM yyyy HH:mm', {
+      locale: nl
     });
   };
 
@@ -152,6 +195,17 @@ const PeriodSummary = () => {
             <span className="text-muted-foreground">Aantal invoeren</span>
             <span>{currentPeriod.tips.length}</span>
           </div>
+          
+          {autoClosePeriods && currentPeriod.autoCloseDate && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground flex items-center">
+                <Calendar size={14} className="mr-1" /> Sluit automatisch
+              </span>
+              <span className="text-muted-foreground">
+                {formatPeriodDateTime(currentPeriod.autoCloseDate)}
+              </span>
+            </div>
+          )}
         </div>
         
         {currentPeriod.tips.length === 0 && (
@@ -166,7 +220,7 @@ const PeriodSummary = () => {
         <Button 
           variant="outline" 
           className="w-full border-[#9b87f5]/30 text-[#9b87f5] hover:bg-[#9b87f5]/10 mt-2"
-          onClick={() => {}}
+          onClick={handleClosePeriod}
         >
           Periode afronden
         </Button>
@@ -196,6 +250,27 @@ const PeriodSummary = () => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={isCloseConfirmDialogOpen} onOpenChange={setIsCloseConfirmDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Periode afronden?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Deze periode is ingesteld om automatisch af te sluiten op 
+            {currentPeriod?.autoCloseDate && (
+              <span className="font-medium"> {formatPeriodDateTime(currentPeriod.autoCloseDate)}</span>
+            )}. 
+            Weet je zeker dat je deze periode nu handmatig wilt afronden?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Annuleren</AlertDialogCancel>
+          <AlertDialogAction onClick={doClosePeriod}>
+            Nu afronden
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </>;
 };
 

@@ -108,9 +108,13 @@ const Settings = () => {
       const newAutoCloseDate = calculateAutoCloseDate(currentPeriod.startDate, periodDuration);
       scheduleAutoClose(newAutoCloseDate);
       
+      const timeDescription = hours < 12 
+        ? `${hours}:${minutes.toString().padStart(2, '0')} (volgende dag)` 
+        : `${hours}:${minutes.toString().padStart(2, '0')}`;
+      
       toast({
         title: "Sluitingstijd bijgewerkt",
-        description: `Sluitingstijd is ingesteld op ${hours}:${minutes.toString().padStart(2, '0')}. Dit wordt gebruikt voor automatisch afsluiten van periodes.`,
+        description: `Sluitingstijd is ingesteld op ${timeDescription}. Tijden vóór 12:00 worden op de volgende dag toegepast.`,
       });
     }
   };
@@ -398,6 +402,9 @@ const Settings = () => {
               </div>
               <p className="text-sm text-muted-foreground ml-6 mt-1">
                 Tijd waarop periodes automatisch worden afgesloten
+              </p>
+              <p className="text-xs text-muted-foreground ml-6">
+                Tijden tussen 00:00-11:59 worden op de volgende dag toegepast
               </p>
             </div>
             <Input

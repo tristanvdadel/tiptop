@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth, set } from 'date-fns';
@@ -306,10 +305,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     
-    // Apply custom closing time
+    // Apply custom closing time, adjusting the day if needed
+    const { hour, minute } = closingTime;
+    
+    // For morning hours (AM), move to next day if using AM times (0-11:59)
+    if (hour < 12) {
+      targetDate = addDays(targetDate, 1);
+    }
+    
     targetDate = set(targetDate, { 
-      hours: closingTime.hour, 
-      minutes: closingTime.minute,
+      hours: hour, 
+      minutes: minute,
       seconds: 0,
       milliseconds: 0
     });

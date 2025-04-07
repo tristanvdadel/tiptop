@@ -1,4 +1,3 @@
-
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Calendar, Users, BarChart, Zap, Settings, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -16,7 +15,6 @@ const Navbar = () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
         
-        // Fetch the team the user belongs to
         const { data: teamMembers, error: memberError } = await supabase
           .from('team_members')
           .select('team_id')
@@ -28,7 +26,6 @@ const Navbar = () => {
           return;
         }
         
-        // Get the team name
         const { data: team, error: teamError } = await supabase
           .from('teams')
           .select('name')
@@ -50,21 +47,21 @@ const Navbar = () => {
   }, []);
   
   const navItems = [
-    { to: '/', icon: <Home size={20} className="text-amber-500" />, label: 'Home' },
-    { to: '/periods', icon: <Calendar size={20} className="text-amber-600" />, label: 'Periodes' },
-    { to: '/team', icon: <Users size={20} className="text-amber-700" />, label: 'Team' },
-    { to: '/management', icon: <Shield size={20} className="text-amber-800" />, label: 'Beheer' },
-    { to: '/analytics', icon: <BarChart size={20} className="text-amber-500" />, label: 'Analyse' },
-    { to: '/settings', icon: <Settings size={20} className="text-amber-600" />, label: 'Instellingen' },
+    { to: '/', icon: <Home size={20} className="text-black" />, label: 'Home' },
+    { to: '/periods', icon: <Calendar size={20} className="text-black" />, label: 'Periodes' },
+    { to: '/team', icon: <Users size={20} className="text-black" />, label: 'Team' },
+    { to: '/management', icon: <Shield size={20} className="text-black" />, label: 'Beheer' },
+    { to: '/analytics', icon: <BarChart size={20} className="text-black" />, label: 'Analyse' },
+    { to: '/settings', icon: <Settings size={20} className="text-black" />, label: 'Instellingen' },
   ];
 
   return (
-    <header className="bg-background border-b">
+    <header className="bg-yellow-400 border-b border-yellow-500">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <div className="flex items-center">
-          <h1 className="text-2xl font-bold mr-2 bg-gradient-to-r from-amber-500 to-amber-400 bg-clip-text text-transparent">TipTop</h1>
+          <h1 className="text-2xl font-bold mr-2 text-black">TipTop</h1>
           {teamName && (
-            <span className="text-sm ml-1 font-medium text-muted-foreground">
+            <span className="text-sm ml-1 font-medium text-black/70">
               | {teamName}
             </span>
           )}
@@ -72,16 +69,17 @@ const Navbar = () => {
         <div className="flex gap-2">
           <Link to="/fast-tip">
             <Button 
-              variant="goldGradient" 
+              variant="default" 
+              className="bg-yellow-500 text-black hover:bg-yellow-600"
             >
-              <Zap size={16} className="mr-1 text-amber-700" /> 
+              <Zap size={16} className="mr-1 text-black" /> 
               <span>FastTip</span>
             </Button>
           </Link>
         </div>
       </div>
       
-      <nav className="fixed bottom-0 left-0 right-0 bg-background border-t z-50">
+      <nav className="fixed bottom-0 left-0 right-0 bg-yellow-400 border-t z-50">
         <div className="flex justify-around items-center">
           {navItems.map((item) => (
             <Link
@@ -90,8 +88,8 @@ const Navbar = () => {
               className={cn(
                 "flex flex-col items-center py-2 px-4 text-xs w-1/6",
                 location.pathname === item.to
-                  ? "text-amber-500 font-medium"
-                  : "text-muted-foreground"
+                  ? "bg-yellow-500 text-black font-medium"
+                  : "text-black/70"
               )}
             >
               {item.icon}
@@ -105,4 +103,3 @@ const Navbar = () => {
 };
 
 export default Navbar;
-

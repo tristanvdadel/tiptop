@@ -1,4 +1,9 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { formatDistanceToNow } from 'date-fns';
+import { nl } from 'date-fns/locale';
+import { supabase, TeamMemberPermissions } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -14,8 +19,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import EditTipDialog from './EditTipDialog';
-import { useToast } from "@/hooks/use-toast";
-import { supabase, TeamMemberPermissions } from "@/integrations/supabase/client";
 
 interface TipCardProps {
   tip: TipEntry;

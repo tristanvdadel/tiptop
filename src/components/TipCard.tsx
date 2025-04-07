@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
-import { formatDistanceToNow } from 'date-fns';
-import { nl } from 'date-fns/locale';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2 } from 'lucide-react';
 import { TipEntry, useApp } from '@/contexts/AppContext';
@@ -17,7 +15,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import EditTipDialog from './EditTipDialog';
 import { useToast } from "@/hooks/use-toast";
-import { supabase, TeamMemberPermissions } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
+import type { TeamMemberPermissions } from "@/integrations/supabase/client";
+import { formatDistanceToNow } from 'date-fns';
+import { nl } from 'date-fns/locale';
 
 interface TipCardProps {
   tip: TipEntry;
@@ -51,9 +52,11 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
           .single();
         
         if (teamMemberships) {
+          // Explicit type conversion
+          const permissions = teamMemberships.permissions as TeamMemberPermissions;
+          
           // Admin always has permission, otherwise check edit_tips permission
           const isAdmin = teamMemberships.role === 'admin';
-          const permissions = teamMemberships.permissions as TeamMemberPermissions;
           const canEditTips = permissions?.edit_tips === true;
           
           setHasEditPermission(isAdmin || canEditTips);

@@ -96,7 +96,7 @@ const TipInput = () => {
   };
 
   return (
-    <Card>
+    <Card className="card-gradient">
       <CardContent className="p-4">
         <h2 className="text-lg font-medium mb-4">Fooi toevoegen</h2>
         

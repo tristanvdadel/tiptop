@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -6,7 +7,6 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Calendar, Bell, Moon, User, CreditCard, Globe, Lock, LogOut } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useApp, PeriodDuration } from "@/contexts/AppContext";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -21,22 +21,15 @@ const Settings = () => {
     theme,
     toggleTheme
   } = useTheme();
-  
-  const {
-    periodDuration,
-    setPeriodDuration,
-    autoClosePeriods,
-    setAutoClosePeriods
-  } = useApp();
-  
   const {
     toast
   } = useToast();
-  
   const [language, setLanguage] = useState("nl");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userName, setUserName] = useState("Gebruiker");
   const [userEmail] = useState("gebruiker@example.com");
+  const [periodDuration, setPeriodDuration] = useState("week");
+  const [autoClosePeriods, setAutoClosePeriods] = useState(true);
   const navigate = useNavigate();
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -297,16 +290,7 @@ const Settings = () => {
               <Calendar className="h-4 w-4" />
               <Label htmlFor="periodDuration">Periode duur</Label>
             </div>
-            <Select 
-              value={periodDuration} 
-              onValueChange={(value: PeriodDuration) => {
-                setPeriodDuration(value);
-                toast({
-                  title: "Periode duur bijgewerkt",
-                  description: `Periodes duren nu ${value === 'day' ? 'dagelijks' : value === 'week' ? 'wekelijks' : 'maandelijks'}.`
-                });
-              }}
-            >
+            <Select defaultValue={periodDuration} onValueChange={setPeriodDuration}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Selecteer duur" />
               </SelectTrigger>
@@ -328,15 +312,7 @@ const Settings = () => {
             <Switch 
               id="autoClosePeriods" 
               checked={autoClosePeriods} 
-              onCheckedChange={(checked) => {
-                setAutoClosePeriods(checked);
-                toast({
-                  title: checked ? "Auto-sluiting ingeschakeld" : "Auto-sluiting uitgeschakeld",
-                  description: checked ? 
-                    "Periodes worden automatisch afgesloten na de ingestelde duur." : 
-                    "Periodes blijven open totdat je ze handmatig afsluit."
-                });
-              }} 
+              onCheckedChange={setAutoClosePeriods} 
             />
           </div>
         </CardContent>

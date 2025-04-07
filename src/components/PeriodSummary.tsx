@@ -30,11 +30,7 @@ const PeriodSummary = () => {
     currentPeriod,
     updatePeriod,
     startNewPeriod,
-    endCurrentPeriod,
-    hasReachedPeriodLimit,
-    periodDuration,
-    autoClosePeriods,
-    calculateAutoCloseDate
+    hasReachedPeriodLimit
   } = useApp();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [periodName, setPeriodName] = useState('');
@@ -81,19 +77,9 @@ const PeriodSummary = () => {
     });
   };
 
-  const handleEndCurrentPeriod = () => {
-    if (currentPeriod) {
-      endCurrentPeriod();
-      toast({
-        title: "Periode afgerond",
-        description: "De periode is succesvol afgerond.",
-      });
-    }
-  };
-
   if (!currentPeriod) {
     return (
-      <Card>
+      <Card className="card-gradient">
         <CardContent className="p-6">
           <div className="text-center mb-4">
             <ClipboardList className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
@@ -117,25 +103,13 @@ const PeriodSummary = () => {
   const startDate = format(new Date(currentPeriod.startDate), 'd MMMM yyyy', {
     locale: nl
   });
-  
-  // Calculate auto-closing date based on the period duration setting
-  const autoCloseDate = format(
-    calculateAutoCloseDate(currentPeriod.startDate), 
-    'd MMMM yyyy', 
-    { locale: nl }
-  );
 
   return <>
-    <Card className="border-[#9b87f5]/30 bg-[#9b87f5]/5">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex justify-between items-center text-base">
+    <Card className="card-gradient">
+      <CardHeader className="card-header-gradient">
+        <CardTitle className="flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <span className="flex items-center">
-              <span className="text-xs px-2 py-0.5 bg-tier-free/10 text-tier-free rounded-full mr-2">
-                Actief
-              </span>
-              {currentPeriod.name || "Huidige periode"}
-            </span>
+            <span>{currentPeriod.name || "Huidige periode"}</span>
             {currentPeriod && (
               <TooltipProvider>
                 <Tooltip>
@@ -156,52 +130,27 @@ const PeriodSummary = () => {
               </TooltipProvider>
             )}
           </div>
-          <span className="text-sm font-normal text-muted-foreground">
-            Gestart: {startDate}
-          </span>
+          <span className="text-sm font-normal text-muted-foreground">Gestart: {startDate}</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-2 mb-4">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Totaal fooi</span>
-            <span className="font-medium">
-              €{totalTip.toFixed(2)}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Aantal invoeren</span>
-            <span>{currentPeriod.tips.length}</span>
-          </div>
+        <div>
+          <h3 className="text-lg font-medium mb-2">Totaal fooi: €{totalTip.toFixed(2)}</h3>
+          <p className="text-sm text-muted-foreground mb-3">
+            {currentPeriod.tips.length > 0 
+              ? `${currentPeriod.tips.length} fooi invoer(en) in deze periode` 
+              : "Nog geen fooien in deze periode. Voeg fooien toe via het formulier."}
+          </p>
           
-          {autoClosePeriods && (
-            <div className="flex justify-between text-amber-600 dark:text-amber-500">
-              <span className="flex items-center gap-1 text-sm">
-                <Info size={14} />
-                Auto-sluiting ({periodDuration === 'day' ? 'dagelijks' : 
-                                periodDuration === 'week' ? 'wekelijks' : 'maandelijks'})
-              </span>
-              <span className="text-sm">{autoCloseDate}</span>
-            </div>
+          {currentPeriod.tips.length === 0 && (
+            <Alert className="mt-2 bg-muted/50 border-muted">
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Je kunt fooien invoeren via het formulier hieronder.
+              </AlertDescription>
+            </Alert>
           )}
         </div>
-        
-        {currentPeriod.tips.length === 0 && (
-          <Alert className="mt-2 bg-muted/50 border-muted">
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              Je kunt fooien invoeren via het formulier hieronder.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <Button 
-          variant="outline" 
-          className="w-full border-[#9b87f5]/30 text-[#9b87f5] hover:bg-[#9b87f5]/10 mt-2"
-          onClick={handleEndCurrentPeriod}
-        >
-          Periode afronden
-        </Button>
       </CardContent>
     </Card>
 

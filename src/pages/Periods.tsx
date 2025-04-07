@@ -170,6 +170,10 @@ const Periods = () => {
     });
   };
   
+  const goToAnalytics = () => {
+    navigate('/analytics');
+  };
+  
   const handleDeleteAllPaidPeriods = () => {
     setShowDeleteAllPaidDialog(true);
   };
@@ -259,7 +263,11 @@ const Periods = () => {
                 <p className="text-lg font-bold">€{averageTipPerHour.toFixed(2)}</p>
               </div>
             </div>
-            <Button variant="outline" className="text-[#9b87f5] border-[#9b87f5]/30 hover:bg-[#9b87f5]/10">
+            <Button 
+              variant="outline" 
+              className="text-[#9b87f5] border-[#9b87f5]/30 hover:bg-[#9b87f5]/10" 
+              onClick={goToAnalytics}
+            >
               Bekijk analyse <ArrowRight size={14} className="ml-1" />
             </Button>
           </CardContent>

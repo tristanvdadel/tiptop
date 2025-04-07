@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Sparkles, Coins } from 'lucide-react';
+import { Loader2, Coins } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -73,13 +72,7 @@ const Login = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-amber-100/30 via-amber-50/40 to-amber-100/30 p-4 relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden opacity-50">
-        <Sparkles className="absolute top-12 left-24 text-amber-300 animate-pulse" size={24} />
-        <Sparkles className="absolute bottom-24 right-12 text-amber-400 animate-pulse delay-500" size={32} />
-        <Sparkles className="absolute top-1/3 right-1/4 text-amber-200 animate-pulse delay-300" size={20} />
-      </div>
-
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-amber-100/30 via-amber-50/40 to-amber-100/30 p-4 relative">
       <div className="w-full max-w-md space-y-8 z-10">
         <div className="text-center flex flex-col items-center">
           <div className="flex items-center gap-2 mb-4">

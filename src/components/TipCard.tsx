@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2 } from 'lucide-react';
 import { TipEntry, useApp } from '@/contexts/AppContext';
@@ -34,10 +35,11 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
   
   const actualPeriodId = periodId || (currentPeriod ? currentPeriod.id : '');
   
-  const formattedDate = formatDistanceToNow(new Date(tip.date), {
+  // Ensure tip.date exists before formatting
+  const formattedDate = tip.date ? formatDistanceToNow(new Date(tip.date), {
     addSuffix: true,
     locale: nl,
-  });
+  }) : 'Unknown date';
 
   useEffect(() => {
     const checkPermissions = async () => {
@@ -52,12 +54,20 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
           .single();
         
         if (teamMemberships) {
-          // Explicit type conversion
-          const permissions = teamMemberships.permissions as TeamMemberPermissions;
+          // Type safe conversion with fallback
+          const permissions = teamMemberships.permissions as TeamMemberPermissions || {
+            add_tips: false,
+            add_hours: false,
+            view_team: false,
+            view_reports: false,
+            edit_tips: false,
+            close_periods: false,
+            manage_payouts: false
+          };
           
           // Admin always has permission, otherwise check edit_tips permission
           const isAdmin = teamMemberships.role === 'admin';
-          const canEditTips = permissions?.edit_tips === true;
+          const canEditTips = permissions.edit_tips === true;
           
           setHasEditPermission(isAdmin || canEditTips);
         }

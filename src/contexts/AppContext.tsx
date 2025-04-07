@@ -1,6 +1,7 @@
+
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth } from 'date-fns';
+import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth, set } from 'date-fns';
 
 // Define types
 export type TeamMember = {
@@ -63,6 +64,8 @@ type AppContextType = {
   periodDuration: PeriodDuration;
   alignWithCalendar: boolean;
   setAlignWithCalendar: (value: boolean) => void;
+  closingTime: { hour: number; minute: number };
+  setClosingTime: (time: { hour: number; minute: number }) => void;
   
   // Actions
   addTip: (amount: number, note?: string, customDate?: string) => void;
@@ -93,6 +96,7 @@ type AppContextType = {
   scheduleAutoClose: (date: string) => void;
   calculateAutoCloseDate: (startDate: string, duration: PeriodDuration) => string;
   getNextAutoCloseDate: () => string | null;
+  getFormattedClosingTime: () => string;
 };
 
 // Define app limits
@@ -113,6 +117,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [autoClosePeriods, setAutoClosePeriods] = useState<boolean>(true);
   const [periodDuration, setPeriodDuration] = useState<PeriodDuration>('week');
   const [alignWithCalendar, setAlignWithCalendar] = useState<boolean>(false);
+  const [closingTime, setClosingTime] = useState<{ hour: number; minute: number }>({ hour: 0, minute: 0 });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -122,6 +127,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const storedAutoClosePeriods = localStorage.getItem('autoClosePeriods');
     const storedPeriodDuration = localStorage.getItem('periodDuration');
     const storedAlignWithCalendar = localStorage.getItem('alignWithCalendar');
+    const storedClosingTime = localStorage.getItem('closingTime');
     
     if (storedPeriods) {
       try {
@@ -184,6 +190,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setAlignWithCalendar(false); // Default to false if parsing fails
       }
     }
+
+    if (storedClosingTime) {
+      try {
+        const parsedClosingTime = JSON.parse(storedClosingTime);
+        if (parsedClosingTime.hour !== undefined && parsedClosingTime.minute !== undefined) {
+          setClosingTime(parsedClosingTime);
+        }
+      } catch (error) {
+        console.error("Error parsing closingTime from localStorage:", error);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -209,6 +226,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     localStorage.setItem('alignWithCalendar', JSON.stringify(alignWithCalendar));
   }, [alignWithCalendar]);
+  
+  useEffect(() => {
+    localStorage.setItem('closingTime', JSON.stringify(closingTime));
+  }, [closingTime]);
   
   useEffect(() => {
     if (!autoClosePeriods || !currentPeriod) return;
@@ -240,8 +261,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
   };
   
+  const getFormattedClosingTime = () => {
+    const { hour, minute } = closingTime;
+    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+  };
+
   const calculateAutoCloseDate = (startDate: string, duration: PeriodDuration): string => {
     const date = new Date(startDate);
+    let targetDate: Date;
     
     if (alignWithCalendar) {
       switch (duration) {
@@ -249,29 +276,45 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           // For daily periods with calendar alignment, end at midnight
           const nextDay = addDays(date, 1);
           nextDay.setHours(0, 0, 0, 0);
-          return nextDay.toISOString();
+          targetDate = nextDay;
+          break;
         case 'week':
           // For weekly periods with calendar alignment, end on Sunday
-          return endOfWeek(date, { weekStartsOn: 1 }).toISOString();
+          targetDate = endOfWeek(date, { weekStartsOn: 1 });
+          break;
         case 'month':
           // For monthly periods with calendar alignment, end on last day of month
-          return endOfMonth(date).toISOString();
+          targetDate = endOfMonth(date);
+          break;
         default:
-          return addWeeks(date, 1).toISOString();
+          targetDate = addWeeks(date, 1);
       }
     } else {
       // Original behavior without calendar alignment
       switch (duration) {
         case 'day':
-          return addDays(date, 1).toISOString();
+          targetDate = addDays(date, 1);
+          break;
         case 'week':
-          return addWeeks(date, 1).toISOString();
+          targetDate = addWeeks(date, 1);
+          break;
         case 'month':
-          return addMonths(date, 1).toISOString();
+          targetDate = addMonths(date, 1);
+          break;
         default:
-          return addWeeks(date, 1).toISOString();
+          targetDate = addWeeks(date, 1);
       }
     }
+    
+    // Apply custom closing time
+    targetDate = set(targetDate, { 
+      hours: closingTime.hour, 
+      minutes: closingTime.minute,
+      seconds: 0,
+      milliseconds: 0
+    });
+    
+    return targetDate.toISOString();
   };
   
   const scheduleAutoClose = (date: string) => {
@@ -905,6 +948,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         getNextAutoCloseDate,
         alignWithCalendar,
         setAlignWithCalendar,
+        closingTime,
+        setClosingTime,
+        getFormattedClosingTime,
       }}
     >
       {children}

@@ -4,7 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Calendar, Bell, Moon, User, CreditCard, Globe, Lock, LogOut } from "lucide-react";
+import { Calendar, Bell, Moon, User, CreditCard, Globe, Lock, LogOut, Clock } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -42,7 +42,10 @@ const Settings = () => {
     scheduleAutoClose,
     getNextAutoCloseDate,
     alignWithCalendar,
-    setAlignWithCalendar
+    setAlignWithCalendar,
+    closingTime,
+    setClosingTime,
+    getFormattedClosingTime
   } = useApp();
 
   const [nextAutoCloseDate, setNextAutoCloseDate] = useState<string | null>(null);
@@ -50,7 +53,7 @@ const Settings = () => {
   useEffect(() => {
     const autoCloseDate = getNextAutoCloseDate();
     if (autoCloseDate) {
-      setNextAutoCloseDate(format(new Date(autoCloseDate), 'd MMMM yyyy', { locale: nl }));
+      setNextAutoCloseDate(format(new Date(autoCloseDate), 'd MMMM yyyy HH:mm', { locale: nl }));
     } else {
       setNextAutoCloseDate(null);
     }
@@ -87,6 +90,27 @@ const Settings = () => {
         description: checked 
           ? "Periodes worden nu uitgelijnd op de kalender (wekelijks tot zondag, maandelijks tot het einde van de maand)." 
           : "Periodes worden niet meer uitgelijnd op de kalender.",
+      });
+    }
+  };
+
+  const handleClosingTimeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const [hours, minutes] = event.target.value.split(':').map(Number);
+    
+    const newClosingTime = {
+      hour: hours,
+      minute: minutes
+    };
+    
+    setClosingTime(newClosingTime);
+    
+    if (autoClosePeriods && currentPeriod) {
+      const newAutoCloseDate = calculateAutoCloseDate(currentPeriod.startDate, periodDuration);
+      scheduleAutoClose(newAutoCloseDate);
+      
+      toast({
+        title: "Sluitingstijd bijgewerkt",
+        description: `Sluitingstijd is ingesteld op ${hours}:${minutes.toString().padStart(2, '0')}. Dit wordt gebruikt voor automatisch afsluiten van periodes.`,
       });
     }
   };
@@ -362,6 +386,27 @@ const Settings = () => {
                 <SelectItem value="month">Maandelijks</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          
+          <Separator />
+          
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <div className="flex items-center space-x-2">
+                <Clock className="h-4 w-4" />
+                <Label htmlFor="closingTime">Sluitingstijd</Label>
+              </div>
+              <p className="text-sm text-muted-foreground ml-6 mt-1">
+                Tijd waarop periodes automatisch worden afgesloten
+              </p>
+            </div>
+            <Input
+              id="closingTime"
+              type="time"
+              value={getFormattedClosingTime()}
+              onChange={handleClosingTimeChange}
+              className="w-[180px]"
+            />
           </div>
           
           <Separator />

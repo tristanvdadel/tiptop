@@ -406,7 +406,11 @@ const Management = () => {
                       onChange={(e) => setNewTeamName(e.target.value)}
                     />
                   </div>
-                  <Button onClick={handleCreateTeam} disabled={!newTeamName.trim()}>
+                  <Button 
+                    onClick={handleCreateTeam} 
+                    disabled={!newTeamName.trim()} 
+                    variant="goldGradient"
+                  >
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Team aanmaken
                   </Button>

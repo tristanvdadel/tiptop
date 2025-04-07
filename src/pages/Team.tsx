@@ -419,7 +419,9 @@ const Team = () => {
       
       {availablePeriods.length > 0 && <div className="mb-6">
           <h2 className="text-lg font-medium mb-2">Selecteer periode om uit te betalen</h2>
-          <Card>
+          <Card 
+            className="border-green-500/30 bg-green-500/5"
+          >
             <CardContent className="p-4">
               <ul className="space-y-2">
                 {availablePeriods.map(period => {

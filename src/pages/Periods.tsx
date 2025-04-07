@@ -1,8 +1,9 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Plus, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileText, DollarSign, Crown } from 'lucide-react';
+import { Plus, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileText, DollarSign, Crown, Calendar } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -14,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
+
 const Periods = () => {
   const {
     periods,
@@ -25,7 +27,8 @@ const Periods = () => {
     calculateAverageTipPerHour,
     deletePaidPeriods,
     deletePeriod,
-    updatePeriod
+    updatePeriod,
+    autoClosePeriods
   } = useApp();
   const navigate = useNavigate();
   const [showLimitDialog, setShowLimitDialog] = useState(false);
@@ -39,19 +42,31 @@ const Periods = () => {
   const [editPeriodNotes, setEditPeriodNotes] = useState('');
   const [showDeleteAllPaidDialog, setShowDeleteAllPaidDialog] = useState(false);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [showCloseConfirmDialog, setShowCloseConfirmDialog] = useState(false);
+  
   const {
     toast
   } = useToast();
+  
   const sortedPeriods = [...periods].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+  
   const formatPeriodDate = (date: string) => {
     return format(new Date(date), 'd MMMM yyyy', {
       locale: nl
     });
   };
+  
+  const formatPeriodDateTime = (date: string) => {
+    return format(new Date(date), 'd MMMM yyyy HH:mm', {
+      locale: nl
+    });
+  };
+  
   const tierPeriodLimit = Infinity;
   const unpaidPeriodesCount = getUnpaidPeriodsCount();
   const paidPeriodesCount = periods.filter(p => p.isPaid).length;
   const averageTipPerHour = calculateAverageTipPerHour();
+  
   const handleStartNewPeriod = () => {
     if (currentPeriod) {
       return; // Already have an active period
@@ -71,10 +86,12 @@ const Periods = () => {
       description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode."
     });
   };
+  
   const handleDeletePaidPeriods = () => {
     setShowPaidPeriodesDialog(false);
     setShowDeleteConfirmDialog(true);
   };
+  
   const confirmDeletePaidPeriods = () => {
     deletePaidPeriods();
     setShowDeleteConfirmDialog(false);
@@ -85,11 +102,13 @@ const Periods = () => {
       variant: "default"
     });
   };
+  
   const handleUpgrade = () => {
     setShowUpgradeDialog(true);
     setShowPaidPeriodesDialog(false);
     setShowLimitDialog(false);
   };
+  
   const doUpgrade = (newTier: 'pro') => {
     toast({
       title: `Upgraden naar ${newTier.toUpperCase()}`,
@@ -99,10 +118,12 @@ const Periods = () => {
     setShowUpgradeDialog(false);
     // In a real app, this would trigger a subscription change
   };
+  
   const handleDeletePeriod = (periodId: string) => {
     setPeriodToDelete(periodId);
     setShowDeletePeriodDialog(true);
   };
+  
   const confirmDeletePeriod = () => {
     if (periodToDelete) {
       deletePeriod(periodToDelete);
@@ -115,6 +136,7 @@ const Periods = () => {
       });
     }
   };
+  
   const handleEditPeriod = (periodId: string) => {
     const period = periods.find(p => p.id === periodId);
     if (period) {
@@ -124,6 +146,7 @@ const Periods = () => {
       setShowEditPeriodDialog(true);
     }
   };
+  
   const confirmEditPeriod = () => {
     if (periodToEdit) {
       updatePeriod(periodToEdit, {
@@ -139,6 +162,7 @@ const Periods = () => {
       });
     }
   };
+  
   const goToTeamPayouts = () => {
     navigate('/team');
     toast({
@@ -146,9 +170,28 @@ const Periods = () => {
       description: "Selecteer perioden en teamleden om de fooi uit te betalen."
     });
   };
+  
   const handleDeleteAllPaidPeriods = () => {
     setShowDeleteAllPaidDialog(true);
   };
+  
+  const handleClosePeriod = () => {
+    if (currentPeriod && autoClosePeriods && currentPeriod.autoCloseDate) {
+      setShowCloseConfirmDialog(true);
+    } else {
+      doClosePeriod();
+    }
+  };
+
+  const doClosePeriod = () => {
+    endCurrentPeriod();
+    setShowCloseConfirmDialog(false);
+    toast({
+      title: "Periode afgerond",
+      description: "De periode is succesvol afgerond.",
+    });
+  };
+  
   return <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Periodes</h1>
@@ -167,7 +210,7 @@ const Periods = () => {
                 <span className="text-xs px-2 py-0.5 bg-tier-free/10 text-tier-free rounded-full mr-2">
                   Actief
                 </span>
-                Huidige periode
+                {currentPeriod.name || "Huidige periode"}
               </span>
               <span className="text-sm font-normal text-muted-foreground">
                 Gestart: {formatPeriodDate(currentPeriod.startDate)}
@@ -186,8 +229,23 @@ const Periods = () => {
                 <span className="text-muted-foreground">Aantal invoeren</span>
                 <span>{currentPeriod.tips.length}</span>
               </div>
+              
+              {autoClosePeriods && currentPeriod.autoCloseDate && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground flex items-center">
+                    <Calendar size={14} className="mr-1" /> Sluit automatisch
+                  </span>
+                  <span className="text-muted-foreground">
+                    {formatPeriodDateTime(currentPeriod.autoCloseDate)}
+                  </span>
+                </div>
+              )}
             </div>
-            <Button variant="outline" className="w-full border-[#9b87f5]/30 text-[#9b87f5] hover:bg-[#9b87f5]/10" onClick={endCurrentPeriod}>
+            <Button 
+              variant="outline" 
+              className="w-full border-[#9b87f5]/30 text-[#9b87f5] hover:bg-[#9b87f5]/10" 
+              onClick={handleClosePeriod}
+            >
               Periode afronden
             </Button>
           </CardContent>
@@ -463,6 +521,27 @@ const Periods = () => {
         </AlertDialogContent>
       </AlertDialog>
       
+      <AlertDialog open={showCloseConfirmDialog} onOpenChange={setShowCloseConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Periode afronden?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deze periode is ingesteld om automatisch af te sluiten op 
+              {currentPeriod?.autoCloseDate && (
+                <span className="font-medium"> {formatPeriodDateTime(currentPeriod.autoCloseDate)}</span>
+              )}. 
+              Weet je zeker dat je deze periode nu handmatig wilt afronden?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction onClick={doClosePeriod}>
+              Nu afronden
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
       {sortedPeriods.length > 0 ? <div className="space-y-4">
           
           {sortedPeriods.filter(period => !period.isActive) // Filter out active period since we show it separately at the top
@@ -547,4 +626,5 @@ const Periods = () => {
         </Card>}
     </div>;
 };
+
 export default Periods;

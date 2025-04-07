@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Pencil, Plus, Info, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,10 @@ const PeriodSummary = () => {
     updatePeriod,
     startNewPeriod,
     endCurrentPeriod,
-    hasReachedPeriodLimit
+    hasReachedPeriodLimit,
+    periodDuration,
+    autoClosePeriods,
+    calculateAutoCloseDate
   } = useApp();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [periodName, setPeriodName] = useState('');
@@ -115,9 +118,9 @@ const PeriodSummary = () => {
     locale: nl
   });
   
-  // Calculate auto-closing date (30 days after start)
+  // Calculate auto-closing date based on the period duration setting
   const autoCloseDate = format(
-    addDays(new Date(currentPeriod.startDate), 30), 
+    calculateAutoCloseDate(currentPeriod.startDate), 
     'd MMMM yyyy', 
     { locale: nl }
   );
@@ -170,13 +173,17 @@ const PeriodSummary = () => {
             <span className="text-muted-foreground">Aantal invoeren</span>
             <span>{currentPeriod.tips.length}</span>
           </div>
-          <div className="flex justify-between text-amber-600 dark:text-amber-500">
-            <span className="flex items-center gap-1 text-sm">
-              <Info size={14} />
-              Auto-sluiting
-            </span>
-            <span className="text-sm">{autoCloseDate}</span>
-          </div>
+          
+          {autoClosePeriods && (
+            <div className="flex justify-between text-amber-600 dark:text-amber-500">
+              <span className="flex items-center gap-1 text-sm">
+                <Info size={14} />
+                Auto-sluiting ({periodDuration === 'day' ? 'dagelijks' : 
+                                periodDuration === 'week' ? 'wekelijks' : 'maandelijks'})
+              </span>
+              <span className="text-sm">{autoCloseDate}</span>
+            </div>
+          )}
         </div>
         
         {currentPeriod.tips.length === 0 && (

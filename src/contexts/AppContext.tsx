@@ -49,6 +49,8 @@ export type PayoutData = {
   }[];
 };
 
+export type PeriodDuration = 'day' | 'week' | 'month';
+
 type AppContextType = {
   // State
   currentPeriod: Period | null;
@@ -80,6 +82,11 @@ type AppContextType = {
   updateTeamMemberName: (memberId: string, newName: string) => boolean;
   mostRecentPayout: PayoutData | null;
   setMostRecentPayout: (payout: PayoutData | null) => void;
+  periodDuration: PeriodDuration;
+  setPeriodDuration: (duration: PeriodDuration) => void;
+  autoClosePeriods: boolean;
+  setAutoClosePeriods: (autoClose: boolean) => void;
+  calculateAutoCloseDate: (startDate: string) => Date;
 };
 
 // Define app limits
@@ -97,6 +104,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [payouts, setPayouts] = useState<PayoutData[]>([]);
   const [mostRecentPayout, setMostRecentPayout] = useState<PayoutData | null>(null);
+  const [periodDuration, setPeriodDuration] = useState<PeriodDuration>('week');
+  const [autoClosePeriods, setAutoClosePeriods] = useState<boolean>(true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -699,6 +708,25 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const calculateAutoCloseDate = (startDate: string): Date => {
+    const date = new Date(startDate);
+    
+    switch (periodDuration) {
+      case 'day':
+        return addDays(date, 1);
+      case 'week':
+        return addDays(date, 7);
+      case 'month':
+        // Add one month to the start date
+        const month = date.getMonth();
+        const newDate = new Date(date);
+        newDate.setMonth(month + 1);
+        return newDate;
+      default:
+        return addDays(date, 30); // Default fallback
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -729,6 +757,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         updateTeamMemberBalance,
         clearTeamMemberHours,
         updateTeamMemberName,
+        periodDuration,
+        setPeriodDuration,
+        autoClosePeriods,
+        setAutoClosePeriods,
+        calculateAutoCloseDate,
       }}
     >
       {children}

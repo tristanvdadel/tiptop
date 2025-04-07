@@ -26,7 +26,10 @@ const Periods = () => {
     calculateAverageTipPerHour,
     deletePaidPeriods,
     deletePeriod,
-    updatePeriod
+    updatePeriod,
+    periodDuration,
+    autoClosePeriods,
+    calculateAutoCloseDate
   } = useApp();
   const navigate = useNavigate();
   const [showLimitDialog, setShowLimitDialog] = useState(false);
@@ -199,15 +202,19 @@ const Periods = () => {
                 <span className="text-muted-foreground">Aantal invoeren</span>
                 <span>{currentPeriod.tips.length}</span>
               </div>
-              <div className="flex justify-between text-amber-600 dark:text-amber-500">
-                <span className="flex items-center gap-1 text-sm">
-                  <Info size={14} />
-                  Auto-sluiting
-                </span>
-                <span className="text-sm">
-                  {formatPeriodDate(addDays(new Date(currentPeriod.startDate), 30).toISOString())}
-                </span>
-              </div>
+              
+              {autoClosePeriods && (
+                <div className="flex justify-between text-amber-600 dark:text-amber-500">
+                  <span className="flex items-center gap-1 text-sm">
+                    <Info size={14} />
+                    Auto-sluiting ({periodDuration === 'day' ? 'dagelijks' : 
+                                   periodDuration === 'week' ? 'wekelijks' : 'maandelijks'})
+                  </span>
+                  <span className="text-sm">
+                    {formatPeriodDate(calculateAutoCloseDate(currentPeriod.startDate).toISOString())}
+                  </span>
+                </div>
+              )}
             </div>
             <Button variant="outline" className="w-full border-[#9b87f5]/30 text-[#9b87f5] hover:bg-[#9b87f5]/10" onClick={endCurrentPeriod}>
               Periode afronden

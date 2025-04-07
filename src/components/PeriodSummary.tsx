@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from "@/components/ui/alert";
+
 const PeriodSummary = () => {
   const {
     currentPeriod,
@@ -27,16 +28,19 @@ const PeriodSummary = () => {
   const {
     toast
   } = useToast();
+
   const totalTip = useMemo(() => {
     if (!currentPeriod) return 0;
     return currentPeriod.tips.reduce((sum, tip) => sum + tip.amount, 0);
   }, [currentPeriod]);
+
   const handleEditClick = () => {
     if (currentPeriod) {
       setPeriodName(currentPeriod.name || '');
       setIsEditDialogOpen(true);
     }
   };
+
   const handleSaveName = () => {
     if (currentPeriod) {
       updatePeriod(currentPeriod.id, {
@@ -49,6 +53,7 @@ const PeriodSummary = () => {
       });
     }
   };
+
   const handleStartNewPeriod = () => {
     if (hasReachedPeriodLimit()) {
       toast({
@@ -64,6 +69,7 @@ const PeriodSummary = () => {
       description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode."
     });
   };
+
   const handleClosePeriod = () => {
     if (currentPeriod && autoClosePeriods && currentPeriod.autoCloseDate) {
       setIsCloseConfirmDialogOpen(true);
@@ -71,6 +77,7 @@ const PeriodSummary = () => {
       doClosePeriod();
     }
   };
+
   const doClosePeriod = () => {
     endCurrentPeriod();
     setIsCloseConfirmDialogOpen(false);
@@ -79,16 +86,19 @@ const PeriodSummary = () => {
       description: "De periode is succesvol afgerond."
     });
   };
+
   const formatPeriodDate = (date: string) => {
     return format(new Date(date), 'd MMMM yyyy', {
       locale: nl
     });
   };
+
   const formatPeriodDateTime = (date: string) => {
-    return format(new Date(date), 'd MMMM yyyy HH:mm', {
+    return format(new Date(date), 'EEEE d MMMM yyyy HH:mm', {
       locale: nl
     });
   };
+
   if (!currentPeriod) {
     return <Card>
         <CardContent className="p-6">
@@ -105,9 +115,11 @@ const PeriodSummary = () => {
         </CardContent>
       </Card>;
   }
+
   const startDate = format(new Date(currentPeriod.startDate), 'd MMMM yyyy', {
     locale: nl
   });
+
   return <>
     <Card className="border-[#9b87f5]/30 bg-[#9b87f5]/5">
       <CardHeader className="pb-2">
@@ -206,4 +218,5 @@ const PeriodSummary = () => {
     </AlertDialog>
   </>;
 };
+
 export default PeriodSummary;

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -57,7 +56,7 @@ const Periods = () => {
   };
   
   const formatPeriodDateTime = (date: string) => {
-    return format(new Date(date), 'd MMMM yyyy HH:mm', {
+    return format(new Date(date), 'EEEE d MMMM yyyy HH:mm', {
       locale: nl
     });
   };

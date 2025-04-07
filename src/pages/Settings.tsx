@@ -404,7 +404,8 @@ const Settings = () => {
                 Tijd waarop periodes automatisch worden afgesloten
               </p>
               <p className="text-xs text-muted-foreground ml-6">
-                Tijden tussen 00:00-11:59 worden op de volgende dag toegepast
+                Tijden tussen 00:00-11:59 (AM) worden beschouwd als na het einde van de dag.
+                Tijden tussen 12:00-23:59 (PM) worden beschouwd als binnen dezelfde dag.
               </p>
             </div>
             <Input

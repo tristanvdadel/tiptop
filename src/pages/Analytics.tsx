@@ -1,15 +1,13 @@
-
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Info } from 'lucide-react';
+import { Info, TrendingUp, ArrowRight } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { useMemo } from 'react';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import TipChart from '@/components/TipChart';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -24,12 +22,10 @@ const Analytics = () => {
   
   const isMobile = useIsMobile();
 
-  // Calculate all-time average tip per hour, include paid periods
   const averageTipPerHour = useMemo(() => {
     return calculateAverageTipPerHour();
   }, [calculateAverageTipPerHour]);
 
-  // Create period data for charts, including all periods (active, inactive, and paid)
   const periodData = useMemo(() => {
     return periods
       .map(period => {
@@ -41,10 +37,8 @@ const Analytics = () => {
           locale: nl
         }) : 'Actief';
 
-        // Always calculate average tip per hour for all periods, including paid ones
         const averageTipPerHour = calculateAverageTipPerHour(period.id);
         
-        // Add timestamp for sorting
         const timestamp = new Date(period.startDate).getTime();
         
         return {
@@ -56,11 +50,9 @@ const Analytics = () => {
           timestamp: timestamp
         };
       })
-      // Sort periods by start date
       .sort((a, b) => a.timestamp - b.timestamp);
   }, [periods, calculateAverageTipPerHour]);
 
-  // Get the data for the line chart, limit to 10 most recent periods if more than 10
   const lineChartData = useMemo(() => {
     const filteredData = periodData.filter(period => period.total > 0);
     if (filteredData.length > 10) {
@@ -69,7 +61,6 @@ const Analytics = () => {
     return filteredData;
   }, [periodData]);
 
-  // Create chart config for the line chart
   const chartConfig = useMemo(() => {
     return {
       average: {
@@ -79,7 +70,6 @@ const Analytics = () => {
     };
   }, []);
 
-  // Determine the empty state message
   const getEmptyStateMessage = () => {
     const allPeriods = periods;
     const periodsWithTips = allPeriods.some(period => period.tips.length > 0);
@@ -96,28 +86,30 @@ const Analytics = () => {
     return ""; // Fallback, should not happen
   };
 
-  // Create the average tip per hour card component with dynamic empty state
   const AverageTipCard = () => (
     <Card className="mb-4 w-full">
       <CardContent className="p-4">
         {averageTipPerHour > 0 ? (
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center bg-gradient-to-r from-[#9b87f5]/10 to-[#7E69AB]/5 border-[#9b87f5]/20 rounded-md p-3">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-medium">Gemiddelde fooi per uur</h3>
-              <TooltipProvider>
-                <UITooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6">
-                      <Info size={16} className="text-muted-foreground" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Gemiddelde berekend over alle periodes (incl. uitbetaald)</p>
-                  </TooltipContent>
-                </UITooltip>
-              </TooltipProvider>
+              <TrendingUp size={20} className="text-[#9b87f5]" />
+              <div>
+                <h3 className="text-sm font-medium">Gemiddelde fooi per uur</h3>
+                <TooltipProvider>
+                  <UITooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <Info size={16} className="text-muted-foreground" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Gemiddelde berekend over alle periodes (incl. uitbetaald)</p>
+                    </TooltipContent>
+                  </UITooltip>
+                </TooltipProvider>
+              </div>
             </div>
-            <span className="font-medium">€{averageTipPerHour.toFixed(2)} / uur</span>
+            <span className="font-bold text-[#9b87f5]">€{averageTipPerHour.toFixed(2)} / uur</span>
           </div>
         ) : (
           <div className="text-center py-2 text-muted-foreground">
@@ -128,14 +120,12 @@ const Analytics = () => {
     </Card>
   );
 
-  // Check if we have any periods with tips
   const hasAnyPeriodWithTips = periods.some(period => period.tips.length > 0);
 
   return (
     <div className="space-y-4 w-full max-w-full px-1 sm:px-4">
       <h1 className="text-xl font-bold">Analyse</h1>
       
-      {/* Always display the average tip per hour at the top, even for empty state */}
       <AverageTipCard />
       
       <TipChart />
@@ -224,7 +214,6 @@ const Analytics = () => {
             <ScrollArea className="h-64 w-full">
               <div className="space-y-2 pr-2">
                 {periodData.filter(period => period.total > 0)
-                  // Reverse the array to show the latest period at the top
                   .reverse()
                   .map(period => (
                     <div key={period.id} className="flex justify-between p-2 border rounded-md">

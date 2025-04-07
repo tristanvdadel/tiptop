@@ -86,7 +86,7 @@ const Index = () => {
           </div>
         </div>
         
-        <div>
+        <div className="bg-white/70 p-4 md:p-6 rounded-lg shadow-sm card-gradient">
           <h2 className="text-lg font-medium mb-4">
             Recente fooi
             {currentPeriod && (

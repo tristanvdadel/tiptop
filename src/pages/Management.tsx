@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Link, LogIn, History } from 'lucide-react';
+import { PlusCircle, Users, Link, LogIn, History, Shield } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ import { addDays } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import PayoutHistory from '@/components/PayoutHistory';
+import TeamMemberPermissions from '@/components/TeamMemberPermissions';
 
 const Management = () => {
   const location = useLocation();
@@ -291,8 +292,12 @@ const Management = () => {
       )}
       
       <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue="teams">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="teams">Mijn teams</TabsTrigger>
+          <TabsTrigger value="permissions" className="flex items-center gap-1">
+            <Shield className="h-4 w-4" />
+            Bevoegdheden
+          </TabsTrigger>
           <TabsTrigger value="payouts" className="flex items-center gap-1">
             <History className="h-4 w-4" />
             Uitbetalingen
@@ -414,6 +419,10 @@ const Management = () => {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+        
+        <TabsContent value="permissions" className="mt-4">
+          <TeamMemberPermissions teamId={selectedTeamId} isAdmin={isAdmin} />
         </TabsContent>
         
         <TabsContent value="payouts" className="mt-4">

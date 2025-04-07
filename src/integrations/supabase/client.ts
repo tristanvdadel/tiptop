@@ -42,6 +42,12 @@ export interface TeamMember {
     view_reports: boolean;
   };
   created_at: string;
+  profile?: {
+    first_name: string | null;
+    last_name: string | null;
+    avatar_url: string | null;
+  };
+  email?: string;
 }
 
 export interface Invite {

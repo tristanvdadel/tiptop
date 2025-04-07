@@ -79,7 +79,7 @@ const PeriodSummary = () => {
 
   if (!currentPeriod) {
     return (
-      <Card className="card-gradient">
+      <Card>
         <CardContent className="p-6">
           <div className="text-center mb-4">
             <ClipboardList className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
@@ -105,8 +105,8 @@ const PeriodSummary = () => {
   });
 
   return <>
-    <Card className="card-gradient">
-      <CardHeader className="card-header-gradient">
+    <Card>
+      <CardHeader>
         <CardTitle className="flex justify-between items-center">
           <div className="flex items-center gap-2">
             <span>{currentPeriod.name || "Huidige periode"}</span>

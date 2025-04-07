@@ -1,4 +1,3 @@
-
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
@@ -6,36 +5,13 @@ import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Pencil, Plus, Info, ClipboardList, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { 
-  Tooltip, 
-  TooltipContent, 
-  TooltipProvider, 
-  TooltipTrigger 
-} from '@/components/ui/tooltip';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
-  DialogDescription
-} from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from "@/components/ui/alert";
-
 const PeriodSummary = () => {
   const {
     currentPeriod,
@@ -48,32 +24,31 @@ const PeriodSummary = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCloseConfirmDialogOpen, setIsCloseConfirmDialogOpen] = useState(false);
   const [periodName, setPeriodName] = useState('');
-  const { toast } = useToast();
-
+  const {
+    toast
+  } = useToast();
   const totalTip = useMemo(() => {
     if (!currentPeriod) return 0;
     return currentPeriod.tips.reduce((sum, tip) => sum + tip.amount, 0);
   }, [currentPeriod]);
-
   const handleEditClick = () => {
     if (currentPeriod) {
       setPeriodName(currentPeriod.name || '');
       setIsEditDialogOpen(true);
     }
   };
-
   const handleSaveName = () => {
     if (currentPeriod) {
-      updatePeriod(currentPeriod.id, { name: periodName });
+      updatePeriod(currentPeriod.id, {
+        name: periodName
+      });
       setIsEditDialogOpen(false);
-      
       toast({
         title: "Periode bijgewerkt",
-        description: "De naam van de periode is bijgewerkt.",
+        description: "De naam van de periode is bijgewerkt."
       });
     }
   };
-
   const handleStartNewPeriod = () => {
     if (hasReachedPeriodLimit()) {
       toast({
@@ -83,14 +58,12 @@ const PeriodSummary = () => {
       });
       return;
     }
-    
     startNewPeriod();
     toast({
       title: "Nieuwe periode gestart",
-      description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode.",
+      description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode."
     });
   };
-
   const handleClosePeriod = () => {
     if (currentPeriod && autoClosePeriods && currentPeriod.autoCloseDate) {
       setIsCloseConfirmDialogOpen(true);
@@ -98,31 +71,26 @@ const PeriodSummary = () => {
       doClosePeriod();
     }
   };
-
   const doClosePeriod = () => {
     endCurrentPeriod();
     setIsCloseConfirmDialogOpen(false);
     toast({
       title: "Periode afgerond",
-      description: "De periode is succesvol afgerond.",
+      description: "De periode is succesvol afgerond."
     });
   };
-
   const formatPeriodDate = (date: string) => {
     return format(new Date(date), 'd MMMM yyyy', {
       locale: nl
     });
   };
-
   const formatPeriodDateTime = (date: string) => {
     return format(new Date(date), 'd MMMM yyyy HH:mm', {
       locale: nl
     });
   };
-
   if (!currentPeriod) {
-    return (
-      <Card>
+    return <Card>
         <CardContent className="p-6">
           <div className="text-center mb-4">
             <ClipboardList className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
@@ -131,22 +99,15 @@ const PeriodSummary = () => {
               Start een nieuwe periode om fooien te kunnen registreren.
             </p>
           </div>
-          <Button 
-            onClick={handleStartNewPeriod} 
-            className="w-full gold-button"
-            variant="goldGradient"
-          >
+          <Button onClick={handleStartNewPeriod} className="w-full gold-button" variant="goldGradient">
             <Plus size={16} className="mr-1" /> Nieuwe periode starten
           </Button>
         </CardContent>
-      </Card>
-    );
+      </Card>;
   }
-
   const startDate = format(new Date(currentPeriod.startDate), 'd MMMM yyyy', {
     locale: nl
   });
-
   return <>
     <Card className="border-[#9b87f5]/30 bg-[#9b87f5]/5">
       <CardHeader className="pb-2">
@@ -158,16 +119,10 @@ const PeriodSummary = () => {
               </span>
               {currentPeriod.name || "Huidige periode"}
             </span>
-            {currentPeriod && (
-              <TooltipProvider>
+            {currentPeriod && <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6"
-                      onClick={handleEditClick}
-                    >
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleEditClick}>
                       <Pencil size={16} className="text-muted-foreground" />
                     </Button>
                   </TooltipTrigger>
@@ -175,8 +130,7 @@ const PeriodSummary = () => {
                     <p>Naam van periode wijzigen</p>
                   </TooltipContent>
                 </Tooltip>
-              </TooltipProvider>
-            )}
+              </TooltipProvider>}
           </div>
           <span className="text-sm font-normal text-muted-foreground">
             Gestart: {startDate}
@@ -196,32 +150,19 @@ const PeriodSummary = () => {
             <span>{currentPeriod.tips.length}</span>
           </div>
           
-          {autoClosePeriods && currentPeriod.autoCloseDate && (
-            <div className="flex justify-between">
+          {autoClosePeriods && currentPeriod.autoCloseDate && <div className="flex justify-between">
               <span className="text-muted-foreground flex items-center">
                 <Calendar size={14} className="mr-1" /> Sluit automatisch
               </span>
               <span className="text-muted-foreground">
                 {formatPeriodDateTime(currentPeriod.autoCloseDate)}
               </span>
-            </div>
-          )}
+            </div>}
         </div>
         
-        {currentPeriod.tips.length === 0 && (
-          <Alert className="mt-2 bg-muted/50 border-muted">
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              Je kunt fooien invoeren via het formulier hieronder.
-            </AlertDescription>
-          </Alert>
-        )}
+        {currentPeriod.tips.length === 0}
 
-        <Button 
-          variant="outline" 
-          className="w-full border-[#9b87f5]/30 text-[#9b87f5] hover:bg-[#9b87f5]/10 mt-2"
-          onClick={handleClosePeriod}
-        >
+        <Button variant="outline" className="w-full border-[#9b87f5]/30 text-[#9b87f5] hover:bg-[#9b87f5]/10 mt-2" onClick={handleClosePeriod}>
           Periode afronden
         </Button>
       </CardContent>
@@ -234,13 +175,7 @@ const PeriodSummary = () => {
         </DialogHeader>
         <div className="py-4">
           <Label htmlFor="periodName">Naam</Label>
-          <Input
-            id="periodName"
-            value={periodName}
-            onChange={(e) => setPeriodName(e.target.value)}
-            placeholder="Voer een naam in voor deze periode"
-            className="mt-2"
-          />
+          <Input id="periodName" value={periodName} onChange={e => setPeriodName(e.target.value)} placeholder="Voer een naam in voor deze periode" className="mt-2" />
         </div>
         <DialogFooter>
           <DialogClose asChild>
@@ -257,9 +192,7 @@ const PeriodSummary = () => {
           <AlertDialogTitle>Periode afronden?</AlertDialogTitle>
           <AlertDialogDescription>
             Deze periode is ingesteld om automatisch af te sluiten op 
-            {currentPeriod?.autoCloseDate && (
-              <span className="font-medium"> {formatPeriodDateTime(currentPeriod.autoCloseDate)}</span>
-            )}. 
+            {currentPeriod?.autoCloseDate && <span className="font-medium"> {formatPeriodDateTime(currentPeriod.autoCloseDate)}</span>}. 
             Weet je zeker dat je deze periode nu handmatig wilt afronden?
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -273,5 +206,4 @@ const PeriodSummary = () => {
     </AlertDialog>
   </>;
 };
-
 export default PeriodSummary;

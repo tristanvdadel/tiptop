@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { addDays, addWeeks, addMonths } from 'date-fns';
+import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth } from 'date-fns';
 
 // Define types
 export type TeamMember = {
@@ -61,6 +61,8 @@ type AppContextType = {
   payouts: PayoutData[];
   autoClosePeriods: boolean;
   periodDuration: PeriodDuration;
+  alignWithCalendar: boolean;
+  setAlignWithCalendar: (value: boolean) => void;
   
   // Actions
   addTip: (amount: number, note?: string, customDate?: string) => void;
@@ -110,6 +112,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [mostRecentPayout, setMostRecentPayout] = useState<PayoutData | null>(null);
   const [autoClosePeriods, setAutoClosePeriods] = useState<boolean>(true);
   const [periodDuration, setPeriodDuration] = useState<PeriodDuration>('week');
+  const [alignWithCalendar, setAlignWithCalendar] = useState<boolean>(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -118,6 +121,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const storedPayouts = localStorage.getItem('payouts');
     const storedAutoClosePeriods = localStorage.getItem('autoClosePeriods');
     const storedPeriodDuration = localStorage.getItem('periodDuration');
+    const storedAlignWithCalendar = localStorage.getItem('alignWithCalendar');
     
     if (storedPeriods) {
       try {
@@ -171,6 +175,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setPeriodDuration('week'); // Default to week if parsing fails
       }
     }
+    
+    if (storedAlignWithCalendar !== null) {
+      try {
+        setAlignWithCalendar(JSON.parse(storedAlignWithCalendar));
+      } catch (error) {
+        console.error("Error parsing alignWithCalendar from localStorage:", error);
+        setAlignWithCalendar(false); // Default to false if parsing fails
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -192,6 +205,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     localStorage.setItem('periodDuration', JSON.stringify(periodDuration));
   }, [periodDuration]);
+  
+  useEffect(() => {
+    localStorage.setItem('alignWithCalendar', JSON.stringify(alignWithCalendar));
+  }, [alignWithCalendar]);
   
   useEffect(() => {
     if (!autoClosePeriods || !currentPeriod) return;
@@ -226,15 +243,34 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const calculateAutoCloseDate = (startDate: string, duration: PeriodDuration): string => {
     const date = new Date(startDate);
     
-    switch (duration) {
-      case 'day':
-        return addDays(date, 1).toISOString();
-      case 'week':
-        return addWeeks(date, 1).toISOString();
-      case 'month':
-        return addMonths(date, 1).toISOString();
-      default:
-        return addWeeks(date, 1).toISOString();
+    if (alignWithCalendar) {
+      switch (duration) {
+        case 'day':
+          // For daily periods with calendar alignment, end at midnight
+          const nextDay = addDays(date, 1);
+          nextDay.setHours(0, 0, 0, 0);
+          return nextDay.toISOString();
+        case 'week':
+          // For weekly periods with calendar alignment, end on Sunday
+          return endOfWeek(date, { weekStartsOn: 1 }).toISOString();
+        case 'month':
+          // For monthly periods with calendar alignment, end on last day of month
+          return endOfMonth(date).toISOString();
+        default:
+          return addWeeks(date, 1).toISOString();
+      }
+    } else {
+      // Original behavior without calendar alignment
+      switch (duration) {
+        case 'day':
+          return addDays(date, 1).toISOString();
+        case 'week':
+          return addWeeks(date, 1).toISOString();
+        case 'month':
+          return addMonths(date, 1).toISOString();
+        default:
+          return addWeeks(date, 1).toISOString();
+      }
     }
   };
   
@@ -867,6 +903,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         scheduleAutoClose,
         calculateAutoCloseDate,
         getNextAutoCloseDate,
+        alignWithCalendar,
+        setAlignWithCalendar,
       }}
     >
       {children}

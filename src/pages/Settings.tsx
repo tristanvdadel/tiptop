@@ -40,7 +40,9 @@ const Settings = () => {
     currentPeriod,
     calculateAutoCloseDate,
     scheduleAutoClose,
-    getNextAutoCloseDate
+    getNextAutoCloseDate,
+    alignWithCalendar,
+    setAlignWithCalendar
   } = useApp();
 
   const [nextAutoCloseDate, setNextAutoCloseDate] = useState<string | null>(null);
@@ -70,6 +72,22 @@ const Settings = () => {
     if (checked && currentPeriod) {
       const newAutoCloseDate = calculateAutoCloseDate(currentPeriod.startDate, periodDuration);
       scheduleAutoClose(newAutoCloseDate);
+    }
+  };
+
+  const handleAlignWithCalendarToggle = (checked: boolean) => {
+    setAlignWithCalendar(checked);
+    
+    if (autoClosePeriods && currentPeriod) {
+      const newAutoCloseDate = calculateAutoCloseDate(currentPeriod.startDate, periodDuration);
+      scheduleAutoClose(newAutoCloseDate);
+      
+      toast({
+        title: checked ? "Kalenderuitlijning ingeschakeld" : "Kalenderuitlijning uitgeschakeld",
+        description: checked 
+          ? "Periodes worden nu uitgelijnd op de kalender (wekelijks tot zondag, maandelijks tot het einde van de maand)." 
+          : "Periodes worden niet meer uitgelijnd op de kalender.",
+      });
     }
   };
 
@@ -364,6 +382,25 @@ const Settings = () => {
               id="autoClosePeriods" 
               checked={autoClosePeriods} 
               onCheckedChange={handleAutoCloseToggle} 
+            />
+          </div>
+          
+          <Separator />
+          
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-4 w-4" />
+                <Label htmlFor="alignWithCalendar">Uitlijnen op kalender</Label>
+              </div>
+              <p className="text-sm text-muted-foreground ml-6 mt-1">
+                Wekelijks tot zondag, maandelijks tot einde van de maand
+              </p>
+            </div>
+            <Switch 
+              id="alignWithCalendar" 
+              checked={alignWithCalendar} 
+              onCheckedChange={handleAlignWithCalendarToggle} 
             />
           </div>
         </CardContent>

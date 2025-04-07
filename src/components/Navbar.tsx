@@ -50,12 +50,12 @@ const Navbar = () => {
   }, []);
   
   const navItems = [
-    { to: '/', icon: <Home size={20} />, label: 'Home' },
-    { to: '/periods', icon: <Calendar size={20} />, label: 'Periodes' },
-    { to: '/team', icon: <Users size={20} />, label: 'Team' },
-    { to: '/management', icon: <Shield size={20} />, label: 'Beheer' },
-    { to: '/analytics', icon: <BarChart size={20} />, label: 'Analyse' },
-    { to: '/settings', icon: <Settings size={20} />, label: 'Instellingen' },
+    { to: '/', icon: <Home size={20} className="text-amber-500" />, label: 'Home' },
+    { to: '/periods', icon: <Calendar size={20} className="text-amber-600" />, label: 'Periodes' },
+    { to: '/team', icon: <Users size={20} className="text-amber-700" />, label: 'Team' },
+    { to: '/management', icon: <Shield size={20} className="text-amber-800" />, label: 'Beheer' },
+    { to: '/analytics', icon: <BarChart size={20} className="text-amber-500" />, label: 'Analyse' },
+    { to: '/settings', icon: <Settings size={20} className="text-amber-600" />, label: 'Instellingen' },
   ];
 
   return (
@@ -105,3 +105,4 @@ const Navbar = () => {
 };
 
 export default Navbar;
+

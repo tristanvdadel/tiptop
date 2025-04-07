@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Sparkles, Coins } from 'lucide-react';
+import { Loader2, Coins } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -73,32 +73,26 @@ const Login = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary/10 via-secondary/20 to-accent/10 p-4 relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden opacity-50">
-        <Sparkles className="absolute top-12 left-24 text-primary/50 animate-pulse" size={24} />
-        <Sparkles className="absolute bottom-24 right-12 text-secondary/50 animate-pulse delay-500" size={32} />
-        <Sparkles className="absolute top-1/3 right-1/4 text-accent/50 animate-pulse delay-300" size={20} />
-      </div>
-
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary/20 via-secondary/30 to-amber-200/20 p-4 relative overflow-hidden">
       <div className="w-full max-w-md space-y-8 z-10">
         <div className="text-center flex flex-col items-center">
           <div className="flex items-center gap-2 mb-4">
-            <Coins className="h-10 w-10 text-primary animate-bounce" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary-foreground bg-clip-text text-transparent animate-pulse">TipTop</h1>
+            <Coins className="h-10 w-10 text-amber-500 animate-bounce" />
+            <h1 className="text-4xl font-bold text-gradient bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">TipTop</h1>
           </div>
-          <p className="text-muted-foreground mt-2 animate-fade-in">Beheer en verdeel fooi voor teams</p>
+          <p className="text-muted-foreground mt-2">Beheer en verdeel fooi voor teams</p>
         </div>
         
         <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-secondary/30 to-secondary/50 backdrop-blur-sm">
-            <TabsTrigger value="login" className="rounded-md hover:bg-secondary/50 transition-colors">Inloggen</TabsTrigger>
-            <TabsTrigger value="register" className="rounded-md hover:bg-secondary/50 transition-colors">Registreren</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-amber-500/30 to-amber-600/50 backdrop-blur-sm">
+            <TabsTrigger value="login" className="data-[state=active]:bg-white/20 data-[state=active]:text-amber-900 rounded-md hover:bg-amber-600/50 transition-colors">Inloggen</TabsTrigger>
+            <TabsTrigger value="register" className="data-[state=active]:bg-white/20 data-[state=active]:text-amber-900 rounded-md hover:bg-amber-600/50 transition-colors">Registreren</TabsTrigger>
           </TabsList>
           
           <TabsContent value="login">
-            <Card className="bg-white/30 backdrop-blur-lg border-border/20 shadow-lg hover:shadow-purple-300/30 transition-shadow">
+            <Card className="bg-white/50 backdrop-blur-lg border-amber-500/20 shadow-lg hover:shadow-amber-300/30 transition-shadow">
               <CardHeader>
-                <CardTitle>Inloggen</CardTitle>
+                <CardTitle className="text-amber-800">Inloggen</CardTitle>
                 <CardDescription>
                   Vul je gegevens in om in te loggen bij je account
                 </CardDescription>
@@ -107,15 +101,17 @@ const Login = () => {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="email">E-mail</Label>
-                    <Input id="email" type="email" placeholder="naam@voorbeeld.nl" required value={email} onChange={e => setEmail(e.target.value)} />
+                    <Input id="email" type="email" placeholder="naam@voorbeeld.nl" required value={email} onChange={e => setEmail(e.target.value)} 
+                      className="border-amber-200 focus-visible:ring-amber-500" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">Wachtwoord</Label>
-                    <Input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} />
+                    <Input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} 
+                      className="border-amber-200 focus-visible:ring-amber-500" />
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white" disabled={loading}>
                     {loading ? <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Bezig met inloggen...
@@ -127,9 +123,9 @@ const Login = () => {
           </TabsContent>
           
           <TabsContent value="register">
-            <Card className="bg-white/30 backdrop-blur-lg border-border/20 shadow-lg hover:shadow-pink-300/30 transition-shadow">
+            <Card className="bg-white/50 backdrop-blur-lg border-amber-500/20 shadow-lg hover:shadow-amber-300/30 transition-shadow">
               <CardHeader>
-                <CardTitle>Nieuw account</CardTitle>
+                <CardTitle className="text-amber-800">Nieuw account</CardTitle>
                 <CardDescription>
                   Maak een account aan om fooi te beheren
                 </CardDescription>
@@ -138,18 +134,20 @@ const Login = () => {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="registerEmail">E-mail</Label>
-                    <Input id="registerEmail" type="email" placeholder="naam@voorbeeld.nl" required value={email} onChange={e => setEmail(e.target.value)} />
+                    <Input id="registerEmail" type="email" placeholder="naam@voorbeeld.nl" required value={email} onChange={e => setEmail(e.target.value)} 
+                      className="border-amber-200 focus-visible:ring-amber-500" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="registerPassword">Wachtwoord</Label>
-                    <Input id="registerPassword" type="password" required value={password} onChange={e => setPassword(e.target.value)} />
+                    <Input id="registerPassword" type="password" required value={password} onChange={e => setPassword(e.target.value)} 
+                      className="border-amber-200 focus-visible:ring-amber-500" />
                     <p className="text-xs text-muted-foreground">
                       Wachtwoord moet minimaal 6 tekens bevatten
                     </p>
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white" disabled={loading}>
                     {loading ? <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Account aanmaken...

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { addDays, addWeeks, addMonths } from 'date-fns';
 
 // Define types
 export type TeamMember = {
@@ -36,6 +37,7 @@ export type Period = {
   totalTip?: number;
   isPaid?: boolean; // Track if the period has been paid out
   notes?: string; // Added notes field
+  autoCloseDate?: string; // Added auto-close date
 };
 
 export type PayoutData = {
@@ -49,12 +51,16 @@ export type PayoutData = {
   }[];
 };
 
+export type PeriodDuration = 'day' | 'week' | 'month';
+
 type AppContextType = {
   // State
   currentPeriod: Period | null;
   periods: Period[];
   teamMembers: TeamMember[];
   payouts: PayoutData[];
+  autoClosePeriods: boolean;
+  periodDuration: PeriodDuration;
   
   // Actions
   addTip: (amount: number, note?: string, customDate?: string) => void;
@@ -67,7 +73,7 @@ type AppContextType = {
   calculateAverageTipPerHour: (periodId?: string, calculationMode?: 'period' | 'day' | 'week' | 'month') => number;
   markPeriodsAsPaid: (periodIds: string[], customDistribution?: PayoutData['distribution']) => void;
   hasReachedLimit: () => boolean;
-  hasReachedPeriodLimit: () => boolean; // Added missing property
+  hasReachedPeriodLimit: () => boolean;
   getUnpaidPeriodsCount: () => number;
   deletePaidPeriods: () => void;
   deletePeriod: (periodId: string) => void;
@@ -80,6 +86,11 @@ type AppContextType = {
   updateTeamMemberName: (memberId: string, newName: string) => boolean;
   mostRecentPayout: PayoutData | null;
   setMostRecentPayout: (payout: PayoutData | null) => void;
+  setAutoClosePeriods: (value: boolean) => void;
+  setPeriodDuration: (value: PeriodDuration) => void;
+  scheduleAutoClose: (date: string) => void;
+  calculateAutoCloseDate: (startDate: string, duration: PeriodDuration) => string;
+  getNextAutoCloseDate: () => string | null;
 };
 
 // Define app limits
@@ -97,12 +108,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [payouts, setPayouts] = useState<PayoutData[]>([]);
   const [mostRecentPayout, setMostRecentPayout] = useState<PayoutData | null>(null);
+  const [autoClosePeriods, setAutoClosePeriods] = useState<boolean>(true);
+  const [periodDuration, setPeriodDuration] = useState<PeriodDuration>('week');
   const { toast } = useToast();
 
   useEffect(() => {
     const storedPeriods = localStorage.getItem('periods');
     const storedTeamMembers = localStorage.getItem('teamMembers');
     const storedPayouts = localStorage.getItem('payouts');
+    const storedAutoClosePeriods = localStorage.getItem('autoClosePeriods');
+    const storedPeriodDuration = localStorage.getItem('periodDuration');
     
     if (storedPeriods) {
       const parsedPeriods = JSON.parse(storedPeriods);
@@ -121,6 +136,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (storedPayouts) {
       setPayouts(JSON.parse(storedPayouts));
     }
+    
+    if (storedAutoClosePeriods !== null) {
+      setAutoClosePeriods(JSON.parse(storedAutoClosePeriods));
+    }
+    
+    if (storedPeriodDuration) {
+      setPeriodDuration(JSON.parse(storedPeriodDuration) as PeriodDuration);
+    }
   }, []);
 
   useEffect(() => {
@@ -134,9 +157,86 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     localStorage.setItem('payouts', JSON.stringify(payouts));
   }, [payouts]);
+  
+  useEffect(() => {
+    localStorage.setItem('autoClosePeriods', JSON.stringify(autoClosePeriods));
+  }, [autoClosePeriods]);
+  
+  useEffect(() => {
+    localStorage.setItem('periodDuration', JSON.stringify(periodDuration));
+  }, [periodDuration]);
+  
+  // Check for auto-close periods
+  useEffect(() => {
+    if (!autoClosePeriods || !currentPeriod) return;
+    
+    const checkAutoClose = () => {
+      if (currentPeriod && currentPeriod.autoCloseDate) {
+        const autoCloseDate = new Date(currentPeriod.autoCloseDate);
+        const now = new Date();
+        
+        if (now >= autoCloseDate) {
+          endCurrentPeriod();
+          startNewPeriod();
+          toast({
+            title: "Periode automatisch afgesloten",
+            description: `De vorige periode is automatisch afgesloten op basis van je instellingen.`,
+          });
+        }
+      }
+    };
+    
+    // Check initially
+    checkAutoClose();
+    
+    // Set up interval to check every minute
+    const interval = setInterval(checkAutoClose, 60000);
+    
+    return () => clearInterval(interval);
+  }, [currentPeriod, autoClosePeriods]);
 
   const generateId = () => {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  };
+  
+  const calculateAutoCloseDate = (startDate: string, duration: PeriodDuration): string => {
+    const date = new Date(startDate);
+    
+    switch (duration) {
+      case 'day':
+        return addDays(date, 1).toISOString();
+      case 'week':
+        return addWeeks(date, 1).toISOString();
+      case 'month':
+        return addMonths(date, 1).toISOString();
+      default:
+        return addWeeks(date, 1).toISOString();
+    }
+  };
+  
+  const scheduleAutoClose = (date: string) => {
+    if (!currentPeriod) return;
+    
+    const updatedPeriod = {
+      ...currentPeriod,
+      autoCloseDate: date
+    };
+    
+    setCurrentPeriod(updatedPeriod);
+    
+    setPeriods(prev => 
+      prev.map(p => p.id === updatedPeriod.id ? updatedPeriod : p)
+    );
+    
+    toast({
+      title: "Automatisch afsluiten gepland",
+      description: `Deze periode wordt automatisch afgesloten op de ingestelde datum.`,
+    });
+  };
+  
+  const getNextAutoCloseDate = (): string | null => {
+    if (!currentPeriod || !currentPeriod.autoCloseDate) return null;
+    return currentPeriod.autoCloseDate;
   };
 
   const addTip = (amount: number, note?: string, customDate?: string) => {
@@ -353,16 +453,31 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       endCurrentPeriod();
     }
     
+    const startDate = new Date().toISOString();
+    let autoCloseDate = null;
+    
+    if (autoClosePeriods) {
+      autoCloseDate = calculateAutoCloseDate(startDate, periodDuration);
+    }
+    
     const newPeriod: Period = {
       id: generateId(),
-      startDate: new Date().toISOString(),
+      startDate,
       isActive: true,
       tips: [],
       isPaid: false,
+      ...(autoCloseDate && { autoCloseDate }),
     };
     
     setCurrentPeriod(newPeriod);
     setPeriods(prev => [...prev, newPeriod]);
+    
+    if (autoCloseDate) {
+      toast({
+        title: "Nieuwe periode gestart",
+        description: `Deze periode wordt automatisch afgesloten op ${new Date(autoCloseDate).toLocaleDateString('nl-NL')}.`,
+      });
+    }
   };
 
   const endCurrentPeriod = () => {
@@ -729,6 +844,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         updateTeamMemberBalance,
         clearTeamMemberHours,
         updateTeamMemberName,
+        autoClosePeriods,
+        setAutoClosePeriods,
+        periodDuration,
+        setPeriodDuration,
+        scheduleAutoClose,
+        calculateAutoCloseDate,
+        getNextAutoCloseDate,
       }}
     >
       {children}

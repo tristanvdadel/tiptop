@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,6 +14,9 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { useApp, PeriodDuration } from "@/contexts/AppContext";
+import { format } from "date-fns";
+import { nl } from "date-fns/locale";
 
 const Settings = () => {
   const {
@@ -28,9 +30,48 @@ const Settings = () => {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userName, setUserName] = useState("Gebruiker");
   const [userEmail] = useState("gebruiker@example.com");
-  const [periodDuration, setPeriodDuration] = useState("week");
-  const [autoClosePeriods, setAutoClosePeriods] = useState(true);
   const navigate = useNavigate();
+  
+  const { 
+    periodDuration, 
+    setPeriodDuration, 
+    autoClosePeriods, 
+    setAutoClosePeriods,
+    currentPeriod,
+    calculateAutoCloseDate,
+    scheduleAutoClose,
+    getNextAutoCloseDate
+  } = useApp();
+
+  const [nextAutoCloseDate, setNextAutoCloseDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    const autoCloseDate = getNextAutoCloseDate();
+    if (autoCloseDate) {
+      setNextAutoCloseDate(format(new Date(autoCloseDate), 'd MMMM yyyy', { locale: nl }));
+    } else {
+      setNextAutoCloseDate(null);
+    }
+  }, [getNextAutoCloseDate, currentPeriod]);
+
+  const handlePeriodDurationChange = (value: string) => {
+    const newDuration = value as PeriodDuration;
+    setPeriodDuration(newDuration);
+    
+    if (autoClosePeriods && currentPeriod) {
+      const newAutoCloseDate = calculateAutoCloseDate(currentPeriod.startDate, newDuration);
+      scheduleAutoClose(newAutoCloseDate);
+    }
+  };
+
+  const handleAutoCloseToggle = (checked: boolean) => {
+    setAutoClosePeriods(checked);
+    
+    if (checked && currentPeriod) {
+      const newAutoCloseDate = calculateAutoCloseDate(currentPeriod.startDate, periodDuration);
+      scheduleAutoClose(newAutoCloseDate);
+    }
+  };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -290,7 +331,10 @@ const Settings = () => {
               <Calendar className="h-4 w-4" />
               <Label htmlFor="periodDuration">Periode duur</Label>
             </div>
-            <Select defaultValue={periodDuration} onValueChange={setPeriodDuration}>
+            <Select 
+              value={periodDuration} 
+              onValueChange={handlePeriodDurationChange}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Selecteer duur" />
               </SelectTrigger>
@@ -305,14 +349,21 @@ const Settings = () => {
           <Separator />
           
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4" />
-              <Label htmlFor="autoClosePeriods">Automatisch periodes afsluiten</Label>
+            <div className="flex flex-col">
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-4 w-4" />
+                <Label htmlFor="autoClosePeriods">Automatisch periodes afsluiten</Label>
+              </div>
+              {autoClosePeriods && nextAutoCloseDate && (
+                <p className="text-sm text-muted-foreground ml-6 mt-1">
+                  Huidige periode sluit op: {nextAutoCloseDate}
+                </p>
+              )}
             </div>
             <Switch 
               id="autoClosePeriods" 
               checked={autoClosePeriods} 
-              onCheckedChange={setAutoClosePeriods} 
+              onCheckedChange={handleAutoCloseToggle} 
             />
           </div>
         </CardContent>

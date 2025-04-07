@@ -8,12 +8,12 @@ import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Users } from "lucide-react";
+import { AlertCircle, Users, Calendar } from "lucide-react";
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
 const Index = () => {
-  const { currentPeriod } = useApp();
+  const { currentPeriod, autoClosePeriods } = useApp();
   const [hasTeam, setHasTeam] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -87,12 +87,21 @@ const Index = () => {
         </div>
         
         <div>
-          <h2 className="text-lg font-medium mb-4">
-            Recente fooi
-            {currentPeriod && (
-              <span className="text-sm font-normal text-muted-foreground ml-2">
-                {currentPeriod.name ? currentPeriod.name : `Periode ${formatPeriodDate(currentPeriod.startDate)}`}
-              </span>
+          <h2 className="text-lg font-medium mb-4 flex items-center justify-between">
+            <div>
+              Recente fooi
+              {currentPeriod && (
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  {currentPeriod.name ? currentPeriod.name : `Periode ${formatPeriodDate(currentPeriod.startDate)}`}
+                </span>
+              )}
+            </div>
+            
+            {currentPeriod && autoClosePeriods && currentPeriod.autoCloseDate && (
+              <div className="text-sm flex items-center text-muted-foreground">
+                <Calendar className="h-4 w-4 mr-1" />
+                Sluit op: {formatPeriodDate(currentPeriod.autoCloseDate)}
+              </div>
             )}
           </h2>
           

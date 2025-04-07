@@ -1,152 +1,98 @@
-import { useState, useEffect } from 'react';
-import { formatDistanceToNow } from 'date-fns';
-import { nl } from 'date-fns/locale';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Pencil, Trash2 } from 'lucide-react';
-import { TipEntry, useApp } from '@/contexts/AppContext';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import EditTipDialog from './EditTipDialog';
-import { useToast } from "@/hooks/use-toast";
-import { supabase, TeamMemberPermissions } from "@/integrations/supabase/client";
 
-interface TipCardProps {
-  tip: TipEntry;
-  periodId?: string; // Optional: if not provided, will use currentPeriod
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Check, ArrowLeft } from 'lucide-react';
+import { useApp } from '@/contexts/AppContext';
+
+interface PayoutSummaryProps {
+  onClose: () => void;
 }
 
-const TipCard = ({ tip, periodId }: TipCardProps) => {
-  const { currentPeriod, deleteTip, updateTip } = useApp();
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [hasEditPermission, setHasEditPermission] = useState(false);
-  const { toast } = useToast();
+export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
+  const { payouts, teamMembers } = useApp();
   
-  const actualPeriodId = periodId || (currentPeriod ? currentPeriod.id : '');
+  // Get the most recent payout
+  const latestPayout = payouts.length > 0 ? payouts[payouts.length - 1] : null;
   
-  const formattedDate = formatDistanceToNow(new Date(tip.date), {
-    addSuffix: true,
-    locale: nl,
-  });
-
-  useEffect(() => {
-    const checkPermissions = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        
-        const { data: teamMemberships } = await supabase
-          .from('team_members')
-          .select('permissions, role')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (teamMemberships) {
-          // Admin always has permission, otherwise check edit_tips permission
-          const isAdmin = teamMemberships.role === 'admin';
-          const permissions = teamMemberships.permissions as TeamMemberPermissions;
-          const canEditTips = permissions?.edit_tips === true;
-          
-          setHasEditPermission(isAdmin || canEditTips);
-        }
-      } catch (error) {
-        console.error('Error checking permissions:', error);
-      }
-    };
-    
-    checkPermissions();
-  }, []);
-
-  const handleDelete = () => {
-    if (!actualPeriodId) {
-      toast({
-        title: "Fout bij verwijderen",
-        description: "Kan fooi niet verwijderen: geen periode gevonden.",
-        variant: "destructive",
-      });
-      return;
-    }
-    deleteTip(actualPeriodId, tip.id);
-    setIsDeleteDialogOpen(false);
-    toast({
-      title: "Fooi verwijderd",
-      description: "De fooi is succesvol verwijderd.",
-    });
+  // Function to find a team member by ID
+  const findTeamMember = (id: string) => {
+    return teamMembers.find(member => member.id === id);
   };
-
+  
   return (
-    <>
-      <Card className="mb-3 relative group">
-        <CardContent className="p-4">
-          <div className="flex justify-between items-center">
+    <Card className="w-full max-w-3xl mx-auto">
+      <CardHeader className="border-b">
+        <CardTitle className="text-xl flex items-center">
+          <Check className="h-5 w-5 mr-2 text-green-500" />
+          Uitbetaling succesvol
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-6">
+        {latestPayout ? (
+          <div className="space-y-6">
             <div>
-              <p className="text-lg font-medium">€{tip.amount.toFixed(2)}</p>
-              <p className="text-sm text-muted-foreground">{formattedDate}</p>
-              {tip.note && <p className="text-sm mt-1">{tip.note}</p>}
+              <h3 className="font-medium mb-2">Uitbetaling details:</h3>
+              <p className="text-sm text-muted-foreground">
+                Uitbetaald op: {new Date(latestPayout.date).toLocaleDateString('nl')}
+              </p>
+              {latestPayout.periodIds && latestPayout.periodIds.length > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Aantal periodes: {latestPayout.periodIds.length}
+                </p>
+              )}
             </div>
             
-            {hasEditPermission && (
-              <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-8 w-8" 
-                  onClick={() => setIsEditDialogOpen(true)}
-                  aria-label="Bewerk fooi"
-                >
-                  <Pencil size={16} />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-8 w-8 text-destructive hover:text-destructive" 
-                  onClick={() => setIsDeleteDialogOpen(true)}
-                  aria-label="Verwijder fooi"
-                >
-                  <Trash2 size={16} />
-                </Button>
+            {latestPayout.distribution && latestPayout.distribution.length > 0 && (
+              <div>
+                <h3 className="font-medium mb-3">Verdeling:</h3>
+                <div className="space-y-2">
+                  {latestPayout.distribution.map((item, index) => {
+                    const member = findTeamMember(item.memberId);
+                    return (
+                      <div key={index} className="flex justify-between p-2 bg-muted/50 rounded-md">
+                        <span>{member ? member.name : 'Onbekend teamlid'}</span>
+                        <span className="font-medium">€{item.amount.toFixed(2)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <div className="mt-4 pt-4 border-t flex justify-between">
+                  <span className="font-medium">Totaal</span>
+                  <span className="font-medium">
+                    €{latestPayout.distribution.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}
+                  </span>
+                </div>
               </div>
             )}
+            
+            <div className="bg-green-50 border border-green-200 p-4 rounded-md text-green-800 mt-4">
+              <p className="flex items-center">
+                <Check className="h-5 w-5 mr-2" />
+                Alle geselecteerde periodes zijn gemarkeerd als uitbetaald.
+              </p>
+            </div>
           </div>
-        </CardContent>
-      </Card>
-      
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Fooi verwijderen</AlertDialogTitle>
-            <AlertDialogDescription>
-              Weet je zeker dat je deze fooi van €{tip.amount.toFixed(2)} wilt verwijderen? 
-              Deze actie kan niet ongedaan worden gemaakt.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuleren</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
-              Verwijderen
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      
-      <EditTipDialog
-        isOpen={isEditDialogOpen}
-        onClose={() => setIsEditDialogOpen(false)}
-        tip={tip}
-        periodId={actualPeriodId}
-        onSave={updateTip}
-      />
-    </>
+        ) : (
+          <div className="text-center py-6">
+            <p>Geen recente uitbetaling gevonden.</p>
+          </div>
+        )}
+        
+        <div className="mt-8">
+          <Button 
+            onClick={onClose}
+            className="w-full"
+            variant="outline"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Terug naar team overzicht
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
-export default TipCard;
+export default PayoutSummary;

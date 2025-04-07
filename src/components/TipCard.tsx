@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -53,7 +54,8 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
         if (teamMemberships) {
           // Admin always has permission, otherwise check edit_tips permission
           const isAdmin = teamMemberships.role === 'admin';
-          const permissions = teamMemberships.permissions as TeamMemberPermissions;
+          // Safely cast the JSON permissions to our type
+          const permissions = teamMemberships.permissions as unknown as TeamMemberPermissions;
           const canEditTips = permissions?.edit_tips === true;
           
           setHasEditPermission(isAdmin || canEditTips);

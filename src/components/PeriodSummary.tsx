@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Pencil, Plus, Info, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ const PeriodSummary = () => {
     currentPeriod,
     updatePeriod,
     startNewPeriod,
+    endCurrentPeriod,
     hasReachedPeriodLimit
   } = useApp();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -77,6 +78,16 @@ const PeriodSummary = () => {
     });
   };
 
+  const handleEndCurrentPeriod = () => {
+    if (currentPeriod) {
+      endCurrentPeriod();
+      toast({
+        title: "Periode afgerond",
+        description: "De periode is succesvol afgerond.",
+      });
+    }
+  };
+
   if (!currentPeriod) {
     return (
       <Card>
@@ -103,6 +114,13 @@ const PeriodSummary = () => {
   const startDate = format(new Date(currentPeriod.startDate), 'd MMMM yyyy', {
     locale: nl
   });
+  
+  // Calculate auto-closing date (30 days after start)
+  const autoCloseDate = format(
+    addDays(new Date(currentPeriod.startDate), 30), 
+    'd MMMM yyyy', 
+    { locale: nl }
+  );
 
   return <>
     <Card className="border-[#9b87f5]/30 bg-[#9b87f5]/5">
@@ -152,6 +170,13 @@ const PeriodSummary = () => {
             <span className="text-muted-foreground">Aantal invoeren</span>
             <span>{currentPeriod.tips.length}</span>
           </div>
+          <div className="flex justify-between text-amber-600 dark:text-amber-500">
+            <span className="flex items-center gap-1 text-sm">
+              <Info size={14} />
+              Auto-sluiting
+            </span>
+            <span className="text-sm">{autoCloseDate}</span>
+          </div>
         </div>
         
         {currentPeriod.tips.length === 0 && (
@@ -166,7 +191,7 @@ const PeriodSummary = () => {
         <Button 
           variant="outline" 
           className="w-full border-[#9b87f5]/30 text-[#9b87f5] hover:bg-[#9b87f5]/10 mt-2"
-          onClick={() => {}}
+          onClick={handleEndCurrentPeriod}
         >
           Periode afronden
         </Button>

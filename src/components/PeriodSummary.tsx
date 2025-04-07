@@ -105,11 +105,16 @@ const PeriodSummary = () => {
   });
 
   return <>
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex justify-between items-center">
+    <Card className="border-[#9b87f5]/30 bg-[#9b87f5]/5">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex justify-between items-center text-base">
           <div className="flex items-center gap-2">
-            <span>{currentPeriod.name || "Huidige periode"}</span>
+            <span className="flex items-center">
+              <span className="text-xs px-2 py-0.5 bg-tier-free/10 text-tier-free rounded-full mr-2">
+                Actief
+              </span>
+              {currentPeriod.name || "Huidige periode"}
+            </span>
             {currentPeriod && (
               <TooltipProvider>
                 <Tooltip>
@@ -130,27 +135,41 @@ const PeriodSummary = () => {
               </TooltipProvider>
             )}
           </div>
-          <span className="text-sm font-normal text-muted-foreground">Gestart: {startDate}</span>
+          <span className="text-sm font-normal text-muted-foreground">
+            Gestart: {startDate}
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div>
-          <h3 className="text-lg font-medium mb-2">Totaal fooi: €{totalTip.toFixed(2)}</h3>
-          <p className="text-sm text-muted-foreground mb-3">
-            {currentPeriod.tips.length > 0 
-              ? `${currentPeriod.tips.length} fooi invoer(en) in deze periode` 
-              : "Nog geen fooien in deze periode. Voeg fooien toe via het formulier."}
-          </p>
-          
-          {currentPeriod.tips.length === 0 && (
-            <Alert className="mt-2 bg-muted/50 border-muted">
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                Je kunt fooien invoeren via het formulier hieronder.
-              </AlertDescription>
-            </Alert>
-          )}
+        <div className="space-y-2 mb-4">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Totaal fooi</span>
+            <span className="font-medium">
+              €{totalTip.toFixed(2)}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Aantal invoeren</span>
+            <span>{currentPeriod.tips.length}</span>
+          </div>
         </div>
+        
+        {currentPeriod.tips.length === 0 && (
+          <Alert className="mt-2 bg-muted/50 border-muted">
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Je kunt fooien invoeren via het formulier hieronder.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <Button 
+          variant="outline" 
+          className="w-full border-[#9b87f5]/30 text-[#9b87f5] hover:bg-[#9b87f5]/10 mt-2"
+          onClick={() => {}}
+        >
+          Periode afronden
+        </Button>
       </CardContent>
     </Card>
 

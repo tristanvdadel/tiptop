@@ -62,7 +62,7 @@ const Navbar = () => {
     <header className="bg-background border-b">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <div className="flex items-center">
-          <h1 className="text-2xl font-bold mr-2">TipTop</h1>
+          <h1 className="text-2xl font-bold mr-2 bg-gradient-to-r from-amber-500 to-amber-400 bg-clip-text text-transparent">TipTop</h1>
           {teamName && (
             <span className="text-sm ml-1 font-medium text-muted-foreground">
               | {teamName}
@@ -90,7 +90,7 @@ const Navbar = () => {
               className={cn(
                 "flex flex-col items-center py-2 px-4 text-xs w-1/6",
                 location.pathname === item.to
-                  ? "text-foreground font-medium"
+                  ? "text-amber-500 font-medium"
                   : "text-muted-foreground"
               )}
             >

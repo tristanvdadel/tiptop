@@ -34,6 +34,11 @@
     --ring: 222.2 84% 4.9%;
  
     --radius: 0.5rem;
+    
+    /* Gold theme colors */
+    --gold-primary: 45 100% 50%;
+    --gold-secondary: 43 100% 55%;
+    --gold-accent: 40 100% 60%;
   }
  
   .dark {
@@ -64,6 +69,11 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+    
+    /* Gold theme colors in dark mode */
+    --gold-primary: 45 80% 50%;
+    --gold-secondary: 43 70% 45%;
+    --gold-accent: 40 60% 40%;
   }
 }
  
@@ -84,5 +94,13 @@
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+  
+  .gold-gradient-text {
+    @apply bg-gradient-to-r from-amber-500 to-amber-400 bg-clip-text text-transparent;
+  }
+  
+  .gold-gradient-bg {
+    @apply bg-gradient-to-r from-amber-400 to-amber-300;
   }
 }

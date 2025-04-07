@@ -1,3 +1,4 @@
+
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Calendar, Users, BarChart, Zap, Settings, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -56,7 +57,7 @@ const Navbar = () => {
   ];
 
   return (
-    <header className="bg-yellow-400 border-b border-yellow-500">
+    <header className="bg-yellow-200 border-b border-yellow-300">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <div className="flex items-center">
           <h1 className="text-2xl font-bold mr-2 text-black">TipTop</h1>
@@ -70,7 +71,7 @@ const Navbar = () => {
           <Link to="/fast-tip">
             <Button 
               variant="default" 
-              className="bg-yellow-500 text-black hover:bg-yellow-600"
+              className="bg-yellow-300 text-black hover:bg-yellow-400"
             >
               <Zap size={16} className="mr-1 text-black" /> 
               <span>FastTip</span>
@@ -79,7 +80,7 @@ const Navbar = () => {
         </div>
       </div>
       
-      <nav className="fixed bottom-0 left-0 right-0 bg-yellow-400 border-t z-50">
+      <nav className="fixed bottom-0 left-0 right-0 bg-yellow-200 border-t z-50">
         <div className="flex justify-around items-center">
           {navItems.map((item) => (
             <Link
@@ -88,7 +89,7 @@ const Navbar = () => {
               className={cn(
                 "flex flex-col items-center py-2 px-4 text-xs w-1/6",
                 location.pathname === item.to
-                  ? "bg-yellow-500 text-black font-medium"
+                  ? "bg-yellow-300 text-black font-medium"
                   : "text-black/70"
               )}
             >

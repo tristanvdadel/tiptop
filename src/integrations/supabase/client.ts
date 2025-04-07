@@ -30,20 +30,22 @@ export interface Team {
   created_at: string;
 }
 
+export interface TeamMemberPermissions {
+  add_tips: boolean;
+  add_hours: boolean;
+  view_team: boolean;
+  view_reports: boolean;
+  edit_tips: boolean;
+  close_periods: boolean;
+  manage_payouts: boolean;
+}
+
 export interface TeamMember {
   id: string;
   team_id: string;
   user_id: string;
   role: string;
-  permissions: {
-    add_tips: boolean;
-    add_hours: boolean;
-    view_team: boolean;
-    view_reports: boolean;
-    edit_tips: boolean;     // New permission for editing tips
-    close_periods: boolean; // New permission for closing periods
-    manage_payouts: boolean; // New permission for managing payouts
-  };
+  permissions: TeamMemberPermissions;
   created_at: string;
   profile?: {
     first_name: string | null;
@@ -61,13 +63,5 @@ export interface Invite {
   created_by: string;
   created_at: string;
   expires_at: string;
-  permissions: {
-    add_tips: boolean;
-    add_hours: boolean;
-    view_team: boolean;
-    view_reports: boolean;
-    edit_tips: boolean;     // New permission for editing tips
-    close_periods: boolean; // New permission for closing periods
-    manage_payouts: boolean; // New permission for managing payouts
-  };
+  permissions: TeamMemberPermissions;
 }

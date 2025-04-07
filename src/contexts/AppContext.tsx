@@ -272,10 +272,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (alignWithCalendar) {
       switch (duration) {
         case 'day':
-          // For daily periods with calendar alignment, end at midnight
-          const nextDay = addDays(date, 1);
-          nextDay.setHours(0, 0, 0, 0);
-          targetDate = nextDay;
+          // For daily periods with calendar alignment, end at the end of the current day
+          targetDate = new Date(date);
+          targetDate.setHours(23, 59, 59, 999);
           break;
         case 'week':
           // For weekly periods with calendar alignment, end on Sunday
@@ -292,7 +291,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       // Original behavior without calendar alignment
       switch (duration) {
         case 'day':
-          targetDate = addDays(date, 1);
+          // For daily periods, end at the specified time on the SAME day
+          targetDate = new Date(date);
           break;
         case 'week':
           targetDate = addWeeks(date, 1);
@@ -305,20 +305,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     
-    // Apply custom closing time, adjusting the day if needed
+    // Apply custom closing time, adjusting the date correctly
     const { hour, minute } = closingTime;
     
-    // For morning hours (AM), move to next day if using AM times (0-11:59)
-    if (hour < 12) {
-      targetDate = addDays(targetDate, 1);
-    }
+    // Set the target date's time to the specified closing time
+    targetDate.setHours(hour, minute, 0, 0);
     
-    targetDate = set(targetDate, { 
-      hours: hour, 
-      minutes: minute,
-      seconds: 0,
-      milliseconds: 0
-    });
+    // If the resulting datetime is earlier than now (for same-day periods),
+    // then we need to ensure we're not setting it in the past
+    const now = new Date();
+    if (duration === 'day' && targetDate < now) {
+      // If we're creating a period and the closing time has already passed today,
+      // then set the close time to tomorrow at the specified time
+      targetDate.setDate(targetDate.getDate() + 1);
+    }
     
     return targetDate.toISOString();
   };

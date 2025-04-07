@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -18,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import EditTipDialog from './EditTipDialog';
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, TeamMemberPermissions } from "@/integrations/supabase/client";
 
 interface TipCardProps {
   tip: TipEntry;
@@ -54,7 +53,8 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
         if (teamMemberships) {
           // Admin always has permission, otherwise check edit_tips permission
           const isAdmin = teamMemberships.role === 'admin';
-          const canEditTips = teamMemberships.permissions?.edit_tips === true;
+          const permissions = teamMemberships.permissions as TeamMemberPermissions;
+          const canEditTips = permissions?.edit_tips === true;
           
           setHasEditPermission(isAdmin || canEditTips);
         }

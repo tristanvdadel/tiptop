@@ -120,29 +120,56 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const storedPeriodDuration = localStorage.getItem('periodDuration');
     
     if (storedPeriods) {
-      const parsedPeriods = JSON.parse(storedPeriods);
-      setPeriods(parsedPeriods);
-      
-      const active = parsedPeriods.find((p: Period) => p.isActive);
-      if (active) {
-        setCurrentPeriod(active);
+      try {
+        const parsedPeriods = JSON.parse(storedPeriods);
+        setPeriods(parsedPeriods);
+        
+        const active = parsedPeriods.find((p: Period) => p.isActive);
+        if (active) {
+          setCurrentPeriod(active);
+        }
+      } catch (error) {
+        console.error("Error parsing periods from localStorage:", error);
       }
     }
     
     if (storedTeamMembers) {
-      setTeamMembers(JSON.parse(storedTeamMembers));
+      try {
+        setTeamMembers(JSON.parse(storedTeamMembers));
+      } catch (error) {
+        console.error("Error parsing teamMembers from localStorage:", error);
+      }
     }
     
     if (storedPayouts) {
-      setPayouts(JSON.parse(storedPayouts));
+      try {
+        setPayouts(JSON.parse(storedPayouts));
+      } catch (error) {
+        console.error("Error parsing payouts from localStorage:", error);
+      }
     }
     
     if (storedAutoClosePeriods !== null) {
-      setAutoClosePeriods(JSON.parse(storedAutoClosePeriods));
+      try {
+        setAutoClosePeriods(JSON.parse(storedAutoClosePeriods));
+      } catch (error) {
+        console.error("Error parsing autoClosePeriods from localStorage:", error);
+        setAutoClosePeriods(true); // Default to true if parsing fails
+      }
     }
     
     if (storedPeriodDuration) {
-      setPeriodDuration(JSON.parse(storedPeriodDuration) as PeriodDuration);
+      try {
+        const parsedDuration = JSON.parse(storedPeriodDuration);
+        if (parsedDuration === 'day' || parsedDuration === 'week' || parsedDuration === 'month') {
+          setPeriodDuration(parsedDuration);
+        } else {
+          setPeriodDuration('week'); // Default to week if invalid
+        }
+      } catch (error) {
+        console.error("Error parsing periodDuration from localStorage:", error);
+        setPeriodDuration('week'); // Default to week if parsing fails
+      }
     }
   }, []);
 
@@ -166,7 +193,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('periodDuration', JSON.stringify(periodDuration));
   }, [periodDuration]);
   
-  // Check for auto-close periods
   useEffect(() => {
     if (!autoClosePeriods || !currentPeriod) return;
     
@@ -186,10 +212,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     
-    // Check initially
     checkAutoClose();
     
-    // Set up interval to check every minute
     const interval = setInterval(checkAutoClose, 60000);
     
     return () => clearInterval(interval);
@@ -519,7 +543,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
     
     if (totalHours === 0) {
-      // If no hours, distribute evenly but consider existing balances
       const membersWithBalances = teamMembers.filter(member => 
         (member.balance !== undefined && member.balance !== 0) || member.hours > 0
       );
@@ -528,13 +551,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return [];
       }
       
-      // First, calculate total of existing balances
       const totalBalances = membersWithBalances.reduce(
         (sum, member) => sum + (member.balance || 0), 
         0
       );
       
-      // Distribute remaining tip amount (after subtracting balances) evenly
       const remainingTip = totalTip - totalBalances;
       const evenShare = remainingTip > 0 ? remainingTip / membersWithBalances.length : 0;
       
@@ -563,16 +584,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         break;
     }
     
-    // First, reserve the existing balances
     const totalBalances = teamMembers.reduce(
       (sum, member) => sum + (member.balance || 0), 
       0
     );
     
-    // Calculate the tip amount that should be distributed based on hours
     const tipToDistribute = totalTip;
     
-    // Calculate the distribution based on hours
     const initialDistribution = teamMembers.map(member => {
       const hourShare = totalHours > 0 
         ? (member.hours / totalHours) * tipToDistribute 
@@ -592,13 +610,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       };
     });
     
-    // Calculate the total after adjustment
     const totalAfterAdjustment = initialDistribution.reduce(
       (sum, member) => sum + (member.hourShare || 0), 
       0
     );
     
-    // Apply a scaling factor to ensure the total matches the original tip amount
     const scalingFactor = totalTip / totalAfterAdjustment;
     
     return initialDistribution.map(member => {

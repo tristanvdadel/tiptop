@@ -1,29 +1,42 @@
-
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { useApp } from '@/contexts/AppContext';
-import { History, FileText, Download } from 'lucide-react';
+import { History, FileText, Download, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
+type SortField = 'date' | 'calculatedAmount' | 'actualAmount';
+type SortDirection = 'asc' | 'desc';
+
 const PayoutHistory = () => {
   const { payouts, teamMembers } = useApp();
   const { toast } = useToast();
   const [selectedPayout, setSelectedPayout] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   
   const formatDate = (dateString: string): string => {
     try {
       return format(new Date(dateString), 'd MMMM yyyy HH:mm', { locale: nl });
     } catch (e) {
       return 'Ongeldige datum';
+    }
+  };
+
+  const handleSortClick = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
     }
   };
 
@@ -38,7 +51,6 @@ const PayoutHistory = () => {
     const payoutDate = formatDate(selectedPayout.date);
     const memberDetails = selectedPayout.distribution.map(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
-      // Use optional chaining to safely access actualAmount
       return `${member?.name || 'Onbekend lid'}: €${(item.actualAmount || item.amount).toFixed(2)}`;
     }).join('\n');
 
@@ -85,6 +97,41 @@ const PayoutHistory = () => {
     });
   };
 
+  const sortedPayouts = useMemo(() => {
+    if (!payouts || payouts.length === 0) return [];
+    
+    return [...payouts].sort((a, b) => {
+      let valueA, valueB;
+      
+      if (sortField === 'date') {
+        valueA = new Date(a.date).getTime();
+        valueB = new Date(b.date).getTime();
+      } else if (sortField === 'calculatedAmount') {
+        valueA = a.distribution.reduce((sum, dist) => sum + dist.amount, 0);
+        valueB = b.distribution.reduce((sum, dist) => sum + dist.amount, 0);
+      } else if (sortField === 'actualAmount') {
+        valueA = a.distribution.reduce((sum, dist) => sum + (dist.actualAmount || dist.amount), 0);
+        valueB = b.distribution.reduce((sum, dist) => sum + (dist.actualAmount || dist.amount), 0);
+      }
+      
+      if (sortDirection === 'asc') {
+        return valueA - valueB;
+      } else {
+        return valueB - valueA;
+      }
+    });
+  }, [payouts, sortField, sortDirection]);
+
+  const renderSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 ml-1" />;
+    }
+    
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 ml-1" /> 
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
+
   return (
     <>
       <Card className="w-full mb-6">
@@ -100,14 +147,38 @@ const PayoutHistory = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Datum</TableHead>
+                    <TableHead 
+                      onClick={() => handleSortClick('date')} 
+                      className="cursor-pointer hover:text-primary transition-colors"
+                    >
+                      <div className="flex items-center">
+                        Datum
+                        {renderSortIcon('date')}
+                      </div>
+                    </TableHead>
                     <TableHead>Periodes</TableHead>
-                    <TableHead className="text-right">Berekend bedrag</TableHead>
-                    <TableHead className="text-right">Uitbetaald</TableHead>
+                    <TableHead 
+                      className="text-right cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => handleSortClick('calculatedAmount')}
+                    >
+                      <div className="flex items-center justify-end">
+                        Berekend bedrag
+                        {renderSortIcon('calculatedAmount')}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="text-right cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => handleSortClick('actualAmount')}
+                    >
+                      <div className="flex items-center justify-end">
+                        Uitbetaald
+                        {renderSortIcon('actualAmount')}
+                      </div>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {payouts.map((payout, index) => {
+                  {sortedPayouts.map((payout, index) => {
                     const calculatedAmount = payout.distribution.reduce(
                       (sum, dist) => sum + dist.amount, 
                       0

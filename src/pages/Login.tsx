@@ -7,15 +7,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles, Coins } from 'lucide-react';
+
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
   const navigate = useNavigate();
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -41,6 +41,7 @@ const Login = () => {
       setLoading(false);
     }
   };
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -69,21 +70,32 @@ const Login = () => {
       setLoading(false);
     }
   };
-  return <div className="flex items-center justify-center min-h-screen bg-background p-4">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold">TipTop</h1>
-          <p className="text-muted-foreground mt-2">Beheer en verdeel fooi voor teams</p>
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary/10 via-secondary/20 to-accent/10 p-4 relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden opacity-50">
+        <Sparkles className="absolute top-12 left-24 text-amber-300 animate-pulse" size={24} />
+        <Sparkles className="absolute bottom-24 right-12 text-purple-300 animate-pulse delay-500" size={32} />
+        <Sparkles className="absolute top-1/3 right-1/4 text-blue-200 animate-pulse delay-300" size={20} />
+      </div>
+
+      <div className="w-full max-w-md space-y-8 z-10">
+        <div className="text-center flex flex-col items-center">
+          <div className="flex items-center gap-2 mb-4">
+            <Coins className="h-10 w-10 text-amber-500" />
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">TipTop</h1>
+          </div>
+          <p className="text-muted-foreground mt-2 animate-fade-in">Beheer en verdeel fooi voor teams</p>
         </div>
         
         <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">Inloggen</TabsTrigger>
-            <TabsTrigger value="register">Registreren</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 bg-secondary/30 backdrop-blur-sm">
+            <TabsTrigger value="login" className="rounded-md">Inloggen</TabsTrigger>
+            <TabsTrigger value="register" className="rounded-md">Registreren</TabsTrigger>
           </TabsList>
           
           <TabsContent value="login">
-            <Card>
+            <Card className="bg-white/30 backdrop-blur-lg border-border/20 shadow-lg">
               <CardHeader>
                 <CardTitle>Inloggen</CardTitle>
                 <CardDescription>
@@ -114,7 +126,7 @@ const Login = () => {
           </TabsContent>
           
           <TabsContent value="register">
-            <Card>
+            <Card className="bg-white/30 backdrop-blur-lg border-border/20 shadow-lg">
               <CardHeader>
                 <CardTitle>Nieuw account</CardTitle>
                 <CardDescription>
@@ -148,6 +160,8 @@ const Login = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default Login;

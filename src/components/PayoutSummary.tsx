@@ -1,32 +1,44 @@
-
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { useApp } from '@/contexts/AppContext';
-import { format } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { formatDistanceToNow } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { supabase } from "@/integrations/supabase/client";
-import type { TeamMemberPermissions } from "@/integrations/supabase/client";
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Pencil, Trash2 } from 'lucide-react';
+import { TipEntry, useApp } from '@/contexts/AppContext';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import EditTipDialog from './EditTipDialog';
+import { useToast } from "@/hooks/use-toast";
+import { supabase, TeamMemberPermissions } from "@/integrations/supabase/client";
 
-interface PayoutSummaryProps {
-  onClose: () => void;
+interface TipCardProps {
+  tip: TipEntry;
+  periodId?: string; // Optional: if not provided, will use currentPeriod
 }
 
-const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
-  const { payouts, periods, teamMembers } = useApp();
-  const [latestPayout, setLatestPayout] = useState<any>(null);
-  const [canManagePayouts, setCanManagePayouts] = useState(false);
+const TipCard = ({ tip, periodId }: TipCardProps) => {
+  const { currentPeriod, deleteTip, updateTip } = useApp();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [hasEditPermission, setHasEditPermission] = useState(false);
+  const { toast } = useToast();
+  
+  const actualPeriodId = periodId || (currentPeriod ? currentPeriod.id : '');
+  
+  const formattedDate = formatDistanceToNow(new Date(tip.date), {
+    addSuffix: true,
+    locale: nl,
+  });
 
   useEffect(() => {
-    if (payouts.length > 0) {
-      // Find the most recent payout
-      const sortedPayouts = [...payouts].sort((a, b) => 
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-      setLatestPayout(sortedPayouts[0]);
-    }
-
-    // Check if the user has permission to manage payouts
     const checkPermissions = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -39,22 +51,12 @@ const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
           .single();
         
         if (teamMemberships) {
-          // Type safe conversion with fallback
-          const permissions = teamMemberships.permissions as TeamMemberPermissions || {
-            add_tips: false,
-            add_hours: false,
-            view_team: false,
-            view_reports: false,
-            edit_tips: false,
-            close_periods: false,
-            manage_payouts: false
-          };
-          
-          // Admin always has permission, otherwise check manage_payouts permission
+          // Admin always has permission, otherwise check edit_tips permission
           const isAdmin = teamMemberships.role === 'admin';
-          const canManagePayouts = permissions.manage_payouts === true;
+          const permissions = teamMemberships.permissions as TeamMemberPermissions;
+          const canEditTips = permissions?.edit_tips === true;
           
-          setCanManagePayouts(isAdmin || canManagePayouts);
+          setHasEditPermission(isAdmin || canEditTips);
         }
       } catch (error) {
         console.error('Error checking permissions:', error);
@@ -62,101 +64,89 @@ const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     };
     
     checkPermissions();
-  }, [payouts]);
+  }, []);
 
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'd MMMM yyyy', { locale: nl });
+  const handleDelete = () => {
+    if (!actualPeriodId) {
+      toast({
+        title: "Fout bij verwijderen",
+        description: "Kan fooi niet verwijderen: geen periode gevonden.",
+        variant: "destructive",
+      });
+      return;
+    }
+    deleteTip(actualPeriodId, tip.id);
+    setIsDeleteDialogOpen(false);
+    toast({
+      title: "Fooi verwijderd",
+      description: "De fooi is succesvol verwijderd.",
+    });
   };
-
-  // Find period names for the latest payout
-  const getPeriodNames = () => {
-    if (!latestPayout) return '';
-    
-    return latestPayout.periodIds.map((periodId: string) => {
-      const period = periods.find(p => p.id === periodId);
-      return period ? (period.name || `Periode ${formatDate(period.startDate)}`) : 'Onbekende periode';
-    }).join(', ');
-  };
-
-  // Calculate total tips from the covered periods
-  const getTotalTips = () => {
-    if (!latestPayout) return 0;
-    
-    return latestPayout.periodIds.reduce((sum: number, periodId: string) => {
-      const period = periods.find(p => p.id === periodId);
-      if (period) {
-        return sum + period.tips.reduce((s: number, tip: any) => s + tip.amount, 0);
-      }
-      return sum;
-    }, 0);
-  };
-
-  if (!latestPayout) {
-    return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Uitbetaling Overzicht</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p>Geen recente uitbetalingen gevonden.</p>
-          <Button onClick={onClose} className="mt-4">Terug</Button>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Uitbetaling Overzicht</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="mb-4">
-          <p className="text-sm text-muted-foreground">Uitbetaald op {formatDate(latestPayout.date)}</p>
-          <p className="text-sm text-muted-foreground">Perioden: {getPeriodNames()}</p>
-          <p className="text-sm font-medium mt-2">Totaal fooien: €{getTotalTips().toFixed(2)}</p>
-        </div>
-        
-        <div className="space-y-4">
-          <h3 className="font-medium">Verdeling</h3>
-          <div className="border rounded-md overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Naam</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Bedrag</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {latestPayout.distribution.map((item: any) => {
-                  const member = teamMembers.find(m => m.id === item.memberId);
-                  return (
-                    <tr key={item.memberId}>
-                      <td className="px-4 py-2 whitespace-nowrap">{member ? member.name : 'Onbekend lid'}</td>
-                      <td className="px-4 py-2 whitespace-nowrap text-right font-medium">€{item.amount.toFixed(2)}</td>
-                    </tr>
-                  );
-                })}
-                <tr className="bg-muted/20">
-                  <td className="px-4 py-2 whitespace-nowrap font-bold">Totaal</td>
-                  <td className="px-4 py-2 whitespace-nowrap text-right font-bold">
-                    €{latestPayout.distribution.reduce((sum: number, item: any) => sum + item.amount, 0).toFixed(2)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+    <>
+      <Card className="mb-3 relative group">
+        <CardContent className="p-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-lg font-medium">€{tip.amount.toFixed(2)}</p>
+              <p className="text-sm text-muted-foreground">{formattedDate}</p>
+              {tip.note && <p className="text-sm mt-1">{tip.note}</p>}
+            </div>
+            
+            {hasEditPermission && (
+              <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8" 
+                  onClick={() => setIsEditDialogOpen(true)}
+                  aria-label="Bewerk fooi"
+                >
+                  <Pencil size={16} />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 text-destructive hover:text-destructive" 
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  aria-label="Verwijder fooi"
+                >
+                  <Trash2 size={16} />
+                </Button>
+              </div>
+            )}
           </div>
-        </div>
-        
-        <div className="mt-6 flex justify-between">
-          <Button onClick={onClose} variant="outline">Terug</Button>
-          {canManagePayouts && (
-            <Button variant="default">Exporteren</Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+      
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fooi verwijderen</AlertDialogTitle>
+            <AlertDialogDescription>
+              Weet je zeker dat je deze fooi van €{tip.amount.toFixed(2)} wilt verwijderen? 
+              Deze actie kan niet ongedaan worden gemaakt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+              Verwijderen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <EditTipDialog
+        isOpen={isEditDialogOpen}
+        onClose={() => setIsEditDialogOpen(false)}
+        tip={tip}
+        periodId={actualPeriodId}
+        onSave={updateTip}
+      />
+    </>
   );
 };
 
-export default PayoutSummary;
+export default TipCard;

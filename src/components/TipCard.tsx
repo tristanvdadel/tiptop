@@ -1,5 +1,6 @@
-
 import { useState, useEffect } from 'react';
+import { formatDistanceToNow } from 'date-fns';
+import { nl } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -16,10 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import EditTipDialog from './EditTipDialog';
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import type { TeamMemberPermissions } from "@/integrations/supabase/client";
-import { formatDistanceToNow } from 'date-fns';
-import { nl } from 'date-fns/locale';
+import { supabase, TeamMemberPermissions } from "@/integrations/supabase/client";
 
 interface TipCardProps {
   tip: TipEntry;
@@ -35,11 +33,10 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
   
   const actualPeriodId = periodId || (currentPeriod ? currentPeriod.id : '');
   
-  // Ensure tip.date exists before formatting
-  const formattedDate = tip.date ? formatDistanceToNow(new Date(tip.date), {
+  const formattedDate = formatDistanceToNow(new Date(tip.date), {
     addSuffix: true,
     locale: nl,
-  }) : 'Unknown date';
+  });
 
   useEffect(() => {
     const checkPermissions = async () => {
@@ -54,20 +51,10 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
           .single();
         
         if (teamMemberships) {
-          // Type safe conversion with fallback
-          const permissions = teamMemberships.permissions as TeamMemberPermissions || {
-            add_tips: false,
-            add_hours: false,
-            view_team: false,
-            view_reports: false,
-            edit_tips: false,
-            close_periods: false,
-            manage_payouts: false
-          };
-          
           // Admin always has permission, otherwise check edit_tips permission
           const isAdmin = teamMemberships.role === 'admin';
-          const canEditTips = permissions.edit_tips === true;
+          const permissions = teamMemberships.permissions as TeamMemberPermissions;
+          const canEditTips = permissions?.edit_tips === true;
           
           setHasEditPermission(isAdmin || canEditTips);
         }

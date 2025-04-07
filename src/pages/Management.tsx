@@ -1,82 +1,480 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useLocation } from 'react-router-dom';
-import TeamMemberPermissions from "@/components/TeamMemberPermissions";
-import PayoutHistory from "@/components/PayoutHistory";
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PlusCircle, Users, Link, LogIn, History, Shield } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Separator } from "@/components/ui/separator";
+import { useNavigate, useLocation } from "react-router-dom";
+import { addDays } from 'date-fns';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import PayoutHistory from '@/components/PayoutHistory';
+import TeamMemberPermissions from '@/components/TeamMemberPermissions';
 
 const Management = () => {
-  const [activeTab, setActiveTab] = useState("permissions");
-  const [selectedTeamId, setSelectedTeamId] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
   const location = useLocation();
+  const initialTabFromState = location.state?.initialTab;
+  
+  const [userTeams, setUserTeams] = useState([]);
+  const [userTeamMemberships, setUserTeamMemberships] = useState([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  const [loadingTeams, setLoadingTeams] = useState(true);
+  const [selectedTeamId, setSelectedTeamId] = useState(null);
+  const [user, setUser] = useState(null);
+  const [error, setError] = useState(null);
+  const [hasAnyTeam, setHasAnyTeam] = useState(false);
+  const [activeTab, setActiveTab] = useState(initialTabFromState || "teams");
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if there's an initialTab in the location state
-    if (location.state?.initialTab) {
-      setActiveTab(location.state.initialTab);
+    if (initialTabFromState) {
+      setActiveTab(initialTabFromState);
     }
+  }, [initialTabFromState]);
+
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          navigate('/login');
+          return;
+        }
+        setUser(user);
+        
+        setLoadingTeams(true);
+        setError(null);
+        
+        try {
+          const { data: teamMembers, error: memberError } = await supabase
+            .from('team_members')
+            .select('id, team_id, role')
+            .eq('user_id', user.id);
+            
+          if (memberError) {
+            console.error('Error fetching team memberships:', memberError);
+            setError(memberError.message);
+            toast({
+              title: "Fout bij ophalen teams",
+              description: memberError.message,
+              variant: "destructive"
+            });
+            setLoadingTeams(false);
+            return;
+          }
+          
+          setUserTeamMemberships(teamMembers || []);
+          setHasAnyTeam(teamMembers && teamMembers.length > 0);
+          
+          const adminMemberships = teamMembers?.filter(tm => tm.role === 'admin') || [];
+          
+          if (adminMemberships.length > 0) {
+            setIsAdmin(true);
+            
+            const teamIds = adminMemberships.map(tm => tm.team_id);
+            const { data: teams, error: teamsError } = await supabase
+              .from('teams')
+              .select('*')
+              .in('id', teamIds);
+              
+            if (teamsError) {
+              console.error('Error fetching teams:', teamsError);
+              setError(teamsError.message);
+            } else {
+              setUserTeams(teams || []);
+              
+              if (teams && teams.length > 0 && !selectedTeamId) {
+                setSelectedTeamId(teams[0].id);
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error in team fetch:', err);
+          setError(err.message);
+        }
+        
+        setLoadingTeams(false);
+      } catch (err) {
+        console.error('Error checking user:', err);
+        setError(err.message);
+        setLoadingTeams(false);
+      }
+    };
     
-    // Fetch the user's teams and permissions on component mount
-    fetchUserTeamInfo();
-  }, [location.state]);
+    checkUser();
+  }, [navigate, toast, selectedTeamId]);
 
-  const fetchUserTeamInfo = async () => {
+  const handleCreateTeam = async () => {
+    if (!newTeamName.trim() || !user) return;
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Get the user's team memberships
-      const { data: teamMemberships, error } = await supabase
-        .from('team_members')
-        .select(`
-          team_id,
-          role,
-          teams:team_id (id, name)
-        `)
-        .eq('user_id', user.id)
+      console.log("Creating team:", newTeamName, "for user:", user.id);
+      
+      const { data: team, error: teamError } = await supabase
+        .from('teams')
+        .insert([
+          { name: newTeamName, created_by: user.id }
+        ])
+        .select()
         .single();
-
-      if (error) {
-        console.error('Error fetching team info:', error);
-        return;
+      
+      if (teamError) {
+        console.error("Team creation error:", teamError);
+        throw teamError;
       }
-
-      if (teamMemberships) {
-        setSelectedTeamId(teamMemberships.team_id);
-        setIsAdmin(teamMemberships.role === 'admin');
+      
+      console.log("Team created:", team);
+      
+      const { error: memberError } = await supabase
+        .from('team_members')
+        .insert([
+          { 
+            team_id: team.id, 
+            user_id: user.id, 
+            role: 'admin',
+            permissions: {
+              add_tips: true,
+              add_hours: true,
+              view_team: true,
+              view_reports: true
+            }
+          }
+        ]);
+      
+      if (memberError) {
+        console.error("Team member creation error:", memberError);
+        throw memberError;
       }
-    } catch (error) {
-      console.error('Error in fetchUserTeamInfo:', error);
+      
       toast({
-        title: "Error",
-        description: "Failed to load user team information",
-        variant: "destructive",
+        title: "Team aangemaakt",
+        description: `Team '${newTeamName}' is succesvol aangemaakt.`
+      });
+      
+      setNewTeamName('');
+      
+      window.location.reload();
+      
+    } catch (error) {
+      console.error('Error creating team:', error);
+      toast({
+        title: "Fout bij aanmaken team",
+        description: error.message || "Er is een fout opgetreden bij het aanmaken van het team.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleGenerateInvite = async (role, permissions) => {
+    if (!selectedTeamId || !user) return;
+    
+    try {
+      const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+      const expiresAt = addDays(new Date(), 7).toISOString();
+      
+      // Add new permissions
+      const fullPermissions = {
+        ...permissions,
+        edit_tips: role === 'admin' || false,
+        close_periods: role === 'admin' || false,
+        manage_payouts: role === 'admin' || false
+      };
+      
+      const { error } = await supabase
+        .from('invites')
+        .insert([
+          { 
+            team_id: selectedTeamId, 
+            code, 
+            created_by: user.id,
+            role,
+            permissions: fullPermissions,
+            expires_at: expiresAt
+          }
+        ]);
+      
+      if (error) throw error;
+      
+      setInviteCode(code);
+      toast({
+        title: "Uitnodigingscode aangemaakt",
+        description: "De code is 7 dagen geldig."
+      });
+      
+    } catch (error) {
+      console.error('Error generating invite:', error);
+      toast({
+        title: "Fout bij aanmaken uitnodiging",
+        description: error.message || "Er is een fout opgetreden bij het aanmaken van de uitnodiging.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleJoinTeam = async () => {
+    if (!inviteCode.trim() || !user) return;
+    
+    try {
+      const { data: invite, error: inviteError } = await supabase
+        .from('invites')
+        .select('*')
+        .eq('code', inviteCode.trim())
+        .single();
+      
+      if (inviteError) {
+        if (inviteError.code === 'PGRST116') {
+          throw new Error("Ongeldige uitnodigingscode");
+        }
+        throw inviteError;
+      }
+      
+      if (new Date(invite.expires_at) < new Date()) {
+        throw new Error("Deze uitnodigingscode is verlopen");
+      }
+      
+      const { data: existingMember } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('team_id', invite?.team_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (existingMember) {
+        throw new Error("Je bent al lid van dit team");
+      }
+      
+      const { error: memberError } = await supabase
+        .from('team_members')
+        .insert([
+          { 
+            team_id: invite?.team_id, 
+            user_id: user.id,
+            role: invite?.role,
+            permissions: invite?.permissions
+          }
+        ]);
+      
+      if (memberError) throw memberError;
+      
+      toast({
+        title: "Succesvol toegevoegd",
+        description: "Je bent toegevoegd aan het team."
+      });
+      
+      setInviteCode('');
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error joining team:', error);
+      toast({
+        title: "Fout bij deelnemen aan team",
+        description: error.message || "Er is een fout opgetreden bij het deelnemen aan het team.",
+        variant: "destructive"
       });
     }
   };
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold mb-6">Team Management</h1>
+    <div className="container mx-auto px-4 py-6 space-y-6 pb-20">
+      <h1 className="text-2xl font-bold">Beheer</h1>
       
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-6">
-          <TabsTrigger value="permissions">Team Permissions</TabsTrigger>
-          <TabsTrigger value="payouts">Payout History</TabsTrigger>
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Fout bij laden van teams</AlertTitle>
+          <AlertDescription>
+            {error}
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue="teams">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="teams">Mijn teams</TabsTrigger>
+          <TabsTrigger value="permissions" className="flex items-center gap-1">
+            <Shield className="h-4 w-4" />
+            Bevoegdheden
+          </TabsTrigger>
+          <TabsTrigger value="payouts" className="flex items-center gap-1">
+            <History className="h-4 w-4" />
+            Uitbetalingen
+          </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="permissions">
+        <TabsContent value="teams" className="space-y-4 mt-4">
+          {loadingTeams ? (
+            <div className="flex justify-center py-8">Laden...</div>
+          ) : userTeams.length > 0 ? (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Team selecteren</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4">
+                    {userTeams.map(team => (
+                      <Button 
+                        key={team.id}
+                        variant={selectedTeamId === team.id ? "default" : "outline"}
+                        className="justify-start"
+                        onClick={() => setSelectedTeamId(team.id)}
+                      >
+                        <Users className="mr-2 h-4 w-4" />
+                        {team.name}
+                      </Button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {selectedTeamId && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Team uitnodiging aanmaken</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Rol</Label>
+                        <div className="flex items-center space-x-2 mt-1.5">
+                          <Button 
+                            onClick={() => handleGenerateInvite('member', {
+                              add_tips: true,
+                              add_hours: true,
+                              view_team: true,
+                              view_reports: false
+                            })}
+                            variant="outline"
+                          >
+                            Teamlid (standaard)
+                          </Button>
+                          <Button 
+                            onClick={() => handleGenerateInvite('admin', {
+                              add_tips: true,
+                              add_hours: true,
+                              view_team: true,
+                              view_reports: true
+                            })}
+                            variant="outline"
+                          >
+                            Admin
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      {inviteCode && (
+                        <div className="mt-4 space-y-4">
+                          <Separator />
+                          
+                          <div className="flex flex-col items-center justify-center space-y-4">
+                            <Label>Uitnodigingscode:</Label>
+                            <div className="text-2xl font-mono tracking-wider bg-muted p-2 rounded">
+                              {inviteCode}
+                            </div>
+                            
+                            <Button
+                              onClick={() => {
+                                navigator.clipboard.writeText(inviteCode);
+                                toast({
+                                  title: "Gekopieerd",
+                                  description: "Uitnodigingscode is gekopieerd naar het klembord."
+                                });
+                              }}
+                              className="mt-2"
+                            >
+                              Kopieer code
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Nieuw team aanmaken</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="teamName">Teamnaam</Label>
+                    <Input
+                      id="teamName"
+                      placeholder="Bijv. Café De Kroeg"
+                      value={newTeamName}
+                      onChange={(e) => setNewTeamName(e.target.value)}
+                    />
+                  </div>
+                  <Button onClick={handleCreateTeam} disabled={!newTeamName.trim()}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Team aanmaken
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="permissions" className="mt-4">
           <TeamMemberPermissions teamId={selectedTeamId} isAdmin={isAdmin} />
         </TabsContent>
         
-        <TabsContent value="payouts">
+        <TabsContent value="payouts" className="mt-4">
           <PayoutHistory />
         </TabsContent>
+        
+        {!hasAnyTeam && (
+          <TabsContent value="join" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Team toetreden met code</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="inviteCode">Uitnodigingscode</Label>
+                    <Input
+                      id="inviteCode"
+                      placeholder="Voer code in"
+                      value={inviteCode}
+                      onChange={(e) => setInviteCode(e.target.value)}
+                    />
+                  </div>
+                  <Button onClick={handleJoinTeam} disabled={!inviteCode.trim()}>
+                    <LogIn className="mr-2 h-4 w-4" />
+                    Team toetreden
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
+      
+      {userTeams.length === 0 && !loadingTeams && !error && (
+        <Alert className="mt-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Geen team gevonden</AlertTitle>
+          <AlertDescription>
+            Je hebt nog geen team. Maak een nieuw team aan om fooi en uren te kunnen registreren.
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 };

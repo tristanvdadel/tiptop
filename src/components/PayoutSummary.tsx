@@ -67,7 +67,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
               </div>
             )}
             
-            <div className="bg-green-50 border border-green-200 p-4 rounded-md text-green-800 mt-4">
+            <div className="bg-green-50 border border-green-200 p-4 rounded-md mt-4">
               <p className="flex items-center">
                 <Check className="h-5 w-5 mr-2" />
                 Alle geselecteerde periodes zijn gemarkeerd als uitbetaald.

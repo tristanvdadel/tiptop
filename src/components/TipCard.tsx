@@ -34,10 +34,11 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
   
   const actualPeriodId = periodId || (currentPeriod ? currentPeriod.id : '');
   
-  const formattedDate = formatDistanceToNow(new Date(tip.date), {
+  // Add a null check before using formatDistanceToNow
+  const formattedDate = tip.date ? formatDistanceToNow(new Date(tip.date), {
     addSuffix: true,
     locale: nl,
-  });
+  }) : 'Datum onbekend';
 
   useEffect(() => {
     const checkPermissions = async () => {

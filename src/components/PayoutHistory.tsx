@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import jsPDF from 'jspdf';
 
 type SortField = 'date' | 'calculatedAmount' | 'actualAmount';
 type SortDirection = 'asc' | 'desc';
@@ -76,7 +77,7 @@ const PayoutHistory = () => {
   const downloadExcel = () => {
     if (!selectedPayout) return;
     
-    const headers = "Uitbetaling datum:,${formatDate(selectedPayout.date)}\n\n";
+    const headers = `Uitbetaling datum:,${formatDate(selectedPayout.date)}\n\n`;
     const tableHeaders = "Naam,Berekend bedrag,Balans,Uitbetaald bedrag,Nieuw saldo\n";
     
     const rows = selectedPayout.distribution.map(item => {
@@ -114,18 +115,83 @@ const PayoutHistory = () => {
   const downloadPDF = () => {
     if (!selectedPayout) return;
     
-    toast({
-      title: "PDF wordt gegenereerd",
-      description: "Het factuur-stijl PDF bestand wordt gedownload."
-    });
-    
-    setTimeout(() => {
+    try {
+      const doc = new jsPDF();
+      const payoutDate = formatDate(selectedPayout.date);
+      
+      doc.setFontSize(22);
+      doc.text("FACTUUR", 105, 20, { align: "center" });
+      
+      doc.setFontSize(10);
+      doc.text("Uw Bedrijf BV", 20, 40);
+      doc.text("Kerkstraat 1", 20, 45);
+      doc.text("1234 AB Amsterdam", 20, 50);
+      doc.text("info@uwbedrijf.nl", 20, 55);
+      
+      doc.setFontSize(12);
+      doc.text(`Factuurnummer: TIPS-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`, 150, 40, { align: "right" });
+      doc.text(`Datum: ${payoutDate}`, 150, 45, { align: "right" });
+      
+      doc.setFontSize(11);
+      doc.setTextColor(100, 100, 100);
+      doc.text("Naam", 20, 80);
+      doc.text("Berekend bedrag", 75, 80);
+      doc.text("Balans", 115, 80);
+      doc.text("Uitbetaald", 155, 80);
+      
+      doc.setDrawColor(200, 200, 200);
+      doc.line(20, 83, 190, 83);
+      
+      let y = 90;
+      let total = 0;
+      
+      selectedPayout.distribution.forEach((item, index) => {
+        const member = teamMembers.find(m => m.id === item.memberId);
+        const name = member?.name || 'Onbekend lid';
+        const amount = item.amount;
+        const balance = item.balance || 0;
+        const actualAmount = item.actualAmount || item.amount;
+        
+        doc.text(name, 20, y);
+        doc.text(`€ ${amount.toFixed(2)}`, 75, y);
+        doc.text(`€ ${balance.toFixed(2)}`, 115, y);
+        doc.text(`€ ${actualAmount.toFixed(2)}`, 155, y);
+        
+        total += actualAmount;
+        y += 10;
+        
+        if (y > 270 && index < selectedPayout.distribution.length - 1) {
+          doc.addPage();
+          y = 20;
+        }
+      });
+      
+      doc.line(20, y, 190, y);
+      y += 10;
+      doc.setFontStyle("bold");
+      doc.text("Totaal", 115, y);
+      doc.text(`€ ${total.toFixed(2)}`, 155, y);
+      
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text("Dit document betreft een overzicht van fooi uitbetalingen.", 105, 280, { align: "center" });
+      
+      const payoutDateFormatted = payoutDate.replace(/\s/g, '_');
+      doc.save(`fooi-factuur-${payoutDateFormatted}.pdf`);
+      
       toast({
         title: "PDF gedownload",
         description: "De uitbetalingsgegevens zijn gedownload als PDF-factuur."
       });
       setDownloadOptionsOpen(false);
-    }, 1500);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        title: "Fout bij genereren PDF",
+        description: "Er is een fout opgetreden bij het genereren van de PDF.",
+        variant: "destructive"
+      });
+    }
   };
 
   const sortedPayouts = useMemo(() => {

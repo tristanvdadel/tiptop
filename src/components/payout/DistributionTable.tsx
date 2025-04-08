@@ -42,20 +42,28 @@ const DistributionTable: React.FC<DistributionTableProps> = ({
   };
   
   return (
-    <div className="border rounded-md overflow-hidden relative">
-      <div className="overflow-x-auto pb-2" ref={tableContainerRef} style={{ WebkitOverflowScrolling: 'touch', maxHeight: 'calc(100vh - 320px)' }}>
-        <Table className="relative">
-          <TableHeader>
-            <TableRow>
+    <div className="border rounded-md overflow-hidden relative bg-white">
+      <div 
+        className="overflow-x-auto pb-2" 
+        ref={tableContainerRef} 
+        style={{ 
+          WebkitOverflowScrolling: 'touch', 
+          maxHeight: 'calc(100vh - 350px)',
+          background: 'white'
+        }}
+      >
+        <Table className="relative bg-white">
+          <TableHeader className="bg-white">
+            <TableRow className="bg-white">
               <TableHead style={fixedColumnStyle} className="bg-white">Naam</TableHead>
-              <TableHead className="text-right min-w-[100px]">Berekend</TableHead>
-              <TableHead className="text-right min-w-[100px]">Saldo</TableHead>
-              <TableHead className="text-right min-w-[100px]">Totaal</TableHead>
-              <TableHead className="text-right min-w-[120px]">Uitbetaald</TableHead>
-              <TableHead className="text-right min-w-[120px]">Nieuw saldo</TableHead>
+              <TableHead className="text-right min-w-[100px] bg-white">Berekend</TableHead>
+              <TableHead className="text-right min-w-[100px] bg-white">Saldo</TableHead>
+              <TableHead className="text-right min-w-[100px] bg-white">Totaal</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-white">Uitbetaald</TableHead>
+              <TableHead className="text-right min-w-[120px] bg-white">Nieuw saldo</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="bg-white">
             {distribution.map((item, index) => {
               const member = findTeamMember(item.memberId);
               const calculatedAmount = item.amount;
@@ -65,21 +73,21 @@ const DistributionTable: React.FC<DistributionTableProps> = ({
               const newBalance = isEditing ? item.balance : totalAmount - actualAmount;
               
               return (
-                <TableRow key={index} className={isEditing && item.isEdited ? "bg-amber-50" : ""}>
+                <TableRow key={index} className={`${isEditing && item.isEdited ? "bg-amber-50" : "bg-white"}`}>
                   <TableCell 
                     style={fixedColumnStyle}
                     className="bg-white min-w-[120px] font-medium"
                   >
                     {member ? member.name : 'Onbekend teamlid'}
                   </TableCell>
-                  <TableCell className="text-right whitespace-nowrap">€{calculatedAmount.toFixed(2)}</TableCell>
-                  <TableCell className={`text-right whitespace-nowrap ${originalBalance > 0 ? 'text-green-600' : originalBalance < 0 ? 'text-red-600' : ''}`}>
+                  <TableCell className="text-right whitespace-nowrap bg-white">€{calculatedAmount.toFixed(2)}</TableCell>
+                  <TableCell className={`text-right whitespace-nowrap bg-white ${originalBalance > 0 ? 'text-green-600' : originalBalance < 0 ? 'text-red-600' : ''}`}>
                     {originalBalance !== 0 ? `€${Math.abs(originalBalance).toFixed(2)} ${originalBalance > 0 ? '+' : '-'}` : '-'}
                   </TableCell>
-                  <TableCell className="text-right font-medium whitespace-nowrap">
+                  <TableCell className="text-right font-medium whitespace-nowrap bg-white">
                     €{totalAmount.toFixed(2)}
                   </TableCell>
-                  <TableCell className="text-right font-medium whitespace-nowrap">
+                  <TableCell className="text-right font-medium whitespace-nowrap bg-white">
                     {isEditing ? (
                       <Input 
                         type="number" 
@@ -91,7 +99,7 @@ const DistributionTable: React.FC<DistributionTableProps> = ({
                       />
                     ) : `€${actualAmount.toFixed(2)}`}
                   </TableCell>
-                  <TableCell className={`text-right whitespace-nowrap ${newBalance && newBalance > 0 ? 'text-green-600' : newBalance && newBalance < 0 ? 'text-red-600' : ''}`}>
+                  <TableCell className={`text-right whitespace-nowrap bg-white ${newBalance && newBalance > 0 ? 'text-green-600' : newBalance && newBalance < 0 ? 'text-red-600' : ''}`}>
                     {newBalance !== undefined && newBalance !== 0 ? `€${Math.abs(newBalance).toFixed(2)} ${newBalance > 0 ? '+' : '-'}` : '-'}
                   </TableCell>
                 </TableRow>
@@ -101,7 +109,7 @@ const DistributionTable: React.FC<DistributionTableProps> = ({
         </Table>
       </div>
       
-      <div className="p-2 border-t flex justify-between">
+      <div className="p-2 border-t flex justify-between bg-white">
         <span className="font-medium">Totaal</span>
         <span className="font-medium">
           €{distribution.reduce((sum, item) => sum + item.actualAmount, 0).toFixed(2)}

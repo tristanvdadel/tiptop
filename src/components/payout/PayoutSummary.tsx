@@ -49,7 +49,6 @@ const PayoutSummary = ({
     return teamMembers.find(member => member.id === id);
   };
 
-  // Initialize edited distribution from latest payout
   useEffect(() => {
     if (latestPayout) {
       const initialEditableDistribution = latestPayout.distribution.map(item => {
@@ -68,7 +67,6 @@ const PayoutSummary = ({
     }
   }, [latestPayout]);
 
-  // Handle URL parameters
   useEffect(() => {
     const url = new URL(window.location.href);
     if (!url.searchParams.has('payoutSummary')) {
@@ -84,7 +82,6 @@ const PayoutSummary = ({
     };
   }, []);
 
-  // Calculate new balances whenever distribution changes
   useEffect(() => {
     if (isEditing) {
       calculateNewBalances();
@@ -186,7 +183,6 @@ const PayoutSummary = ({
     setIsEditing(true);
   };
 
-  // Create an object with original balances for the DistributionTable component
   const originalBalances = latestPayout ? latestPayout.distribution.reduce((acc, item) => {
     acc[item.memberId] = item.balance;
     return acc;
@@ -194,7 +190,6 @@ const PayoutSummary = ({
     [key: string]: number | undefined;
   }) : {};
 
-  // Prepare the distribution data for the DistributionTable component
   const tableDistribution: PayoutDetailWithEdits[] = isEditing ? editedDistribution : latestPayout?.distribution.map(item => ({
     memberId: item.memberId,
     amount: item.amount,
@@ -203,7 +198,6 @@ const PayoutSummary = ({
     isEdited: false
   })) || [];
 
-  // Copy to clipboard function
   const handleCopyToClipboard = () => {
     if (!latestPayout) return;
     
@@ -225,7 +219,6 @@ const PayoutSummary = ({
     });
   };
   
-  // Download CSV function
   const downloadCSV = () => {
     if (!latestPayout) return;
     
@@ -261,7 +254,7 @@ const PayoutSummary = ({
   };
 
   return (
-    <Card className="w-full max-w-3xl mx-auto mb-24">
+    <Card className="w-full max-w-3xl mx-auto mb-28">
       <PayoutHeader />
       <CardContent className="p-6">
         {latestPayout ? (

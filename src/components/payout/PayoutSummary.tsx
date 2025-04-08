@@ -245,6 +245,17 @@ const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     }, {} as { [key: string]: number | undefined }) 
     : {};
 
+  // Prepare the distribution data for the DistributionTable component
+  const tableDistribution: PayoutDetailWithEdits[] = isEditing 
+    ? editedDistribution 
+    : (latestPayout?.distribution.map(item => ({
+        memberId: item.memberId,
+        amount: item.amount,
+        actualAmount: item.actualAmount || (item.amount + (item.balance || 0)),
+        balance: item.balance,
+        isEdited: false
+      })) || []);
+
   return (
     <Card className="w-full max-w-3xl mx-auto">
       <PayoutHeader />
@@ -276,11 +287,7 @@ const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
               )}
               
               <DistributionTable
-                distribution={isEditing ? editedDistribution : latestPayout.distribution.map(item => ({
-                  ...item,
-                  isEdited: false,
-                  actualAmount: item.actualAmount || (item.amount + (item.balance || 0))
-                }))}
+                distribution={tableDistribution}
                 isEditing={isEditing}
                 findTeamMember={findTeamMember}
                 originalBalances={originalBalances}

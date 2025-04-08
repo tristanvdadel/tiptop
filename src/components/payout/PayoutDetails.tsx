@@ -1,9 +1,9 @@
 
 import React from 'react';
-import { Payout } from '@/contexts/AppContext';
+import { PayoutData } from '@/contexts/AppContext';
 
 interface PayoutDetailsProps {
-  payout: Payout;
+  payout: PayoutData;
 }
 
 const PayoutDetails: React.FC<PayoutDetailsProps> = ({ payout }) => {

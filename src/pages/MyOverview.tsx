@@ -43,12 +43,10 @@ const MyOverview = () => {
     });
   };
   return <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Mijn Overzicht</h1>
+      
       
       <Card>
-        <CardHeader>
-          <CardTitle>Hallo, {currentUser.name}</CardTitle>
-        </CardHeader>
+        
         
       </Card>
       

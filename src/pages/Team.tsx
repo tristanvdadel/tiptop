@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { TeamMember } from '@/contexts/AppContext';
@@ -126,7 +127,7 @@ const Team = () => {
 
   if (showPayoutSummary) {
     return (
-      <div>
+      <div className="pb-16">
         <PayoutSummary onClose={() => {
           setShowPayoutSummary(false);
           // Remove the payoutSummary parameter from URL when closing
@@ -137,7 +138,7 @@ const Team = () => {
   }
 
   return (
-    <div className="pb-20 min-h-[calc(100vh-100px)]">
+    <div className="pb-16">
       <div className="flex items-center gap-2 mb-4">
         <Users size={20} />
         <h1 className="text-xl font-bold">Team leden</h1>

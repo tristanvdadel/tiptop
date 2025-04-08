@@ -10,7 +10,6 @@ import PayoutDetails from './PayoutDetails';
 import RoundingSelector, { RoundingOption } from './RoundingSelector';
 import DistributionTable from './DistributionTable';
 import ActionButtons from './ActionButtons';
-import { supabase } from '@/integrations/supabase/client';
 
 interface PayoutSummaryProps {
   onClose: () => void;
@@ -43,8 +42,7 @@ const PayoutSummary = ({
   const [editedDistribution, setEditedDistribution] = useState<PayoutDetailWithEdits[]>([]);
   const [roundingOption, setRoundingOption] = useState<RoundingOption>('none');
   const [balancesUpdated, setBalancesUpdated] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ id: string; email: string } | null>(null);
-
+  
   const latestPayout = mostRecentPayout || (payouts.length > 0 ? payouts[payouts.length - 1] : null);
   
   const findTeamMember = (id: string) => {
@@ -90,20 +88,6 @@ const PayoutSummary = ({
     }
   }, [editedDistribution, isEditing]);
 
-  useEffect(() => {
-    const getUserInfo = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUser({
-          id: user.id,
-          email: user.email || '',
-        });
-      }
-    };
-    
-    getUserInfo();
-  }, []);
-
   const handleAmountChange = (memberId: string, actualAmount: string) => {
     const amount = parseFloat(actualAmount);
     if (isNaN(amount) || amount < 0) return;
@@ -132,7 +116,6 @@ const PayoutSummary = ({
 
   const saveChanges = () => {
     if (!latestPayout || !editedDistribution.length) return;
-    
     editedDistribution.forEach(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
       if (member) {
@@ -140,31 +123,24 @@ const PayoutSummary = ({
         clearTeamMemberHours(item.memberId);
       }
     });
-    
     const updatedDistribution = editedDistribution.map(item => ({
       memberId: item.memberId,
       amount: item.amount,
       actualAmount: item.actualAmount,
       balance: latestPayout.distribution.find(d => d.memberId === item.memberId)?.balance || 0
     }));
-    
     const updatedPayout = {
       ...latestPayout,
-      distribution: updatedDistribution,
-      paidBy: currentUser?.email?.split('@')[0] || 'Onbekend',
-      paidById: currentUser?.id,
+      distribution: updatedDistribution
     };
-    
     setMostRecentPayout(updatedPayout);
     setIsEditing(false);
     setBalancesUpdated(true);
-    
     toast({
       title: "Gefeliciteerd!",
       description: "De uitbetaling is voltooid. De saldo's zijn opgeslagen. Je kan de uitbetaling terugvinden in de geschiedenis.",
       variant: "default"
     });
-    
     setTimeout(() => {
       navigate('/');
     }, 1500);

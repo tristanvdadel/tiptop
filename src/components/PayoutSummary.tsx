@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -80,10 +81,12 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   const downloadCSV = () => {
     if (!latestPayout) return;
     
-    const headers = "Naam,Berekend bedrag,Daadwerkelijk uitbetaald,Saldo\n";
+    const headers = "Naam,Berekend bedrag,Saldo,Totaal te ontvangen,Daadwerkelijk uitbetaald\n";
     const rows = latestPayout.distribution.map(item => {
       const member = findTeamMember(item.memberId);
-      return `${member?.name || 'Onbekend lid'},${item.amount.toFixed(2)},${(item.actualAmount || item.amount).toFixed(2)},${(item.balance || 0).toFixed(2)}`;
+      const balance = item.balance || 0;
+      const total = item.amount + balance;
+      return `${member?.name || 'Onbekend lid'},${item.amount.toFixed(2)},${balance.toFixed(2)},${total.toFixed(2)},${(item.actualAmount || item.amount).toFixed(2)}`;
     }).join('\n');
     
     const csv = headers + rows;
@@ -136,12 +139,12 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       let newBalance = originalBalance;
       
       // If actual amount is less than calculated, add the difference to balance
-      if (newActualAmount < originalAmount) {
-        newBalance += (originalAmount - newActualAmount);
+      if (newActualAmount < originalAmount + originalBalance) {
+        newBalance += ((originalAmount + originalBalance) - newActualAmount);
       } 
       // If actual amount is more than calculated, subtract the difference from balance
-      else if (newActualAmount > originalAmount) {
-        newBalance -= (newActualAmount - originalAmount);
+      else if (newActualAmount > originalAmount + originalBalance) {
+        newBalance -= (newActualAmount - (originalAmount + originalBalance));
       }
       
       return {
@@ -178,30 +181,34 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     
     // First create the rounded distribution without recalculating balances
     const roundedDistribution = editedDistribution.map(item => {
-      // Round DOWN the actual amount based on the selected rounding option
-      let roundedAmount = item.amount;
+      // Get original balance to add to amount for rounding calculation
+      const originalBalance = item.balance || 0;
+      const totalAmount = item.amount + originalBalance;
+      
+      // Round DOWN the total amount based on the selected rounding option
+      let roundedAmount = totalAmount;
       
       if (roundingValue === 0.50) {
         // Round down to nearest 0.50
-        roundedAmount = Math.floor(item.amount / 0.50) * 0.50;
+        roundedAmount = Math.floor(totalAmount / 0.50) * 0.50;
       } else if (roundingValue === 1.00) {
         // Round down to nearest 1.00
-        roundedAmount = Math.floor(item.amount);
+        roundedAmount = Math.floor(totalAmount);
       } else if (roundingValue === 2.00) {
         // Round down to nearest 2.00
-        roundedAmount = Math.floor(item.amount / 2.00) * 2.00;
+        roundedAmount = Math.floor(totalAmount / 2.00) * 2.00;
       } else if (roundingValue === 5.00) {
         // Round down to nearest 5.00
-        roundedAmount = Math.floor(item.amount / 5.00) * 5.00;
+        roundedAmount = Math.floor(totalAmount / 5.00) * 5.00;
       } else if (roundingValue === 10.00) {
         // Round down to nearest 10.00
-        roundedAmount = Math.floor(item.amount / 10.00) * 10.00;
+        roundedAmount = Math.floor(totalAmount / 10.00) * 10.00;
       }
       
       return {
         ...item,
         actualAmount: parseFloat(roundedAmount.toFixed(2)),
-        isEdited: roundedAmount !== item.amount
+        isEdited: roundedAmount !== totalAmount
       };
     });
     
@@ -298,23 +305,33 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
                     <TableRow>
                       <TableHead>Naam</TableHead>
                       <TableHead className="text-right">Berekend</TableHead>
-                      <TableHead className="text-right">Uitbetaald</TableHead>
                       <TableHead className="text-right">Saldo</TableHead>
+                      <TableHead className="text-right">Totaal</TableHead>
+                      <TableHead className="text-right">Uitbetaald</TableHead>
+                      <TableHead className="text-right">Nieuw saldo</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {(isEditing ? editedDistribution : latestPayout.distribution).map((item, index) => {
                       const member = findTeamMember(item.memberId);
                       const amount = item.amount;
+                      const originalBalance = item.balance || 0;
+                      const totalAmount = amount + originalBalance;
                       const actualAmount = isEditing 
                         ? item.actualAmount 
                         : (item.actualAmount || item.amount);
-                      const balance = isEditing ? item.balance : item.balance;
+                      const newBalance = isEditing ? item.balance : item.balance;
                       
                       return (
                         <TableRow key={index} className={isEditing && (item as any).isEdited ? "bg-amber-50" : ""}>
                           <TableCell>{member ? member.name : 'Onbekend teamlid'}</TableCell>
                           <TableCell className="text-right">€{amount.toFixed(2)}</TableCell>
+                          <TableCell className={`text-right ${originalBalance > 0 ? 'text-green-600' : originalBalance < 0 ? 'text-red-600' : ''}`}>
+                            {originalBalance !== 0 ? `€${Math.abs(originalBalance).toFixed(2)} ${originalBalance > 0 ? '+' : '-'}` : '-'}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            €{totalAmount.toFixed(2)}
+                          </TableCell>
                           <TableCell className="text-right font-medium">
                             {isEditing ? (
                               <Input 
@@ -329,9 +346,9 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
                               `€${actualAmount.toFixed(2)}`
                             )}
                           </TableCell>
-                          <TableCell className={`text-right ${balance > 0 ? 'text-green-600' : balance < 0 ? 'text-red-600' : ''}`}>
-                            {balance !== undefined && balance !== 0 ? 
-                              `€${Math.abs(balance).toFixed(2)} ${balance > 0 ? '+' : '-'}` : 
+                          <TableCell className={`text-right ${newBalance && newBalance > 0 ? 'text-green-600' : newBalance && newBalance < 0 ? 'text-red-600' : ''}`}>
+                            {newBalance !== undefined && newBalance !== 0 ? 
+                              `€${Math.abs(newBalance).toFixed(2)} ${newBalance > 0 ? '+' : '-'}` : 
                               '-'
                             }
                           </TableCell>

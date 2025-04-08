@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -11,6 +12,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from 'jspdf';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 type SortField = 'date' | 'calculatedAmount' | 'actualAmount';
 type SortDirection = 'asc' | 'desc';
@@ -235,109 +243,126 @@ const PayoutHistory = () => {
 
   return (
     <>
-      <Card className="w-full mb-6">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <History className="h-5 w-5" />
-            Uitbetaal Geschiedenis
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {payouts && payouts.length > 0 ? (
-            <ScrollArea className="h-[400px]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead 
-                      onClick={() => handleSortClick('date')} 
-                      className="cursor-pointer hover:text-primary transition-colors"
-                    >
-                      <div className="flex items-center">
-                        Datum
-                        {renderSortIcon('date')}
-                      </div>
-                    </TableHead>
-                    <TableHead>Periodes</TableHead>
-                    <TableHead>Uitgevoerd door</TableHead>
-                    <TableHead 
-                      className="text-right cursor-pointer hover:text-primary transition-colors"
-                      onClick={() => handleSortClick('calculatedAmount')}
-                    >
-                      <div className="flex items-center justify-end">
-                        Berekend bedrag
-                        {renderSortIcon('calculatedAmount')}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="text-right cursor-pointer hover:text-primary transition-colors"
-                      onClick={() => handleSortClick('actualAmount')}
-                    >
-                      <div className="flex items-center justify-end">
-                        Uitbetaald
-                        {renderSortIcon('actualAmount')}
-                      </div>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedPayouts.map((payout, index) => {
-                    const calculatedAmount = payout.distribution.reduce(
-                      (sum, dist) => sum + dist.amount, 
-                      0
-                    );
-                    
-                    const actualAmount = payout.distribution.reduce(
-                      (sum, dist) => sum + (dist.actualAmount || dist.amount), 
-                      0
-                    );
-                    
-                    return (
-                      <TableRow 
-                        key={index} 
-                        className="group cursor-pointer hover:bg-muted/80"
-                        onClick={() => handleRowClick(payout)}
-                      >
-                        <TableCell className="font-medium">
-                          {formatDate(payout.date)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {payout.periodIds.length > 3 ? (
-                              <Badge variant="outline">
-                                {payout.periodIds.length} periodes
-                              </Badge>
-                            ) : (
-                              payout.periodIds.map((periodId, idx) => (
-                                <Badge key={periodId} variant="outline">
-                                  Periode {idx + 1}
-                                </Badge>
-                              ))
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {payout.payerName || 'Onbekend'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          €{calculatedAmount.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          €{actualAmount.toFixed(2)}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>Geen uitbetalingen gevonden</p>
-              <p className="text-sm mt-2">Uitbetalingen verschijnen hier wanneer je fooi markeert als uitbetaald</p>
+      <Carousel
+        className="w-full mb-6"
+        opts={{
+          align: "start",
+        }}
+      >
+        <CarouselContent className="-ml-1">
+          <CarouselItem className="pl-1">
+            <div className="p-1">
+              <Card className="w-full">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <History className="h-5 w-5" />
+                    Geschiedenis
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {payouts && payouts.length > 0 ? (
+                    <ScrollArea className="h-[400px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead 
+                              onClick={() => handleSortClick('date')} 
+                              className="cursor-pointer hover:text-primary transition-colors"
+                            >
+                              <div className="flex items-center">
+                                Datum
+                                {renderSortIcon('date')}
+                              </div>
+                            </TableHead>
+                            <TableHead>Periodes</TableHead>
+                            <TableHead>Uitgevoerd door</TableHead>
+                            <TableHead 
+                              className="text-right cursor-pointer hover:text-primary transition-colors"
+                              onClick={() => handleSortClick('calculatedAmount')}
+                            >
+                              <div className="flex items-center justify-end">
+                                Berekend bedrag
+                                {renderSortIcon('calculatedAmount')}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="text-right cursor-pointer hover:text-primary transition-colors"
+                              onClick={() => handleSortClick('actualAmount')}
+                            >
+                              <div className="flex items-center justify-end">
+                                Uitbetaald
+                                {renderSortIcon('actualAmount')}
+                              </div>
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {sortedPayouts.map((payout, index) => {
+                            const calculatedAmount = payout.distribution.reduce(
+                              (sum, dist) => sum + dist.amount, 
+                              0
+                            );
+                            
+                            const actualAmount = payout.distribution.reduce(
+                              (sum, dist) => sum + (dist.actualAmount || dist.amount), 
+                              0
+                            );
+                            
+                            return (
+                              <TableRow 
+                                key={index} 
+                                className="group cursor-pointer hover:bg-muted/80"
+                                onClick={() => handleRowClick(payout)}
+                              >
+                                <TableCell className="font-medium">
+                                  {formatDate(payout.date)}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-wrap gap-1">
+                                    {payout.periodIds.length > 3 ? (
+                                      <Badge variant="outline">
+                                        {payout.periodIds.length} periodes
+                                      </Badge>
+                                    ) : (
+                                      payout.periodIds.map((periodId, idx) => (
+                                        <Badge key={periodId} variant="outline">
+                                          Periode {idx + 1}
+                                        </Badge>
+                                      ))
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  {payout.payerName || 'Onbekend'}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  €{calculatedAmount.toFixed(2)}
+                                </TableCell>
+                                <TableCell className="text-right font-medium">
+                                  €{actualAmount.toFixed(2)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p>Geen uitbetalingen gevonden</p>
+                      <p className="text-sm mt-2">Uitbetalingen verschijnen hier wanneer je fooi markeert als uitbetaald</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CarouselItem>
+        </CarouselContent>
+        <div className="hidden md:flex">
+          <CarouselPrevious className="left-1" />
+          <CarouselNext className="right-1" />
+        </div>
+      </Carousel>
 
       <Dialog open={downloadOptionsOpen} onOpenChange={setDownloadOptionsOpen}>
         <DialogContent className="sm:max-w-md">

@@ -552,7 +552,7 @@ const Management = () => {
           </TabsTrigger>
           <TabsTrigger value="payouts" className="flex items-center gap-1">
             <History className="h-4 w-4" />
-            Uitbetalingen
+            Geschiedenis
           </TabsTrigger>
         </TabsList>
         

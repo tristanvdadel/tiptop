@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,11 +10,9 @@ import PayoutDetails from './PayoutDetails';
 import RoundingSelector, { RoundingOption } from './RoundingSelector';
 import DistributionTable from './DistributionTable';
 import ActionButtons from './ActionButtons';
-
 interface PayoutSummaryProps {
   onClose: () => void;
 }
-
 interface PayoutDetailWithEdits {
   memberId: string;
   amount: number;
@@ -23,8 +20,9 @@ interface PayoutDetailWithEdits {
   balance: number | undefined;
   isEdited: boolean;
 }
-
-const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
+const PayoutSummary = ({
+  onClose
+}: PayoutSummaryProps) => {
   const {
     payouts,
     teamMembers,
@@ -33,16 +31,15 @@ const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     clearTeamMemberHours,
     setMostRecentPayout
   } = useApp();
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
   const navigate = useNavigate();
-
   const [isEditing, setIsEditing] = useState(true);
   const [editedDistribution, setEditedDistribution] = useState<PayoutDetailWithEdits[]>([]);
   const [roundingOption, setRoundingOption] = useState<RoundingOption>('none');
   const [balancesUpdated, setBalancesUpdated] = useState(false);
-
   const latestPayout = mostRecentPayout || (payouts.length > 0 ? payouts[payouts.length - 1] : null);
-
   const findTeamMember = (id: string) => {
     return teamMembers.find(member => member.id === id);
   };
@@ -73,7 +70,6 @@ const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       url.searchParams.set('payoutSummary', 'true');
       window.history.pushState({}, '', url.toString());
     }
-    
     return () => {
       const url = new URL(window.location.href);
       if (url.searchParams.has('payoutSummary')) {
@@ -89,7 +85,6 @@ const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       calculateNewBalances();
     }
   }, [editedDistribution, isEditing]);
-
   const handleCopyToClipboard = () => {
     if (!latestPayout) return;
     const payoutDate = new Date(latestPayout.date).toLocaleDateString('nl');
@@ -106,7 +101,6 @@ const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       });
     });
   };
-
   const downloadCSV = () => {
     if (!latestPayout) return;
     const headers = "Naam,Berekend bedrag,Saldo,Totaal te ontvangen,Daadwerkelijk uitbetaald,Nieuw saldo\n";
@@ -120,7 +114,9 @@ const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       return `${member?.name || 'Onbekend lid'},${calculatedAmount.toFixed(2)},${originalBalance.toFixed(2)},${totalToReceive.toFixed(2)},${actuallyPaid.toFixed(2)},${newBalance.toFixed(2)}`;
     }).join('\n');
     const csv = headers + rows;
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csv], {
+      type: 'text/csv;charset=utf-8;'
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     const payoutDate = new Date(latestPayout.date).toLocaleDateString('nl').replace(/\//g, '-');
@@ -135,7 +131,6 @@ const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       description: "De uitbetalingsgegevens zijn gedownload als CSV-bestand."
     });
   };
-
   const handleAmountChange = (memberId: string, actualAmount: string) => {
     const amount = parseFloat(actualAmount);
     if (isNaN(amount) || amount < 0) return;
@@ -145,7 +140,6 @@ const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       isEdited: true
     } : item));
   };
-
   const calculateNewBalances = () => {
     if (!editedDistribution.length) return;
     const updatedDistribution = editedDistribution.map(item => {
@@ -161,10 +155,8 @@ const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     });
     setEditedDistribution(updatedDistribution);
   };
-
   const saveChanges = () => {
     if (!latestPayout || !editedDistribution.length) return;
-
     editedDistribution.forEach(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
       if (member) {
@@ -172,34 +164,28 @@ const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
         clearTeamMemberHours(item.memberId);
       }
     });
-
     const updatedDistribution = editedDistribution.map(item => ({
       memberId: item.memberId,
       amount: item.amount,
       actualAmount: item.actualAmount,
       balance: latestPayout.distribution.find(d => d.memberId === item.memberId)?.balance || 0
     }));
-
     const updatedPayout = {
       ...latestPayout,
       distribution: updatedDistribution
     };
-
     setMostRecentPayout(updatedPayout);
     setIsEditing(false);
     setBalancesUpdated(true);
-
     toast({
       title: "Gefeliciteerd!",
       description: "De uitbetaling is voltooid. De saldo's zijn opgeslagen. Je kan de uitbetaling terugvinden in de geschiedenis.",
       variant: "default"
     });
-
     setTimeout(() => {
       navigate('/');
     }, 1500);
   };
-
   const applyRounding = () => {
     if (!editedDistribution.length || roundingOption === 'none') return;
     const roundingValue = parseFloat(roundingOption);
@@ -231,93 +217,55 @@ const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       description: `Alle bedragen zijn naar beneden afgerond op €${roundingOption}.`
     });
   };
-
   const reopenEditor = () => {
     setBalancesUpdated(false);
     setIsEditing(true);
   };
 
   // Create an object with original balances for the DistributionTable component
-  const originalBalances = latestPayout ? 
-    latestPayout.distribution.reduce((acc, item) => {
-      acc[item.memberId] = item.balance;
-      return acc;
-    }, {} as { [key: string]: number | undefined }) 
-    : {};
+  const originalBalances = latestPayout ? latestPayout.distribution.reduce((acc, item) => {
+    acc[item.memberId] = item.balance;
+    return acc;
+  }, {} as {
+    [key: string]: number | undefined;
+  }) : {};
 
   // Prepare the distribution data for the DistributionTable component
-  const tableDistribution: PayoutDetailWithEdits[] = isEditing 
-    ? editedDistribution 
-    : (latestPayout?.distribution.map(item => ({
-        memberId: item.memberId,
-        amount: item.amount,
-        actualAmount: item.actualAmount || (item.amount + (item.balance || 0)),
-        balance: item.balance,
-        isEdited: false
-      })) || []);
-
-  return (
-    <Card className="w-full max-w-3xl mx-auto">
+  const tableDistribution: PayoutDetailWithEdits[] = isEditing ? editedDistribution : latestPayout?.distribution.map(item => ({
+    memberId: item.memberId,
+    amount: item.amount,
+    actualAmount: item.actualAmount || item.amount + (item.balance || 0),
+    balance: item.balance,
+    isEdited: false
+  })) || [];
+  return <Card className="w-full max-w-3xl mx-auto">
       <PayoutHeader />
       <CardContent className="p-6">
-        {latestPayout ? (
-          <div className="space-y-6">
+        {latestPayout ? <div className="space-y-6">
             <PayoutDetails payout={latestPayout} />
             
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-medium">Verdeling:</h3>
-                {balancesUpdated ? (
-                  <Button variant="outline" size="sm" onClick={reopenEditor} className="h-8">
+                {balancesUpdated ? <Button variant="outline" size="sm" onClick={reopenEditor} className="h-8">
                     Opnieuw aanpassen
-                  </Button>
-                ) : !isEditing && (
-                  <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8">
+                  </Button> : !isEditing && <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8">
                     Aanpassen
-                  </Button>
-                )}
+                  </Button>}
               </div>
               
-              {isEditing && (
-                <RoundingSelector 
-                  roundingOption={roundingOption}
-                  setRoundingOption={setRoundingOption}
-                  applyRounding={applyRounding}
-                />
-              )}
+              {isEditing && <RoundingSelector roundingOption={roundingOption} setRoundingOption={setRoundingOption} applyRounding={applyRounding} />}
               
-              <DistributionTable
-                distribution={tableDistribution}
-                isEditing={isEditing}
-                findTeamMember={findTeamMember}
-                originalBalances={originalBalances}
-                handleAmountChange={handleAmountChange}
-              />
+              <DistributionTable distribution={tableDistribution} isEditing={isEditing} findTeamMember={findTeamMember} originalBalances={originalBalances} handleAmountChange={handleAmountChange} />
             </div>
             
-            <div className="bg-green-50 border border-green-200 p-4 rounded-md mt-4">
-              <p className="flex items-center">
-                <Check className="h-5 w-5 mr-2" />
-                Alle geselecteerde periodes zijn gemarkeerd als uitbetaald.
-              </p>
-            </div>
             
-            <ActionButtons
-              isEditing={isEditing}
-              balancesUpdated={balancesUpdated}
-              saveChanges={saveChanges}
-              handleCopyToClipboard={handleCopyToClipboard}
-              downloadCSV={downloadCSV}
-            />
-          </div>
-        ) : (
-          <div className="text-center py-6">
+            
+            <ActionButtons isEditing={isEditing} balancesUpdated={balancesUpdated} saveChanges={saveChanges} handleCopyToClipboard={handleCopyToClipboard} downloadCSV={downloadCSV} />
+          </div> : <div className="text-center py-6">
             <p>Geen recente uitbetaling gevonden.</p>
-          </div>
-        )}
+          </div>}
       </CardContent>
-    </Card>
-  );
+    </Card>;
 };
-
 export default PayoutSummary;

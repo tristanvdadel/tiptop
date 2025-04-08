@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,29 +31,24 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   const [roundingOption, setRoundingOption] = useState<RoundingOption>('none');
   const [balancesUpdated, setBalancesUpdated] = useState(false);
   
-  // Use the most recent payout provided by context, or fall back to the last one in the array
   const latestPayout = mostRecentPayout || (payouts.length > 0 ? payouts[payouts.length - 1] : null);
   
-  // Function to find a team member by ID
   const findTeamMember = (id: string) => {
     return teamMembers.find(member => member.id === id);
   };
 
-  // Initialize edited distribution when latestPayout changes
   useEffect(() => {
     if (latestPayout) {
       const initialEditableDistribution = latestPayout.distribution.map(item => {
-        // The amount is now ONLY the calculated tip amount without the balance
         const calculatedAmount = item.amount;
-        // The starting actualAmount is the sum of calculated amount and balance
         const originalBalance = item.balance || 0;
         const totalAmountWithBalance = calculatedAmount + originalBalance;
         
         return {
           memberId: item.memberId,
-          amount: calculatedAmount, // Just the calculated tip distribution
-          actualAmount: item.actualAmount || totalAmountWithBalance, // What will be paid (amount + balance)
-          balance: item.balance, // Original balance
+          amount: calculatedAmount,
+          actualAmount: item.actualAmount || totalAmountWithBalance,
+          balance: item.balance,
           isEdited: false
         };
       });
@@ -93,12 +87,11 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     const headers = "Naam,Berekend bedrag,Saldo,Totaal te ontvangen,Daadwerkelijk uitbetaald,Nieuw saldo\n";
     const rows = latestPayout.distribution.map(item => {
       const member = findTeamMember(item.memberId);
-      const calculatedAmount = item.amount; // Just the calculated amount
+      const calculatedAmount = item.amount;
       const originalBalance = item.balance || 0;
       const totalToReceive = calculatedAmount + originalBalance;
       const actuallyPaid = item.actualAmount || totalToReceive;
       
-      // Calculate new balance (what's left after payment)
       const newBalance = totalToReceive - actuallyPaid;
       
       return `${member?.name || 'Onbekend lid'},${calculatedAmount.toFixed(2)},${originalBalance.toFixed(2)},${totalToReceive.toFixed(2)},${actuallyPaid.toFixed(2)},${newBalance.toFixed(2)}`;
@@ -145,15 +138,10 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     if (!editedDistribution.length) return;
     
     const updatedDistribution = editedDistribution.map(item => {
-      // Get the original calculated amount (without balance)
       const calculatedAmount = item.amount;
-      // Get the original balance
       const originalBalance = latestPayout?.distribution.find(d => d.memberId === item.memberId)?.balance || 0;
-      // Calculate total that should be received (calculated amount + original balance)
       const totalToReceive = calculatedAmount + originalBalance;
-      // What was actually paid
       const actuallyPaid = item.actualAmount;
-      // New balance is what should have been received minus what was actually paid
       const newBalance = totalToReceive - actuallyPaid;
       
       return {
@@ -168,12 +156,10 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   const saveChanges = () => {
     if (!latestPayout || !editedDistribution.length) return;
     
-    // Apply the changes to the balances in the team members
     editedDistribution.forEach(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
       if (member) {
         updateTeamMemberBalance(item.memberId, item.balance || 0);
-        // Clear hours after payout is completed
         clearTeamMemberHours(item.memberId);
       }
     });
@@ -191,29 +177,22 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     
     const roundingValue = parseFloat(roundingOption);
     
-    // Apply rounding to the total amount (calculated amount + balance)
     const roundedDistribution = editedDistribution.map(item => {
-      const calculatedAmount = item.amount; // Pure calculated amount
+      const calculatedAmount = item.amount;
       const originalBalance = latestPayout?.distribution.find(d => d.memberId === item.memberId)?.balance || 0;
-      const totalAmount = calculatedAmount + originalBalance; // Total to potentially round
+      const totalAmount = calculatedAmount + originalBalance;
       
-      // Round DOWN the total amount based on the selected rounding option
       let roundedAmount = totalAmount;
       
       if (roundingValue === 0.50) {
-        // Round down to nearest 0.50
         roundedAmount = Math.floor(totalAmount / 0.50) * 0.50;
       } else if (roundingValue === 1.00) {
-        // Round down to nearest 1.00
         roundedAmount = Math.floor(totalAmount);
       } else if (roundingValue === 2.00) {
-        // Round down to nearest 2.00
         roundedAmount = Math.floor(totalAmount / 2.00) * 2.00;
       } else if (roundingValue === 5.00) {
-        // Round down to nearest 5.00
         roundedAmount = Math.floor(totalAmount / 5.00) * 5.00;
       } else if (roundingValue === 10.00) {
-        // Round down to nearest 10.00
         roundedAmount = Math.floor(totalAmount / 10.00) * 10.00;
       }
       
@@ -224,19 +203,13 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       };
     });
     
-    // Set the rounded distribution
     setEditedDistribution(roundedDistribution);
-    
-    // Recalculate balances based on new actual amounts
-    calculateNewBalances();
-    
     toast({
       title: "Bedragen afgerond",
       description: `Alle bedragen zijn naar beneden afgerond op €${roundingOption}.`
     });
   };
 
-  // Calculate new balances whenever edited distribution changes during editing
   useEffect(() => {
     if (isEditing) {
       calculateNewBalances();
@@ -307,7 +280,6 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
                       size="sm" 
                       onClick={applyRounding} 
                       className="h-8 gap-1"
-                      disabled={roundingOption === 'none'}
                     >
                       <Calculator className="h-4 w-4" />
                       Toepassen
@@ -332,24 +304,11 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
                     {(isEditing ? editedDistribution : latestPayout.distribution).map((item, index) => {
                       const member = findTeamMember(item.memberId);
                       
-                      // Pure calculated amount without balance
                       const calculatedAmount = item.amount;
-                      
-                      // Original balance
-                      const originalBalance = latestPayout.distribution.find(d => d.memberId === item.memberId)?.balance || 0;
-                      
-                      // Total amount that should be received (calculated + balance)
+                      const originalBalance = latestPayout?.distribution.find(d => d.memberId === item.memberId)?.balance || 0;
                       const totalAmount = calculatedAmount + originalBalance;
-                      
-                      // What is actually being paid (either edited or original)
-                      const actualAmount = isEditing 
-                        ? item.actualAmount 
-                        : (item.actualAmount || totalAmount);
-                      
-                      // Calculate new balance (what's left after payment)
-                      const newBalance = isEditing 
-                        ? item.balance 
-                        : totalAmount - actualAmount;
+                      const actualAmount = isEditing ? item.actualAmount : (item.actualAmount || totalAmount);
+                      const newBalance = isEditing ? item.balance : totalAmount - actualAmount;
                       
                       return (
                         <TableRow key={index} className={isEditing && (item as any).isEdited ? "bg-amber-50" : ""}>

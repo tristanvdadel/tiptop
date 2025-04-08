@@ -45,61 +45,63 @@ const DistributionTable: React.FC<DistributionTableProps> = ({
     <div className="border rounded-md overflow-hidden">
       <div className="relative overflow-x-auto" ref={scrollRef}>
         <ScrollArea className="h-[300px]">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead style={fixedColumnStyle} className="bg-white">Naam</TableHead>
-                <TableHead className="text-right min-w-[100px]">Berekend</TableHead>
-                <TableHead className="text-right min-w-[100px]">Saldo</TableHead>
-                <TableHead className="text-right min-w-[100px]">Totaal</TableHead>
-                <TableHead className="text-right min-w-[100px]">Uitbetaald</TableHead>
-                <TableHead className="text-right min-w-[100px]">Nieuw saldo</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {distribution.map((item, index) => {
-                const member = findTeamMember(item.memberId);
-                const calculatedAmount = item.amount;
-                const originalBalance = originalBalances[item.memberId] || 0;
-                const totalAmount = calculatedAmount + originalBalance;
-                const actualAmount = isEditing ? item.actualAmount : item.actualAmount || totalAmount;
-                const newBalance = isEditing ? item.balance : totalAmount - actualAmount;
-                
-                return (
-                  <TableRow key={index} className={isEditing && item.isEdited ? "bg-amber-50" : ""}>
-                    <TableCell 
-                      style={fixedColumnStyle}
-                      className="bg-white min-w-[120px]"
-                    >
-                      {member ? member.name : 'Onbekend teamlid'}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">€{calculatedAmount.toFixed(2)}</TableCell>
-                    <TableCell className={`text-right whitespace-nowrap ${originalBalance > 0 ? 'text-green-600' : originalBalance < 0 ? 'text-red-600' : ''}`}>
-                      {originalBalance !== 0 ? `€${Math.abs(originalBalance).toFixed(2)} ${originalBalance > 0 ? '+' : '-'}` : '-'}
-                    </TableCell>
-                    <TableCell className="text-right font-medium whitespace-nowrap">
-                      €{totalAmount.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right font-medium whitespace-nowrap">
-                      {isEditing ? (
-                        <Input 
-                          type="number" 
-                          value={actualAmount} 
-                          onChange={e => handleAmountChange(item.memberId, e.target.value)} 
-                          className="w-24 text-right inline-block h-8" 
-                          min="0" 
-                          step="0.01" 
-                        />
-                      ) : `€${actualAmount.toFixed(2)}`}
-                    </TableCell>
-                    <TableCell className={`text-right whitespace-nowrap ${newBalance && newBalance > 0 ? 'text-green-600' : newBalance && newBalance < 0 ? 'text-red-600' : ''}`}>
-                      {newBalance !== undefined && newBalance !== 0 ? `€${Math.abs(newBalance).toFixed(2)} ${newBalance > 0 ? '+' : '-'}` : '-'}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <div className="min-w-[700px]"> {/* Set minimum width to ensure horizontal scrolling on mobile */}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead style={fixedColumnStyle} className="bg-white">Naam</TableHead>
+                  <TableHead className="text-right min-w-[100px]">Berekend</TableHead>
+                  <TableHead className="text-right min-w-[100px]">Saldo</TableHead>
+                  <TableHead className="text-right min-w-[100px]">Totaal</TableHead>
+                  <TableHead className="text-right min-w-[100px]">Uitbetaald</TableHead>
+                  <TableHead className="text-right min-w-[100px]">Nieuw saldo</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {distribution.map((item, index) => {
+                  const member = findTeamMember(item.memberId);
+                  const calculatedAmount = item.amount;
+                  const originalBalance = originalBalances[item.memberId] || 0;
+                  const totalAmount = calculatedAmount + originalBalance;
+                  const actualAmount = isEditing ? item.actualAmount : item.actualAmount || totalAmount;
+                  const newBalance = isEditing ? item.balance : totalAmount - actualAmount;
+                  
+                  return (
+                    <TableRow key={index} className={isEditing && item.isEdited ? "bg-amber-50" : ""}>
+                      <TableCell 
+                        style={fixedColumnStyle}
+                        className="bg-white min-w-[120px] font-medium"
+                      >
+                        {member ? member.name : 'Onbekend teamlid'}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">€{calculatedAmount.toFixed(2)}</TableCell>
+                      <TableCell className={`text-right whitespace-nowrap ${originalBalance > 0 ? 'text-green-600' : originalBalance < 0 ? 'text-red-600' : ''}`}>
+                        {originalBalance !== 0 ? `€${Math.abs(originalBalance).toFixed(2)} ${originalBalance > 0 ? '+' : '-'}` : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-medium whitespace-nowrap">
+                        €{totalAmount.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right font-medium whitespace-nowrap">
+                        {isEditing ? (
+                          <Input 
+                            type="number" 
+                            value={actualAmount} 
+                            onChange={e => handleAmountChange(item.memberId, e.target.value)} 
+                            className="w-24 text-right inline-block h-8" 
+                            min="0" 
+                            step="0.01" 
+                          />
+                        ) : `€${actualAmount.toFixed(2)}`}
+                      </TableCell>
+                      <TableCell className={`text-right whitespace-nowrap ${newBalance && newBalance > 0 ? 'text-green-600' : newBalance && newBalance < 0 ? 'text-red-600' : ''}`}>
+                        {newBalance !== undefined && newBalance !== 0 ? `€${Math.abs(newBalance).toFixed(2)} ${newBalance > 0 ? '+' : '-'}` : '-'}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </ScrollArea>
       </div>
       

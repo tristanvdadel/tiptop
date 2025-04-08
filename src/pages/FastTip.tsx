@@ -143,26 +143,26 @@ const FastTip = () => {
   };
   
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-amber-900/20 via-amber-800/30 to-amber-900/20 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-orange-500/20 via-orange-400/30 to-orange-500/20 relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-50 z-0">
-        <Sparkles className="absolute top-12 left-24 text-amber-600 animate-pulse" size={32} />
-        <Sparkles className="absolute bottom-24 right-12 text-amber-700 animate-pulse delay-500" size={40} />
-        <Sparkles className="absolute top-1/3 right-1/4 text-amber-500 animate-pulse delay-300" size={24} />
-        <Sparkles className="absolute bottom-1/4 left-1/3 text-amber-600 animate-pulse delay-200" size={28} />
+        <Sparkles className="absolute top-12 left-24 text-orange-600 animate-pulse" size={32} />
+        <Sparkles className="absolute bottom-24 right-12 text-orange-700 animate-pulse delay-500" size={40} />
+        <Sparkles className="absolute top-1/3 right-1/4 text-orange-500 animate-pulse delay-300" size={24} />
+        <Sparkles className="absolute bottom-1/4 left-1/3 text-orange-600 animate-pulse delay-200" size={28} />
       </div>
 
-      <header className="bg-amber-900/80 dark:bg-amber-950/90 p-4 flex items-center justify-between shadow-2xl relative z-10 backdrop-blur-sm border-b border-amber-800/30">
+      <header className="bg-orange-600/80 dark:bg-orange-700/90 p-4 flex items-center justify-between shadow-2xl relative z-10 backdrop-blur-sm border-b border-orange-500/30">
         <div className="flex items-center">
           <Button 
             variant="ghost" 
             size="icon" 
             onClick={() => navigate('/')}
-            className="mr-2 text-white hover:bg-amber-800 dark:hover:bg-amber-900 transition-all"
+            className="mr-2 text-white hover:bg-orange-700 dark:hover:bg-orange-800 transition-all"
           >
             <ArrowLeft size={24} />
           </Button>
           <h1 className="text-xl font-bold flex items-center text-white">
-            <Zap size={18} className="mr-2 text-amber-400" />
+            <Zap size={18} className="mr-2 text-orange-300" />
             FastTip
           </h1>
         </div>
@@ -171,12 +171,12 @@ const FastTip = () => {
             <Button 
               variant="ghost" 
               size="icon" 
-              className="text-white hover:bg-amber-800 dark:hover:bg-amber-900"
+              className="text-white hover:bg-orange-700 dark:hover:bg-orange-800"
             >
               <Settings size={20} />
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] backdrop-blur-2xl bg-amber-900/80 dark:bg-amber-950/90 border-amber-800/50 shadow-2xl">
+          <DialogContent className="sm:max-w-[425px] backdrop-blur-2xl bg-orange-600/80 dark:bg-orange-700/90 border-orange-500/50 shadow-2xl">
             <DialogHeader>
               <DialogTitle>Snelknoppen instellen</DialogTitle>
               <DialogDescription>
@@ -202,7 +202,7 @@ const FastTip = () => {
       </header>
       
       <div className="flex-grow flex flex-col items-center justify-center p-4 relative z-10">
-        <div className="w-full max-w-md bg-amber-900/30 dark:bg-amber-950/40 backdrop-blur-2xl shadow-2xl rounded-2xl p-6 border border-amber-800/30 relative overflow-hidden transition-all hover:shadow-amber-700/30 hover:scale-[1.02] transform duration-300 ease-in-out">
+        <div className="w-full max-w-md bg-orange-600/30 dark:bg-orange-700/40 backdrop-blur-2xl shadow-2xl rounded-2xl p-6 border border-orange-500/30 relative overflow-hidden transition-all hover:shadow-orange-700/30 hover:scale-[1.02] transform duration-300 ease-in-out">
           <div className="relative z-10">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-medium mb-2 text-amber-900 dark:text-amber-100 animate-fade-in">Bedrag</h2>
@@ -291,11 +291,11 @@ const FastTip = () => {
             
             <Button 
               variant="goldGradient"
-              className="w-full py-6 text-lg relative group overflow-hidden shadow-xl hover:scale-[1.02] transform transition-transform duration-300 ease-in-out bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600"
+              className="w-full py-6 text-lg relative group overflow-hidden shadow-xl hover:scale-[1.02] transform transition-transform duration-300 ease-in-out bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500"
               disabled={amount <= 0}
               onClick={handleSave}
             >
-              <Sparkles size={20} className="mr-2 animate-pulse group-hover:animate-spin text-amber-100" /> 
+              <Sparkles size={20} className="mr-2 animate-pulse group-hover:animate-spin text-orange-100" /> 
               <span className="relative z-10 text-white">Top Tip</span>
             </Button>
           </div>

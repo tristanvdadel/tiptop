@@ -174,25 +174,40 @@ const Management = () => {
           setSelectedMembershipId(currentMembership.id);
         }
         
-        // Get user emails
-        const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
-        
-        if (usersError) {
-          console.error('Error fetching users:', usersError);
-        }
-        
-        const enrichedMembers = members.map(member => {
-          const profile = profiles?.find(p => p.id === member.user_id) || {};
-          const userEmail = users?.find(u => u.id === member.user_id)?.email || 'Onbekend';
+        // Try to get user emails - this will only work with proper admin permissions
+        try {
+          const { data, error: usersError } = await supabase.auth.admin.listUsers();
           
-          return {
-            ...member,
-            profile,
-            email: userEmail
-          };
-        });
-        
-        setTeamMembers(enrichedMembers);
+          if (usersError) throw usersError;
+          
+          const enrichedMembers = members.map(member => {
+            const profile = profiles?.find(p => p.id === member.user_id) || {};
+            const userInfo = data?.users?.find(u => u.id === member.user_id);
+            const userEmail = userInfo?.email || 'Onbekend';
+            
+            return {
+              ...member,
+              profile,
+              email: userEmail
+            };
+          });
+          
+          setTeamMembers(enrichedMembers);
+        } catch (error) {
+          console.error('Error fetching user emails:', error);
+          // Fallback: just show members without emails
+          const enrichedMembers = members.map(member => {
+            const profile = profiles?.find(p => p.id === member.user_id) || {};
+            
+            return {
+              ...member,
+              profile,
+              email: 'Onbekend' // Default when we can't get emails
+            };
+          });
+          
+          setTeamMembers(enrichedMembers);
+        }
       } catch (error) {
         console.error('Error loading team members:', error);
         toast({
@@ -338,7 +353,7 @@ const Management = () => {
       const { data: existingMember } = await supabase
         .from('team_members')
         .select('id')
-        .eq('team_id', invite?.team_id)
+        .eq('team_id', invite.team_id)
         .eq('user_id', user.id)
         .maybeSingle();
       
@@ -350,10 +365,10 @@ const Management = () => {
         .from('team_members')
         .insert([
           { 
-            team_id: invite?.team_id, 
+            team_id: invite.team_id, 
             user_id: user.id,
-            role: invite?.role,
-            permissions: invite?.permissions
+            role: invite.role,
+            permissions: invite.permissions
           }
         ]);
       
@@ -455,6 +470,14 @@ const Management = () => {
         throw new Error("Je hebt geen rechten om dit team te verwijderen.");
       }
       
+      // Delete all team invites first
+      const { error: inviteDeleteError } = await supabase
+        .from('invites')
+        .delete()
+        .eq('team_id', selectedTeamId);
+        
+      if (inviteDeleteError) throw inviteDeleteError;
+      
       // Delete all team members
       const { error: memberDeleteError } = await supabase
         .from('team_members')
@@ -462,14 +485,6 @@ const Management = () => {
         .eq('team_id', selectedTeamId);
         
       if (memberDeleteError) throw memberDeleteError;
-      
-      // Delete all invites
-      const { error: inviteDeleteError } = await supabase
-        .from('invites')
-        .delete()
-        .eq('team_id', selectedTeamId);
-        
-      if (inviteDeleteError) throw inviteDeleteError;
       
       // Delete the team
       const { error: teamDeleteError } = await supabase

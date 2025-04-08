@@ -509,18 +509,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setTeamMembers(prev => 
       prev.map(member => {
         if (member.id === memberId) {
-          const savedRegistrations = member.hourRegistrations || [];
-          
           return { 
             ...member,
             hours: 0,
-            hourRegistrations: [],
-            savedHourRegistrations: savedRegistrations
+            hourRegistrations: [] // Clear all hour registrations
           };
         }
         return member;
       })
     );
+    
+    toast({
+      title: "Uren gereset",
+      description: "De uren van het teamlid zijn gereset na uitbetaling.",
+    });
   };
 
   const updateTeamMemberName = (memberId: string, newName: string): boolean => {

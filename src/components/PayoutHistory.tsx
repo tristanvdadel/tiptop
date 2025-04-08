@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -6,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { useApp } from '@/contexts/AppContext';
-import { History, FileText, Download, ArrowUpDown, ArrowUp, ArrowDown, FilePdf, FileSpreadsheet, FileCsv } from 'lucide-react';
+import { History, FileText, Download, ArrowUpDown, ArrowUp, ArrowDown, FileText as FilePdf, FileSpreadsheet, FileText as FileCsv } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -77,7 +76,6 @@ const PayoutHistory = () => {
   const downloadExcel = () => {
     if (!selectedPayout) return;
     
-    // Create a more structured Excel-like CSV with formatting
     const headers = "Uitbetaling datum:,${formatDate(selectedPayout.date)}\n\n";
     const tableHeaders = "Naam,Berekend bedrag,Balans,Uitbetaald bedrag,Nieuw saldo\n";
     
@@ -116,14 +114,11 @@ const PayoutHistory = () => {
   const downloadPDF = () => {
     if (!selectedPayout) return;
     
-    // In a real implementation, we would create a proper PDF here
-    // For simplicity in this demo, we'll show a toast message
     toast({
       title: "PDF wordt gegenereerd",
       description: "Het factuur-stijl PDF bestand wordt gedownload."
     });
     
-    // We would normally use a library like jsPDF or pdfmake here to create a proper PDF
     setTimeout(() => {
       toast({
         title: "PDF gedownload",

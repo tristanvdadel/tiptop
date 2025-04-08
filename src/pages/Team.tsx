@@ -79,7 +79,6 @@ const Team = () => {
     markPeriodsAsPaid(selectedPeriods, customDistribution);
     setShowPayoutSummary(true);
     
-    // Add the payoutSummary parameter to URL when showing the payout summary
     const url = new URL(window.location.href);
     url.searchParams.set('payoutSummary', 'true');
     window.history.pushState({}, '', url.toString());
@@ -124,7 +123,6 @@ const Team = () => {
       <div>
         <PayoutSummary onClose={() => {
           setShowPayoutSummary(false);
-          // Remove the payoutSummary parameter when closing the payout summary
           const url = new URL(window.location.href);
           url.searchParams.delete('payoutSummary');
           window.history.pushState({}, '', url.toString());

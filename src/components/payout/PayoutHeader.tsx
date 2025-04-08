@@ -8,7 +8,7 @@ const PayoutHeader: React.FC = () => {
     <CardHeader className="border-b">
       <CardTitle className="text-xl flex items-center">
         <Check className="h-5 w-5 mr-2 text-green-500" />
-        Uitbetaling succesvol
+        Uitbetaling samenvatting
       </CardTitle>
     </CardHeader>
   );

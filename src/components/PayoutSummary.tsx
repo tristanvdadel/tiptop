@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface PayoutSummaryProps {
   onClose: () => void;
@@ -157,7 +157,6 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   const saveChanges = () => {
     if (!latestPayout || !editedDistribution.length) return;
     
-    // Update the balance for each team member
     editedDistribution.forEach(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
       if (member) {
@@ -166,7 +165,6 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       }
     });
     
-    // Update the latestPayout with the edited distribution values
     const updatedDistribution = editedDistribution.map(item => ({
       memberId: item.memberId,
       amount: item.amount,
@@ -174,14 +172,11 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       balance: latestPayout.distribution.find(d => d.memberId === item.memberId)?.balance || 0
     }));
     
-    // Update the mostRecentPayout in the context (important fix!)
     const updatedPayout = {
       ...latestPayout,
       distribution: updatedDistribution
     };
     
-    // This is an important fix to ensure the updated payout information is used
-    // when the component re-renders
     useApp().setMostRecentPayout(updatedPayout);
     
     setIsEditing(false);
@@ -223,7 +218,6 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       };
     });
     
-    // Important fix: Update the editedDistribution state with the rounded values
     setEditedDistribution(roundedDistribution);
     
     toast({
@@ -238,7 +232,6 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     }
   }, [editedDistribution, isEditing]);
   
-  // Function to handle reopening editor when balances are already updated
   const reopenEditor = () => {
     setBalancesUpdated(false);
     setIsEditing(true);
@@ -270,7 +263,6 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-medium">Verdeling:</h3>
-                {/* Fixed button logic to allow reopening editor */}
                 {balancesUpdated ? (
                   <Button 
                     variant="outline" 
@@ -327,62 +319,64 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
               )}
               
               <div className="border rounded-md overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Naam</TableHead>
-                      <TableHead className="text-right">Berekend</TableHead>
-                      <TableHead className="text-right">Saldo</TableHead>
-                      <TableHead className="text-right">Totaal</TableHead>
-                      <TableHead className="text-right">Uitbetaald</TableHead>
-                      <TableHead className="text-right">Nieuw saldo</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(isEditing ? editedDistribution : latestPayout.distribution).map((item, index) => {
-                      const member = findTeamMember(item.memberId);
-                      
-                      const calculatedAmount = item.amount;
-                      const originalBalance = latestPayout?.distribution.find(d => d.memberId === item.memberId)?.balance || 0;
-                      const totalAmount = calculatedAmount + originalBalance;
-                      const actualAmount = isEditing ? item.actualAmount : (item.actualAmount || totalAmount);
-                      const newBalance = isEditing ? item.balance : totalAmount - actualAmount;
-                      
-                      return (
-                        <TableRow key={index} className={isEditing && (item as any).isEdited ? "bg-amber-50" : ""}>
-                          <TableCell>{member ? member.name : 'Onbekend teamlid'}</TableCell>
-                          <TableCell className="text-right">€{calculatedAmount.toFixed(2)}</TableCell>
-                          <TableCell className={`text-right ${originalBalance > 0 ? 'text-green-600' : originalBalance < 0 ? 'text-red-600' : ''}`}>
-                            {originalBalance !== 0 ? `€${Math.abs(originalBalance).toFixed(2)} ${originalBalance > 0 ? '+' : '-'}` : '-'}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            €{totalAmount.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {isEditing ? (
-                              <Input 
-                                type="number" 
-                                value={actualAmount} 
-                                onChange={(e) => handleAmountChange(item.memberId, e.target.value)}
-                                className="w-24 text-right inline-block h-8"
-                                min="0"
-                                step="0.01"
-                              />
-                            ) : (
-                              `€${actualAmount.toFixed(2)}`
-                            )}
-                          </TableCell>
-                          <TableCell className={`text-right ${newBalance && newBalance > 0 ? 'text-green-600' : newBalance && newBalance < 0 ? 'text-red-600' : ''}`}>
-                            {newBalance !== undefined && newBalance !== 0 ? 
-                              `€${Math.abs(newBalance).toFixed(2)} ${newBalance > 0 ? '+' : '-'}` : 
-                              '-'
-                            }
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                <ScrollArea className="h-[300px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Naam</TableHead>
+                        <TableHead className="text-right">Berekend</TableHead>
+                        <TableHead className="text-right">Saldo</TableHead>
+                        <TableHead className="text-right">Totaal</TableHead>
+                        <TableHead className="text-right">Uitbetaald</TableHead>
+                        <TableHead className="text-right">Nieuw saldo</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(isEditing ? editedDistribution : latestPayout.distribution).map((item, index) => {
+                        const member = findTeamMember(item.memberId);
+                        
+                        const calculatedAmount = item.amount;
+                        const originalBalance = latestPayout?.distribution.find(d => d.memberId === item.memberId)?.balance || 0;
+                        const totalAmount = calculatedAmount + originalBalance;
+                        const actualAmount = isEditing ? item.actualAmount : (item.actualAmount || totalAmount);
+                        const newBalance = isEditing ? item.balance : totalAmount - actualAmount;
+                        
+                        return (
+                          <TableRow key={index} className={isEditing && (item as any).isEdited ? "bg-amber-50" : ""}>
+                            <TableCell>{member ? member.name : 'Onbekend teamlid'}</TableCell>
+                            <TableCell className="text-right">€{calculatedAmount.toFixed(2)}</TableCell>
+                            <TableCell className={`text-right ${originalBalance > 0 ? 'text-green-600' : originalBalance < 0 ? 'text-red-600' : ''}`}>
+                              {originalBalance !== 0 ? `€${Math.abs(originalBalance).toFixed(2)} ${originalBalance > 0 ? '+' : '-'}` : '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              €{totalAmount.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {isEditing ? (
+                                <Input 
+                                  type="number" 
+                                  value={actualAmount} 
+                                  onChange={(e) => handleAmountChange(item.memberId, e.target.value)}
+                                  className="w-24 text-right inline-block h-8"
+                                  min="0"
+                                  step="0.01"
+                                />
+                              ) : (
+                                `€${actualAmount.toFixed(2)}`
+                              )}
+                            </TableCell>
+                            <TableCell className={`text-right ${newBalance && newBalance > 0 ? 'text-green-600' : newBalance && newBalance < 0 ? 'text-red-600' : ''}`}>
+                              {newBalance !== undefined && newBalance !== 0 ? 
+                                `€${Math.abs(newBalance).toFixed(2)} ${newBalance > 0 ? '+' : '-'}` : 
+                                '-'
+                              }
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
                 
                 <div className="p-2 border-t flex justify-between">
                   <span className="font-medium">Totaal</span>

@@ -478,6 +478,57 @@ const Management = () => {
     }
   };
 
+  const handleRenameTeam = async (teamId, newName) => {
+    if (!teamId || !newName.trim() || !user) return;
+    
+    try {
+      const { data: adminMembership, error: adminError } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('team_id', teamId)
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+        
+      if (adminError) {
+        console.error("Error checking admin status:", adminError);
+        throw new Error("Er is een fout opgetreden bij het verifiëren van je rechten.");
+      }
+      
+      if (!adminMembership) {
+        throw new Error("Je hebt geen rechten om de teamnaam te wijzigen.");
+      }
+      
+      const { error: updateError } = await supabase
+        .from('teams')
+        .update({ name: newName.trim() })
+        .eq('id', teamId);
+        
+      if (updateError) throw updateError;
+      
+      setUserTeams(prev => 
+        prev.map(team => 
+          team.id === teamId 
+            ? { ...team, name: newName.trim() } 
+            : team
+        )
+      );
+      
+      toast({
+        title: "Teamnaam bijgewerkt",
+        description: "De naam van het team is succesvol bijgewerkt.",
+      });
+      
+    } catch (error) {
+      console.error('Error renaming team:', error);
+      toast({
+        title: "Fout bij hernoemen team",
+        description: error.message || "Er is een fout opgetreden bij het hernoemen van het team.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-6 space-y-6 pb-20">
       <h1 className="text-2xl font-bold">Beheer</h1>
@@ -528,6 +579,7 @@ const Management = () => {
                         onTeamChange={handleTeamChange}
                         onLeaveTeam={handleLeaveTeam}
                         onDeleteTeam={handleDeleteTeam}
+                        onRenameTeam={handleRenameTeam}
                       />
                     </div>
                   </CarouselItem>
@@ -562,7 +614,24 @@ const Management = () => {
         </TabsContent>
         
         <TabsContent value="permissions" className="mt-4">
-          <TeamMemberPermissions teamId={selectedTeamId} isAdmin={isAdmin} />
+          <Carousel
+            className="w-full"
+            opts={{
+              align: "start",
+            }}
+          >
+            <CarouselContent className="-ml-1">
+              <CarouselItem className="pl-1">
+                <div className="p-1">
+                  <TeamMemberPermissions teamId={selectedTeamId} isAdmin={isAdmin} />
+                </div>
+              </CarouselItem>
+            </CarouselContent>
+            <div className="hidden md:flex">
+              <CarouselPrevious className="left-1" />
+              <CarouselNext className="right-1" />
+            </div>
+          </Carousel>
         </TabsContent>
         
         <TabsContent value="payouts" className="mt-4">

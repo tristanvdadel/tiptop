@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { MoveHorizontal, LogOut, Trash2 } from 'lucide-react';
+import { Input } from "@/components/ui/input";
+import { MoveHorizontal, LogOut, Trash2, Edit, Save } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,6 +52,7 @@ interface TeamOverviewProps {
   onTeamChange: (teamId: string) => void;
   onLeaveTeam: () => void;
   onDeleteTeam: () => void;
+  onRenameTeam?: (teamId: string, newName: string) => void;
 }
 
 const TeamOverview = ({
@@ -61,8 +63,39 @@ const TeamOverview = ({
   selectedMembershipId,
   onTeamChange,
   onLeaveTeam,
-  onDeleteTeam
+  onDeleteTeam,
+  onRenameTeam
 }: TeamOverviewProps) => {
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [newTeamName, setNewTeamName] = useState('');
+  const { toast } = useToast();
+
+  const selectedTeam = userTeams.find(team => team.id === selectedTeamId);
+
+  const handleStartEditing = () => {
+    if (selectedTeam) {
+      setNewTeamName(selectedTeam.name);
+      setIsEditingName(true);
+    }
+  };
+
+  const handleSaveTeamName = () => {
+    if (selectedTeamId && newTeamName.trim() && onRenameTeam) {
+      onRenameTeam(selectedTeamId, newTeamName.trim());
+      setIsEditingName(false);
+    } else {
+      toast({
+        title: "Ongeldige naam",
+        description: "Naam mag niet leeg zijn.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCancelEditing = () => {
+    setIsEditingName(false);
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -89,6 +122,39 @@ const TeamOverview = ({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            )}
+            
+            {selectedTeam && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Team naam</Label>
+                  {isEditingName ? (
+                    <div className="flex space-x-2">
+                      <Input
+                        value={newTeamName}
+                        onChange={(e) => setNewTeamName(e.target.value)}
+                        placeholder="Team naam"
+                        className="flex-1"
+                      />
+                      <div className="flex space-x-1">
+                        <Button variant="outline" size="icon" onClick={handleSaveTeamName} title="Opslaan">
+                          <Save className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="icon" onClick={handleCancelEditing} title="Annuleren">
+                          <LogOut className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">{selectedTeam.name}</div>
+                      <Button variant="ghost" size="icon" onClick={handleStartEditing} title="Bewerken">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             

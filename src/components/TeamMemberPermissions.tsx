@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -36,7 +35,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { supabase, TeamMemberPermissions as TMP } from "@/integrations/supabase/client";
+import { supabase, TeamMemberPermissions as TMP, getUserEmail } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 // Ensure we have a well-typed defaultPermissions object
@@ -141,14 +140,8 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
               console.error('Error fetching profile:', profileError);
             }
             
-            // Try to get user email 
-            let userEmail;
-            try {
-              const { data } = await supabase.auth.admin.getUserById(member.user_id);
-              userEmail = data?.user?.email;
-            } catch (error) {
-              console.error('Error fetching user email:', error);
-            }
+            // Try to get user email using our helper function
+            const userEmail = await getUserEmail(member.user_id);
 
             return {
               ...member,

@@ -22,6 +22,28 @@ export const isLoggedIn = async () => {
   return !!user;
 };
 
+// Get user email safely (without admin API)
+export const getUserEmail = async (userId: string) => {
+  try {
+    // First try to get from profile if we have it
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .eq('id', userId)
+      .single();
+      
+    if (profile && profile.email) {
+      return profile.email;
+    }
+    
+    // Return unknown if we can't get the email
+    return 'Onbekend';
+  } catch (error) {
+    console.error('Error getting user email:', error);
+    return 'Onbekend';
+  }
+};
+
 // Interface extensions to help with TypeScript
 export interface Team {
   id: string;

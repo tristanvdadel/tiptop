@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -414,8 +415,9 @@ const Management = () => {
         
       if (adminsError) throw adminsError;
       
-      const isLastAdmin = teamAdmins.length === 1 && 
-                          teamAdmins[0].id === selectedMembershipId;
+      // Fix: Ensure teamAdmins is an array before accessing its length
+      const isLastAdmin = teamAdmins && teamAdmins.length === 1 && 
+                          teamAdmins[0] && teamAdmins[0].id === selectedMembershipId;
       
       if (isLastAdmin) {
         throw new Error("Je kunt het team niet verlaten omdat je de enige beheerder bent. Maak eerst een ander lid beheerder of verwijder het team.");

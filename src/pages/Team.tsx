@@ -173,10 +173,10 @@ const Team = () => {
       {periods.filter(period => !period.isPaid && !period.isActive).length > 0 && (
         <div className="flex gap-2">
           <Button 
-            variant="goldGradient" 
+            variant="default" 
+            className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white"
             onClick={handlePayout} 
-            disabled={selectedPeriods.length === 0} 
-            className="w-full md:w-auto"
+            disabled={selectedPeriods.length === 0}
           >
             Uitbetaling voltooien
           </Button>

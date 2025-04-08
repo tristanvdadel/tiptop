@@ -182,7 +182,7 @@ const Team = () => {
     const customDistribution = distribution.map(member => ({
       memberId: member.id,
       amount: member.tipAmount || 0,
-      actualAmount: member.tipAmount || 0,
+      actualAmount: (member.tipAmount || 0) + (member.balance || 0),
       balance: member.balance
     }));
     

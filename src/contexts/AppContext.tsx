@@ -655,6 +655,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
     
     if (totalHours === 0) {
+      // If no hours logged, distribute equally among members with balances or hours
       const membersWithBalances = teamMembers.filter(member => 
         (member.balance !== undefined && member.balance !== 0) || member.hours > 0
       );
@@ -663,21 +664,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return [];
       }
       
-      const totalBalances = membersWithBalances.reduce(
-        (sum, member) => sum + (member.balance || 0), 
-        0
-      );
-      
-      const remainingTip = totalTip - totalBalances;
-      const evenShare = remainingTip > 0 ? remainingTip / membersWithBalances.length : 0;
+      // Equal distribution - no balances included in the calculation
+      const evenShare = totalTip > 0 ? totalTip / membersWithBalances.length : 0;
       
       return teamMembers.map(member => {
-        const existingBalance = member.balance || 0;
         const tipShare = membersWithBalances.includes(member) ? evenShare : 0;
         
         return {
           ...member,
-          tipAmount: parseFloat((tipShare + existingBalance).toFixed(2)),
+          tipAmount: parseFloat(tipShare.toFixed(2)),
         };
       });
     }
@@ -696,11 +691,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         break;
     }
     
-    const totalBalances = teamMembers.reduce(
-      (sum, member) => sum + (member.balance || 0), 
-      0
-    );
-    
+    // Calculate distribution based on hours only, without adding balances
     const tipToDistribute = totalTip;
     
     const initialDistribution = teamMembers.map(member => {
@@ -713,12 +704,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         adjustedShare = hourShare * adjustmentFactor;
       }
       
-      const existingBalance = member.balance || 0;
-      
       return {
         ...member,
         hourShare: adjustedShare,
-        tipAmount: parseFloat((adjustedShare + existingBalance).toFixed(2)),
+        tipAmount: parseFloat(adjustedShare.toFixed(2)),
       };
     });
     
@@ -731,11 +720,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     return initialDistribution.map(member => {
       const scaledHourShare = member.hourShare * scalingFactor;
-      const existingBalance = member.balance || 0;
       
       return {
         ...member,
-        tipAmount: parseFloat((scaledHourShare + existingBalance).toFixed(2)),
+        tipAmount: parseFloat(scaledHourShare.toFixed(2)),
       };
     });
   };

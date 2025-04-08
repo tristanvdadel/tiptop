@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -113,7 +112,6 @@ const Management = () => {
               if (teams && teams.length > 0 && !selectedTeamId) {
                 setSelectedTeamId(teams[0].id);
                 
-                // Find the membership ID for the selected team
                 const membership = teamMembers.find(tm => tm.team_id === teams[0].id);
                 if (membership) {
                   setSelectedMembershipId(membership.id);
@@ -168,13 +166,11 @@ const Management = () => {
           throw profilesError;
         }
 
-        // Find the current user's membership ID for this team
         const currentMembership = members.find(m => m.user_id === user?.id);
         if (currentMembership) {
           setSelectedMembershipId(currentMembership.id);
         }
         
-        // Try to get user emails - this will only work with proper admin permissions
         try {
           const { data, error: usersError } = await supabase.auth.admin.listUsers();
           
@@ -195,14 +191,13 @@ const Management = () => {
           setTeamMembers(enrichedMembers);
         } catch (error) {
           console.error('Error fetching user emails:', error);
-          // Fallback: just show members without emails
           const enrichedMembers = members.map(member => {
             const profile = profiles?.find(p => p.id === member.user_id) || {};
             
             return {
               ...member,
               profile,
-              email: 'Onbekend' // Default when we can't get emails
+              email: 'Onbekend'
             };
           });
           
@@ -398,7 +393,6 @@ const Management = () => {
   const handleTeamChange = (teamId) => {
     setSelectedTeamId(teamId);
     
-    // Find the membership ID for the selected team
     const membership = userTeamMemberships.find(tm => tm.team_id === teamId);
     if (membership) {
       setSelectedMembershipId(membership.id);
@@ -409,7 +403,6 @@ const Management = () => {
     if (!selectedTeamId || !selectedMembershipId || !user) return;
     
     try {
-      // Check if user is the only admin in the team
       const { data: teamAdmins, error: adminsError } = await supabase
         .from('team_members')
         .select('id')
@@ -425,7 +418,6 @@ const Management = () => {
         throw new Error("Je kunt het team niet verlaten omdat je de enige beheerder bent. Maak eerst een ander lid beheerder of verwijder het team.");
       }
       
-      // Delete the team membership
       const { error: deleteError } = await supabase
         .from('team_members')
         .delete()
@@ -438,7 +430,6 @@ const Management = () => {
         description: "Je bent niet langer lid van dit team."
       });
       
-      // Refresh the page after a short delay
       setTimeout(() => {
         window.location.reload();
       }, 1500);
@@ -457,7 +448,6 @@ const Management = () => {
     if (!selectedTeamId || !user) return;
     
     try {
-      // Check if user is a team admin
       const { data: adminMembership, error: adminError } = await supabase
         .from('team_members')
         .select('id')
@@ -470,7 +460,6 @@ const Management = () => {
         throw new Error("Je hebt geen rechten om dit team te verwijderen.");
       }
       
-      // Delete all team invites first
       const { error: inviteDeleteError } = await supabase
         .from('invites')
         .delete()
@@ -478,7 +467,6 @@ const Management = () => {
         
       if (inviteDeleteError) throw inviteDeleteError;
       
-      // Delete all team members
       const { error: memberDeleteError } = await supabase
         .from('team_members')
         .delete()
@@ -486,7 +474,6 @@ const Management = () => {
         
       if (memberDeleteError) throw memberDeleteError;
       
-      // Delete the team
       const { error: teamDeleteError } = await supabase
         .from('teams')
         .delete()
@@ -499,7 +486,6 @@ const Management = () => {
         description: "Het team is succesvol verwijderd."
       });
       
-      // Refresh the page after a short delay
       setTimeout(() => {
         window.location.reload();
       }, 1500);
@@ -528,7 +514,7 @@ const Management = () => {
         </Alert>
       )}
       
-      <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue="teams">
+      <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue={hasAnyTeam ? "teams" : "join"}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="teams">Mijn teams</TabsTrigger>
           <TabsTrigger value="permissions" className="flex items-center gap-1">
@@ -741,28 +727,53 @@ const Management = () => {
               )}
             </div>
           ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>Nieuw team aanmaken</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="teamName">Teamnaam</Label>
-                    <Input
-                      id="teamName"
-                      placeholder="Bijv. Café De Kroeg"
-                      value={newTeamName}
-                      onChange={(e) => setNewTeamName(e.target.value)}
-                    />
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Team toetreden met code</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="inviteCode">Uitnodigingscode</Label>
+                      <Input
+                        id="inviteCode"
+                        placeholder="Voer code in"
+                        value={inviteCode}
+                        onChange={(e) => setInviteCode(e.target.value)}
+                      />
+                    </div>
+                    <Button onClick={handleJoinTeam} disabled={!inviteCode.trim()}>
+                      <LogIn className="mr-2 h-4 w-4" />
+                      Team toetreden
+                    </Button>
                   </div>
-                  <Button onClick={handleCreateTeam} disabled={!newTeamName.trim()}>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Team aanmaken
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Nieuw team aanmaken</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="teamName">Teamnaam</Label>
+                      <Input
+                        id="teamName"
+                        placeholder="Bijv. Café De Kroeg"
+                        value={newTeamName}
+                        onChange={(e) => setNewTeamName(e.target.value)}
+                      />
+                    </div>
+                    <Button onClick={handleCreateTeam} disabled={!newTeamName.trim()}>
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Team aanmaken
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </TabsContent>
         
@@ -774,32 +785,30 @@ const Management = () => {
           <PayoutHistory />
         </TabsContent>
         
-        {!hasAnyTeam && (
-          <TabsContent value="join" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Team toetreden met code</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="inviteCode">Uitnodigingscode</Label>
-                    <Input
-                      id="inviteCode"
-                      placeholder="Voer code in"
-                      value={inviteCode}
-                      onChange={(e) => setInviteCode(e.target.value)}
-                    />
-                  </div>
-                  <Button onClick={handleJoinTeam} disabled={!inviteCode.trim()}>
-                    <LogIn className="mr-2 h-4 w-4" />
-                    Team toetreden
-                  </Button>
+        <TabsContent value="join" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Team toetreden met code</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="inviteCode">Uitnodigingscode</Label>
+                  <Input
+                    id="inviteCode"
+                    placeholder="Voer code in"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value)}
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
+                <Button onClick={handleJoinTeam} disabled={!inviteCode.trim()}>
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Team toetreden
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
       
       {userTeams.length === 0 && !loadingTeams && !error && (
@@ -807,7 +816,7 @@ const Management = () => {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Geen team gevonden</AlertTitle>
           <AlertDescription>
-            Je hebt nog geen team. Maak een nieuw team aan om fooi en uren te kunnen registreren.
+            Je hebt nog geen team. Maak een nieuw team aan of treed toe tot een bestaand team met een uitnodigingscode.
           </AlertDescription>
         </Alert>
       )}

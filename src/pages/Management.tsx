@@ -140,7 +140,7 @@ const Management = () => {
 
   useEffect(() => {
     const fetchTeamMembers = async () => {
-      if (!selectedTeamId) return;
+      if (!selectedTeamId || !user) return;
       
       setLoadingMembers(true);
       try {
@@ -166,7 +166,7 @@ const Management = () => {
           throw profilesError;
         }
 
-        const currentMembership = members.find(m => m.user_id === user?.id);
+        const currentMembership = members.find(m => m.user_id === user.id);
         if (currentMembership) {
           setSelectedMembershipId(currentMembership.id);
         }

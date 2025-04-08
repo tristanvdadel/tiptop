@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Shield, Info } from 'lucide-react';
+import { Shield, Info, UserRound, UserRoundPlus, UserRoundX } from 'lucide-react';
 import { 
   Table, 
   TableBody, 
@@ -18,6 +18,24 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { supabase, TeamMemberPermissions as TMP } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -30,6 +48,16 @@ const defaultPermissions: TMP = {
   view_reports: false,
   close_periods: false,
   manage_payouts: false
+};
+
+const defaultAdminPermissions: TMP = {
+  add_tips: true,
+  edit_tips: true,
+  add_hours: true,
+  view_team: true,
+  view_reports: true,
+  close_periods: true,
+  manage_payouts: true
 };
 
 interface TeamMemberPermissionsProps {
@@ -50,7 +78,19 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
     };
   }>>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setCurrentUserId(data.user.id);
+      }
+    };
+    
+    getCurrentUser();
+  }, []);
 
   useEffect(() => {
     const fetchTeamMembers = async () => {
@@ -176,6 +216,124 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
     }
   };
 
+  const updateRole = async (memberId: string, newRole: string) => {
+    const member = teamMembers.find(m => m.id === memberId);
+    if (!member) return;
+
+    // Don't allow changing own role
+    if (member.user_id === currentUserId) {
+      toast({
+        title: "Cannot change own role",
+        description: "Je kunt je eigen rol niet wijzigen.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Check if this would remove the last admin
+      if (member.role === 'admin' && newRole !== 'admin') {
+        const adminCount = teamMembers.filter(m => m.role === 'admin').length;
+        if (adminCount <= 1) {
+          toast({
+            title: "Cannot remove last admin",
+            description: "Er moet ten minste één beheerder zijn in het team.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      // Set permissions based on role
+      const newPermissions = newRole === 'admin' 
+        ? { ...defaultAdminPermissions }
+        : { ...member.permissions };
+
+      const { error } = await supabase
+        .from('team_members')
+        .update({ 
+          role: newRole,
+          permissions: newPermissions
+        })
+        .eq('id', memberId);
+
+      if (error) throw error;
+
+      // Update local state
+      setTeamMembers(prev => 
+        prev.map(m => 
+          m.id === memberId 
+            ? { ...m, role: newRole, permissions: newPermissions } 
+            : m
+        )
+      );
+
+      toast({
+        title: "Role updated",
+        description: `${member.profile?.first_name || member.email} is now a ${newRole}.`,
+      });
+    } catch (error: any) {
+      console.error('Error updating role:', error);
+      toast({
+        title: "Error updating role",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const removeTeamMember = async (memberId: string) => {
+    const member = teamMembers.find(m => m.id === memberId);
+    if (!member) return;
+
+    // Don't allow removing yourself
+    if (member.user_id === currentUserId) {
+      toast({
+        title: "Cannot remove yourself",
+        description: "Je kunt jezelf niet verwijderen. Gebruik de optie 'Team verlaten' in de Teams tab.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Don't allow removing the last admin
+    if (member.role === 'admin') {
+      const adminCount = teamMembers.filter(m => m.role === 'admin').length;
+      if (adminCount <= 1) {
+        toast({
+          title: "Cannot remove last admin",
+          description: "Je kunt de laatste beheerder niet verwijderen.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('id', memberId);
+
+      if (error) throw error;
+
+      // Update local state
+      setTeamMembers(prev => prev.filter(m => m.id !== memberId));
+
+      toast({
+        title: "Team member removed",
+        description: `${member.profile?.first_name || member.email} is verwijderd uit het team.`,
+      });
+    } catch (error: any) {
+      console.error('Error removing team member:', error);
+      toast({
+        title: "Error removing team member",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (!isAdmin) {
     return (
       <Card>
@@ -222,6 +380,7 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
                 <TableHead>Email</TableHead>
                 <TableHead>Rol</TableHead>
                 <TableHead>Bevoegdheden</TableHead>
+                <TableHead>Acties</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -232,11 +391,19 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
                   </TableCell>
                   <TableCell>{member.email || 'Geen email'}</TableCell>
                   <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      member.role === 'admin' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {member.role}
-                    </span>
+                    <Select 
+                      value={member.role}
+                      onValueChange={(value) => updateRole(member.id, value)}
+                      disabled={member.user_id === currentUserId}
+                    >
+                      <SelectTrigger className="w-[120px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="member">Lid</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-2">
@@ -394,6 +561,36 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
                         />
                       </div>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="w-full"
+                          disabled={member.user_id === currentUserId}
+                        >
+                          <UserRoundX className="h-4 w-4 mr-2" />
+                          Verwijderen
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Teamlid verwijderen</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Weet je zeker dat je {member.profile?.first_name || member.email} wilt verwijderen uit het team?
+                            Dit kan niet ongedaan worden gemaakt.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => removeTeamMember(member.id)}>
+                            Verwijderen
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </TableCell>
                 </TableRow>
               ))}

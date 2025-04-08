@@ -1,9 +1,10 @@
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from '@/components/ui/input';
 import { TeamMember } from '@/contexts/AppContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface PayoutDetailWithEdits {
   memberId: string;
@@ -28,60 +29,79 @@ const DistributionTable: React.FC<DistributionTableProps> = ({
   originalBalances,
   handleAmountChange
 }) => {
+  const isMobile = useIsMobile();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  
+  // Style for the fixed name column
+  const fixedColumnStyle = {
+    position: 'sticky' as const,
+    left: 0,
+    backgroundColor: 'white',
+    zIndex: 10,
+    boxShadow: '2px 0 5px rgba(0, 0, 0, 0.05)'
+  };
+  
   return (
     <div className="border rounded-md overflow-hidden">
-      <ScrollArea className="h-[300px]">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Naam</TableHead>
-              <TableHead className="text-right">Berekend</TableHead>
-              <TableHead className="text-right">Saldo</TableHead>
-              <TableHead className="text-right">Totaal</TableHead>
-              <TableHead className="text-right">Uitbetaald</TableHead>
-              <TableHead className="text-right">Nieuw saldo</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {distribution.map((item, index) => {
-              const member = findTeamMember(item.memberId);
-              const calculatedAmount = item.amount;
-              const originalBalance = originalBalances[item.memberId] || 0;
-              const totalAmount = calculatedAmount + originalBalance;
-              const actualAmount = isEditing ? item.actualAmount : item.actualAmount || totalAmount;
-              const newBalance = isEditing ? item.balance : totalAmount - actualAmount;
-              
-              return (
-                <TableRow key={index} className={isEditing && item.isEdited ? "bg-amber-50" : ""}>
-                  <TableCell>{member ? member.name : 'Onbekend teamlid'}</TableCell>
-                  <TableCell className="text-right">€{calculatedAmount.toFixed(2)}</TableCell>
-                  <TableCell className={`text-right ${originalBalance > 0 ? 'text-green-600' : originalBalance < 0 ? 'text-red-600' : ''}`}>
-                    {originalBalance !== 0 ? `€${Math.abs(originalBalance).toFixed(2)} ${originalBalance > 0 ? '+' : '-'}` : '-'}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    €{totalAmount.toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {isEditing ? (
-                      <Input 
-                        type="number" 
-                        value={actualAmount} 
-                        onChange={e => handleAmountChange(item.memberId, e.target.value)} 
-                        className="w-24 text-right inline-block h-8" 
-                        min="0" 
-                        step="0.01" 
-                      />
-                    ) : `€${actualAmount.toFixed(2)}`}
-                  </TableCell>
-                  <TableCell className={`text-right ${newBalance && newBalance > 0 ? 'text-green-600' : newBalance && newBalance < 0 ? 'text-red-600' : ''}`}>
-                    {newBalance !== undefined && newBalance !== 0 ? `€${Math.abs(newBalance).toFixed(2)} ${newBalance > 0 ? '+' : '-'}` : '-'}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </ScrollArea>
+      <div className={`relative ${isMobile ? 'overflow-x-auto' : ''}`} ref={scrollRef}>
+        <ScrollArea className="h-[300px]">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead style={isMobile ? fixedColumnStyle : {}}>Naam</TableHead>
+                <TableHead className="text-right">Berekend</TableHead>
+                <TableHead className="text-right">Saldo</TableHead>
+                <TableHead className="text-right">Totaal</TableHead>
+                <TableHead className="text-right">Uitbetaald</TableHead>
+                <TableHead className="text-right">Nieuw saldo</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {distribution.map((item, index) => {
+                const member = findTeamMember(item.memberId);
+                const calculatedAmount = item.amount;
+                const originalBalance = originalBalances[item.memberId] || 0;
+                const totalAmount = calculatedAmount + originalBalance;
+                const actualAmount = isEditing ? item.actualAmount : item.actualAmount || totalAmount;
+                const newBalance = isEditing ? item.balance : totalAmount - actualAmount;
+                
+                return (
+                  <TableRow key={index} className={isEditing && item.isEdited ? "bg-amber-50" : ""}>
+                    <TableCell 
+                      style={isMobile ? fixedColumnStyle : {}}
+                      className={`${isMobile ? 'min-w-[120px]' : ''}`}
+                    >
+                      {member ? member.name : 'Onbekend teamlid'}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap">€{calculatedAmount.toFixed(2)}</TableCell>
+                    <TableCell className={`text-right whitespace-nowrap ${originalBalance > 0 ? 'text-green-600' : originalBalance < 0 ? 'text-red-600' : ''}`}>
+                      {originalBalance !== 0 ? `€${Math.abs(originalBalance).toFixed(2)} ${originalBalance > 0 ? '+' : '-'}` : '-'}
+                    </TableCell>
+                    <TableCell className="text-right font-medium whitespace-nowrap">
+                      €{totalAmount.toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium whitespace-nowrap">
+                      {isEditing ? (
+                        <Input 
+                          type="number" 
+                          value={actualAmount} 
+                          onChange={e => handleAmountChange(item.memberId, e.target.value)} 
+                          className="w-24 text-right inline-block h-8" 
+                          min="0" 
+                          step="0.01" 
+                        />
+                      ) : `€${actualAmount.toFixed(2)}`}
+                    </TableCell>
+                    <TableCell className={`text-right whitespace-nowrap ${newBalance && newBalance > 0 ? 'text-green-600' : newBalance && newBalance < 0 ? 'text-red-600' : ''}`}>
+                      {newBalance !== undefined && newBalance !== 0 ? `€${Math.abs(newBalance).toFixed(2)} ${newBalance > 0 ? '+' : '-'}` : '-'}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </ScrollArea>
+      </div>
       
       <div className="p-2 border-t flex justify-between">
         <span className="font-medium">Totaal</span>

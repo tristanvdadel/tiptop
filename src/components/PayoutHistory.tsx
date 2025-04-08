@@ -168,7 +168,7 @@ const PayoutHistory = () => {
       
       doc.line(20, y, 190, y);
       y += 10;
-      doc.setFontStyle("bold");
+      doc.setFont(undefined, 'bold');
       doc.text("Totaal", 115, y);
       doc.text(`€ ${total.toFixed(2)}`, 155, y);
       

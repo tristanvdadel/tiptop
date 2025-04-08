@@ -144,7 +144,7 @@ const FastTip = () => {
   };
   
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-b from-amber-500/10 to-amber-500/20 dark:bg-gradient-to-b dark:from-amber-900/20 dark:to-amber-900/30">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-amber-100/30 via-amber-50/40 to-amber-100/30">
       <header className="bg-amber-500 dark:bg-amber-600 p-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center">
           <Button 
@@ -170,7 +170,7 @@ const FastTip = () => {
               <Settings size={20} />
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[425px] backdrop-blur-lg bg-white/80 dark:bg-gray-900/80 border-amber-200 dark:border-amber-700/50">
             <DialogHeader>
               <DialogTitle>Snelknoppen instellen</DialogTitle>
               <DialogDescription>
@@ -189,15 +189,14 @@ const FastTip = () => {
               </p>
             </div>
             <DialogFooter>
-              <Button onClick={handleSaveQuickAmounts}>Opslaan</Button>
+              <Button onClick={handleSaveQuickAmounts} variant="goldGradient">Opslaan</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </header>
       
       <div className="flex-grow flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-md bg-amber-500/20 dark:bg-amber-900/30 shadow-xl rounded-xl p-6 border border-amber-400/50 dark:border-amber-700/30 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-amber-400/40 dark:from-amber-500/10 to-transparent pointer-events-none"></div>
+        <div className="w-full max-w-md bg-white/30 dark:bg-gray-900/30 backdrop-blur-lg shadow-xl rounded-xl p-6 border border-amber-200/50 dark:border-amber-700/30 relative overflow-hidden transition-all hover:shadow-amber-300/30">
           <div className="relative z-10">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-medium mb-2 text-amber-900 dark:text-amber-100">Bedrag</h2>
@@ -209,7 +208,7 @@ const FastTip = () => {
                   onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
                   onKeyDown={handleKeyDown}
                   placeholder="0.00"
-                  className="text-center text-3xl h-16 w-48 pl-10 pr-4 border-amber-300 focus:border-amber-200 focus:ring-amber-200 bg-amber-50 dark:bg-amber-800/30 dark:border-amber-700 dark:text-white dark:placeholder:text-amber-200/50"
+                  className="text-center text-3xl h-16 w-48 pl-10 pr-4 bg-white/50 dark:bg-gray-800/30 border-amber-300 dark:border-amber-700 dark:text-white dark:placeholder:text-amber-200/50"
                 />
               </div>
             </div>
@@ -219,7 +218,7 @@ const FastTip = () => {
                 <Button 
                   key={value}
                   variant="outline" 
-                  className="text-lg py-6 bg-amber-100 border-amber-300 text-amber-900 hover:bg-amber-400 hover:text-white transition-all dark:bg-amber-800/70 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-500 dark:hover:text-white" 
+                  className="text-lg py-6 bg-white/50 dark:bg-gray-800/40 border-amber-300 text-amber-900 hover:bg-amber-400 hover:text-white transition-all dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-500 dark:hover:text-white" 
                   onClick={() => handleAddAmount(value)}
                 >
                   +{value}
@@ -234,7 +233,7 @@ const FastTip = () => {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-800/30 text-amber-900 dark:text-white",
+                      "w-full justify-start text-left font-normal bg-white/50 dark:bg-gray-800/30 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-white",
                       showDateWarning && "border-amber-500 text-amber-600"
                     )}
                   >
@@ -242,7 +241,7 @@ const FastTip = () => {
                     {date ? format(date, 'd MMMM yyyy', { locale: nl }) : <span>Selecteer datum</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
+                <PopoverContent className="w-auto p-0 backdrop-blur-lg bg-white/90 dark:bg-gray-900/90 border-amber-200 dark:border-amber-700/50">
                   <Calendar
                     mode="single"
                     selected={date}
@@ -267,7 +266,7 @@ const FastTip = () => {
                 onChange={(e) => setNote(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
-                className="w-full placeholder:italic border-amber-300 focus:border-amber-200 focus:ring-amber-200 bg-amber-50 dark:bg-amber-800/30 dark:border-amber-700 dark:text-white dark:placeholder:text-amber-200/50"
+                className="w-full placeholder:italic bg-white/50 dark:bg-gray-800/30 border-amber-300 dark:border-amber-700 dark:text-white dark:placeholder:text-amber-200/50"
                 rows={3}
               />
             </div>
@@ -278,19 +277,19 @@ const FastTip = () => {
                   id="keep-open" 
                   checked={keepOpen} 
                   onCheckedChange={setKeepOpen}
-                  className="data-[state=checked]:bg-white data-[state=checked]:text-amber-500"
+                  className="data-[state=checked]:bg-amber-500"
                 />
                 <Label htmlFor="keep-open" className="text-amber-900 dark:text-amber-100">Blijf op deze pagina na invoer</Label>
               </div>
             </div>
             
             <Button 
-              variant="default"
-              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg bg-white text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+              variant="goldGradient"
+              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg"
               disabled={amount <= 0}
               onClick={handleSave}
             >
-              <Sparkles size={20} className="mr-2 text-amber-700 animate-pulse" /> 
+              <Sparkles size={20} className="mr-2 animate-pulse" /> 
               <span className="relative z-10">Top Tip</span>
             </Button>
           </div>

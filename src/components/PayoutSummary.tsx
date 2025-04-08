@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,7 +41,7 @@ export const PayoutSummary = ({
   } = useToast();
   const navigate = useNavigate();
 
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(true); // Set to true by default
   const [editedDistribution, setEditedDistribution] = useState<PayoutDetailWithEdits[]>([]);
   const [roundingOption, setRoundingOption] = useState<RoundingOption>('none');
   const [balancesUpdated, setBalancesUpdated] = useState(false);
@@ -248,8 +249,10 @@ export const PayoutSummary = ({
                 <h3 className="font-medium">Verdeling:</h3>
                 {balancesUpdated ? <Button variant="outline" size="sm" onClick={reopenEditor} className="h-8">
                     Opnieuw aanpassen
-                  </Button> : <Button variant="outline" size="sm" onClick={() => setIsEditing(!isEditing)} className="h-8">
-                    {isEditing ? "Annuleren" : "Aanpassen"}
+                  </Button> : 
+                  // Only show this button if we're not already editing and balances aren't updated
+                  !isEditing && <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8">
+                    Aanpassen
                   </Button>}
               </div>
               

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -156,6 +157,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   const saveChanges = () => {
     if (!latestPayout || !editedDistribution.length) return;
     
+    // Update the balance for each team member
     editedDistribution.forEach(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
       if (member) {
@@ -163,6 +165,24 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
         clearTeamMemberHours(item.memberId);
       }
     });
+    
+    // Update the latestPayout with the edited distribution values
+    const updatedDistribution = editedDistribution.map(item => ({
+      memberId: item.memberId,
+      amount: item.amount,
+      actualAmount: item.actualAmount,
+      balance: latestPayout.distribution.find(d => d.memberId === item.memberId)?.balance || 0
+    }));
+    
+    // Update the mostRecentPayout in the context (important fix!)
+    const updatedPayout = {
+      ...latestPayout,
+      distribution: updatedDistribution
+    };
+    
+    // This is an important fix to ensure the updated payout information is used
+    // when the component re-renders
+    useApp().setMostRecentPayout(updatedPayout);
     
     setIsEditing(false);
     setBalancesUpdated(true);
@@ -203,7 +223,9 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       };
     });
     
+    // Important fix: Update the editedDistribution state with the rounded values
     setEditedDistribution(roundedDistribution);
+    
     toast({
       title: "Bedragen afgerond",
       description: `Alle bedragen zijn naar beneden afgerond op €${roundingOption}.`
@@ -215,6 +237,12 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       calculateNewBalances();
     }
   }, [editedDistribution, isEditing]);
+  
+  // Function to handle reopening editor when balances are already updated
+  const reopenEditor = () => {
+    setBalancesUpdated(false);
+    setIsEditing(true);
+  };
   
   return (
     <Card className="w-full max-w-3xl mx-auto">
@@ -242,7 +270,17 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-medium">Verdeling:</h3>
-                {!balancesUpdated && (
+                {/* Fixed button logic to allow reopening editor */}
+                {balancesUpdated ? (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={reopenEditor}
+                    className="h-8"
+                  >
+                    Opnieuw aanpassen
+                  </Button>
+                ) : (
                   <Button 
                     variant="outline" 
                     size="sm" 

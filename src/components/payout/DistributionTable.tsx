@@ -43,7 +43,7 @@ const DistributionTable: React.FC<DistributionTableProps> = ({
   
   return (
     <div className="border rounded-md overflow-hidden relative">
-      <div className="overflow-x-auto pb-2" ref={tableContainerRef} style={{ WebkitOverflowScrolling: 'touch' }}>
+      <div className="overflow-x-auto pb-2" ref={tableContainerRef} style={{ WebkitOverflowScrolling: 'touch', maxHeight: 'calc(100vh - 320px)' }}>
         <Table className="relative">
           <TableHeader>
             <TableRow>

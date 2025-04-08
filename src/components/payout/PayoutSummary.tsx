@@ -10,9 +10,11 @@ import PayoutDetails from './PayoutDetails';
 import RoundingSelector, { RoundingOption } from './RoundingSelector';
 import DistributionTable from './DistributionTable';
 import ActionButtons from './ActionButtons';
+
 interface PayoutSummaryProps {
   onClose: () => void;
 }
+
 interface PayoutDetailWithEdits {
   memberId: string;
   amount: number;
@@ -20,6 +22,7 @@ interface PayoutDetailWithEdits {
   balance: number | undefined;
   isEdited: boolean;
 }
+
 const PayoutSummary = ({
   onClose
 }: PayoutSummaryProps) => {
@@ -39,7 +42,9 @@ const PayoutSummary = ({
   const [editedDistribution, setEditedDistribution] = useState<PayoutDetailWithEdits[]>([]);
   const [roundingOption, setRoundingOption] = useState<RoundingOption>('none');
   const [balancesUpdated, setBalancesUpdated] = useState(false);
+  
   const latestPayout = mostRecentPayout || (payouts.length > 0 ? payouts[payouts.length - 1] : null);
+  
   const findTeamMember = (id: string) => {
     return teamMembers.find(member => member.id === id);
   };
@@ -85,52 +90,7 @@ const PayoutSummary = ({
       calculateNewBalances();
     }
   }, [editedDistribution, isEditing]);
-  const handleCopyToClipboard = () => {
-    if (!latestPayout) return;
-    const payoutDate = new Date(latestPayout.date).toLocaleDateString('nl');
-    const memberDetails = latestPayout.distribution.map(item => {
-      const member = findTeamMember(item.memberId);
-      return `${member?.name || 'Onbekend lid'}: €${(item.actualAmount || item.amount).toFixed(2)}`;
-    }).join('\n');
-    const totalAmount = latestPayout.distribution.reduce((sum, dist) => sum + (dist.actualAmount || dist.amount), 0);
-    const payoutText = `Uitbetaling fooi: ${payoutDate}\n\n${memberDetails}\n\nTotaal: €${totalAmount.toFixed(2)}`;
-    navigator.clipboard.writeText(payoutText).then(() => {
-      toast({
-        title: "Gekopieerd naar klembord",
-        description: "De uitbetalingsgegevens zijn gekopieerd naar het klembord."
-      });
-    });
-  };
-  const downloadCSV = () => {
-    if (!latestPayout) return;
-    const headers = "Naam,Berekend bedrag,Saldo,Totaal te ontvangen,Daadwerkelijk uitbetaald,Nieuw saldo\n";
-    const rows = latestPayout.distribution.map(item => {
-      const member = findTeamMember(item.memberId);
-      const calculatedAmount = item.amount;
-      const originalBalance = item.balance || 0;
-      const totalToReceive = calculatedAmount + originalBalance;
-      const actuallyPaid = item.actualAmount || totalToReceive;
-      const newBalance = totalToReceive - actuallyPaid;
-      return `${member?.name || 'Onbekend lid'},${calculatedAmount.toFixed(2)},${originalBalance.toFixed(2)},${totalToReceive.toFixed(2)},${actuallyPaid.toFixed(2)},${newBalance.toFixed(2)}`;
-    }).join('\n');
-    const csv = headers + rows;
-    const blob = new Blob([csv], {
-      type: 'text/csv;charset=utf-8;'
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const payoutDate = new Date(latestPayout.date).toLocaleDateString('nl').replace(/\//g, '-');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `fooi-uitbetaling-${payoutDate}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast({
-      title: "CSV gedownload",
-      description: "De uitbetalingsgegevens zijn gedownload als CSV-bestand."
-    });
-  };
+
   const handleAmountChange = (memberId: string, actualAmount: string) => {
     const amount = parseFloat(actualAmount);
     if (isNaN(amount) || amount < 0) return;
@@ -140,6 +100,7 @@ const PayoutSummary = ({
       isEdited: true
     } : item));
   };
+
   const calculateNewBalances = () => {
     if (!editedDistribution.length) return;
     const updatedDistribution = editedDistribution.map(item => {
@@ -155,6 +116,7 @@ const PayoutSummary = ({
     });
     setEditedDistribution(updatedDistribution);
   };
+
   const saveChanges = () => {
     if (!latestPayout || !editedDistribution.length) return;
     editedDistribution.forEach(item => {
@@ -186,6 +148,7 @@ const PayoutSummary = ({
       navigate('/');
     }, 1500);
   };
+
   const applyRounding = () => {
     if (!editedDistribution.length || roundingOption === 'none') return;
     const roundingValue = parseFloat(roundingOption);
@@ -217,6 +180,7 @@ const PayoutSummary = ({
       description: `Alle bedragen zijn naar beneden afgerond op €${roundingOption}.`
     });
   };
+
   const reopenEditor = () => {
     setBalancesUpdated(false);
     setIsEditing(true);
@@ -238,34 +202,119 @@ const PayoutSummary = ({
     balance: item.balance,
     isEdited: false
   })) || [];
-  return <Card className="w-full max-w-3xl mx-auto">
+
+  // Copy to clipboard function
+  const handleCopyToClipboard = () => {
+    if (!latestPayout) return;
+    
+    const payoutDate = new Date(latestPayout.date).toLocaleDateString('nl');
+    const memberDetails = latestPayout.distribution.map(item => {
+      const member = findTeamMember(item.memberId);
+      return `${member?.name || 'Onbekend lid'}: €${(item.actualAmount || item.amount).toFixed(2)}`;
+    }).join('\n');
+    
+    const totalAmount = latestPayout.distribution.reduce((sum, dist) => sum + (dist.actualAmount || dist.amount), 0);
+    
+    const payoutText = `Uitbetaling fooi: ${payoutDate}\n\n${memberDetails}\n\nTotaal: €${totalAmount.toFixed(2)}`;
+    
+    navigator.clipboard.writeText(payoutText).then(() => {
+      toast({
+        title: "Gekopieerd naar klembord",
+        description: "De uitbetalingsgegevens zijn gekopieerd naar het klembord."
+      });
+    });
+  };
+  
+  // Download CSV function
+  const downloadCSV = () => {
+    if (!latestPayout) return;
+    
+    const headers = "Naam,Berekend bedrag,Saldo,Totaal te ontvangen,Daadwerkelijk uitbetaald,Nieuw saldo\n";
+    const rows = latestPayout.distribution.map(item => {
+      const member = findTeamMember(item.memberId);
+      const calculatedAmount = item.amount;
+      const originalBalance = item.balance || 0;
+      const totalToReceive = calculatedAmount + originalBalance;
+      const actuallyPaid = item.actualAmount || totalToReceive;
+      const newBalance = totalToReceive - actuallyPaid;
+      
+      return `${member?.name || 'Onbekend lid'},${calculatedAmount.toFixed(2)},${originalBalance.toFixed(2)},${totalToReceive.toFixed(2)},${actuallyPaid.toFixed(2)},${newBalance.toFixed(2)}`;
+    }).join('\n');
+    
+    const csv = headers + rows;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const payoutDate = new Date(latestPayout.date).toLocaleDateString('nl').replace(/\//g, '-');
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `fooi-uitbetaling-${payoutDate}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: "CSV gedownload",
+      description: "De uitbetalingsgegevens zijn gedownload als CSV-bestand."
+    });
+  };
+
+  return (
+    <Card className="w-full max-w-3xl mx-auto mb-24">
       <PayoutHeader />
       <CardContent className="p-6">
-        {latestPayout ? <div className="space-y-6">
+        {latestPayout ? (
+          <div className="space-y-6">
             <PayoutDetails payout={latestPayout} />
             
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-medium">Verdeling:</h3>
-                {balancesUpdated ? <Button variant="outline" size="sm" onClick={reopenEditor} className="h-8">
+                {balancesUpdated ? (
+                  <Button variant="outline" size="sm" onClick={reopenEditor} className="h-8">
                     Opnieuw aanpassen
-                  </Button> : !isEditing && <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8">
+                  </Button>
+                ) : !isEditing && (
+                  <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8">
                     Aanpassen
-                  </Button>}
+                  </Button>
+                )}
               </div>
               
-              {isEditing && <RoundingSelector roundingOption={roundingOption} setRoundingOption={setRoundingOption} applyRounding={applyRounding} />}
+              {isEditing && (
+                <RoundingSelector 
+                  roundingOption={roundingOption} 
+                  setRoundingOption={setRoundingOption} 
+                  applyRounding={applyRounding} 
+                />
+              )}
               
-              <DistributionTable distribution={tableDistribution} isEditing={isEditing} findTeamMember={findTeamMember} originalBalances={originalBalances} handleAmountChange={handleAmountChange} />
+              <DistributionTable 
+                distribution={tableDistribution} 
+                isEditing={isEditing} 
+                findTeamMember={findTeamMember} 
+                originalBalances={originalBalances} 
+                handleAmountChange={handleAmountChange} 
+              />
             </div>
             
-            
-            
-            <ActionButtons isEditing={isEditing} balancesUpdated={balancesUpdated} saveChanges={saveChanges} handleCopyToClipboard={handleCopyToClipboard} downloadCSV={downloadCSV} />
-          </div> : <div className="text-center py-6">
+            <ActionButtons 
+              isEditing={isEditing} 
+              balancesUpdated={balancesUpdated} 
+              saveChanges={saveChanges} 
+              handleCopyToClipboard={handleCopyToClipboard} 
+              downloadCSV={downloadCSV} 
+            />
+          </div>
+        ) : (
+          <div className="text-center py-6">
             <p>Geen recente uitbetaling gevonden.</p>
-          </div>}
+          </div>
+        )}
       </CardContent>
-    </Card>;
+    </Card>
+  );
 };
+
 export default PayoutSummary;

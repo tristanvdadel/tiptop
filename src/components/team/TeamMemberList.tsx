@@ -39,7 +39,6 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
   }>({});
   const [editingMember, setEditingMember] = useState<string | null>(null);
   const [editMemberName, setEditMemberName] = useState('');
-  const [scrollPosition, setScrollPosition] = useState(0);
   const { toast } = useToast();
 
   React.useEffect(() => {
@@ -135,26 +134,6 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
   const getBalanceClass = (balance?: number): string => {
     if (balance === undefined || balance === 0) return '';
     return balance > 0 ? 'text-green-600' : 'text-red-600';
-  };
-
-  const calculateMaxScroll = () => {
-    const baseHeight = 300; // Base height in pixels
-    const itemHeight = 80; // Approximate height per team member row
-    const totalHeight = teamMembers.length * itemHeight;
-    return Math.max(0, totalHeight - baseHeight);
-  };
-
-  const maxScroll = calculateMaxScroll();
-  
-  const handleSliderChange = (value: number[]) => {
-    setScrollPosition(value[0]);
-    
-    const scrollElement = document.querySelector('.members-scroll-area');
-    if (scrollElement) {
-      const maxScrollTop = scrollElement.scrollHeight - scrollElement.clientHeight;
-      const scrollTop = (value[0] / 100) * maxScrollTop;
-      scrollElement.scrollTop = scrollTop;
-    }
   };
 
   return (
@@ -265,96 +244,97 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
                                             <AlertDialogAction onClick={() => removeTeamMember(member.id)}>Verwijderen</AlertDialogAction>
                                           </AlertDialogFooter>
                                         </AlertDialogContent>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                                <ScrollArea className="max-h-[300px] overflow-y-auto">
-                                  {member.hourRegistrations && member.hourRegistrations.length > 0 ? (
-                                    <div className="space-y-2">
-                                      {member.hourRegistrations.map((registration: HourRegistration) => (
-                                        <div key={registration.id} className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50">
-                                          <div className="flex items-center">
-                                            <span className="font-medium">{registration.hours} uren</span>
-                                            <span className="mx-2 text-gray-400">•</span>
-                                            <span className="text-xs text-gray-500 flex items-center">
-                                              <Calendar className="h-3 w-3 mr-1" />
-                                              {formatDate(registration.date)}
-                                            </span>
-                                          </div>
-                                          <Button 
-                                            variant="ghost" 
-                                            size="icon" 
-                                            onClick={() => deleteHourRegistration(member.id, registration.id)} 
-                                            className="h-7 w-7 text-gray-500 hover:text-red-500"
-                                          >
-                                            <Trash2 className="h-3 w-3" />
-                                          </Button>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <p className="text-sm text-gray-500">Geen uren historie beschikbaar</p>
+                                      </AlertDialog>
+                                    </>
                                   )}
-                                </ScrollArea>
+                                </div>
                               </div>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {member.balance !== undefined && member.balance !== 0 && (
-                            <span className={`text-xs font-medium ${getBalanceClass(member.balance)}`}>
-                              {member.balance > 0 ? (
-                                <span className="flex items-center">
-                                  <PlusCircle size={14} className="mr-1" />
-                                  €{member.balance.toFixed(2)}
-                                </span>
-                              ) : (
-                                <span className="flex items-center">
-                                  <MinusCircle size={14} className="mr-1" />
-                                  €{Math.abs(member.balance).toFixed(2)}
-                                </span>
-                              )}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right py-2 font-medium">{member.hours}</TableCell>
-                        <TableCell className="py-2">
-                          <div className="flex items-center gap-2">
-                            <Input 
-                              type="number" 
-                              name={`hours-${member.id}`} 
-                              id={`hours-${member.id}`} 
-                              className="h-8 w-20" 
-                              placeholder="Uren" 
-                              value={hoursInputs[member.id] || ''} 
-                              onChange={e => handleHoursChange(member.id, e.target.value)} 
-                              onKeyDown={e => handleKeyDown(e, member.id)} 
-                            />
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => handleHoursSubmit(member.id)} 
-                              className="h-8 w-8 flex items-center justify-center"
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="mb-6">
-            <CardContent className="p-6 text-center">
-              <p>Nog geen teamleden toegevoegd</p>
-            </CardContent>
-          </Card>
-        )}
+                              <ScrollArea className="max-h-[300px] overflow-y-auto">
+                                {member.hourRegistrations && member.hourRegistrations.length > 0 ? (
+                                  <div className="space-y-2">
+                                    {member.hourRegistrations.map((registration: HourRegistration) => (
+                                      <div key={registration.id} className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50">
+                                        <div className="flex items-center">
+                                          <span className="font-medium">{registration.hours} uren</span>
+                                          <span className="mx-2 text-gray-400">•</span>
+                                          <span className="text-xs text-gray-500 flex items-center">
+                                            <Calendar className="h-3 w-3 mr-1" />
+                                            {formatDate(registration.date)}
+                                          </span>
+                                        </div>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          onClick={() => deleteHourRegistration(member.id, registration.id)} 
+                                          className="h-7 w-7 text-gray-500 hover:text-red-500"
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-gray-500">Geen uren historie beschikbaar</p>
+                                )}
+                              </ScrollArea>
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </TableCell>
+                      <TableCell className="py-2">
+                        {member.balance !== undefined && member.balance !== 0 && (
+                          <span className={`text-xs font-medium ${getBalanceClass(member.balance)}`}>
+                            {member.balance > 0 ? (
+                              <span className="flex items-center">
+                                <PlusCircle size={14} className="mr-1" />
+                                €{member.balance.toFixed(2)}
+                              </span>
+                            ) : (
+                              <span className="flex items-center">
+                                <MinusCircle size={14} className="mr-1" />
+                                €{Math.abs(member.balance).toFixed(2)}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right py-2 font-medium">{member.hours}</TableCell>
+                      <TableCell className="py-2">
+                        <div className="flex items-center gap-2">
+                          <Input 
+                            type="number" 
+                            name={`hours-${member.id}`} 
+                            id={`hours-${member.id}`} 
+                            className="h-8 w-20" 
+                            placeholder="Uren" 
+                            value={hoursInputs[member.id] || ''} 
+                            onChange={e => handleHoursChange(member.id, e.target.value)} 
+                            onKeyDown={e => handleKeyDown(e, member.id)} 
+                          />
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleHoursSubmit(member.id)} 
+                            className="h-8 w-8 flex items-center justify-center"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="mb-6">
+          <CardContent className="p-6 text-center">
+            <p>Nog geen teamleden toegevoegd</p>
+          </CardContent>
+        </Card>
+      )}
     </>
   );
 };

@@ -29,9 +29,18 @@ const Team = () => {
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
   const [distribution, setDistribution] = useState<TeamMember[]>([]);
   const [showPayoutSummary, setShowPayoutSummary] = useState(false);
+  const [sortedTeamMembers, setSortedTeamMembers] = useState<TeamMember[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Sort team members alphabetically by name
+  useEffect(() => {
+    const sorted = [...teamMembers].sort((a, b) => 
+      a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+    );
+    setSortedTeamMembers(sorted);
+  }, [teamMembers]);
 
   useEffect(() => {
     // Check if the URL has payoutSummary=true and set state accordingly
@@ -145,7 +154,7 @@ const Team = () => {
       </div>
       
       <TeamMemberList 
-        teamMembers={teamMembers}
+        teamMembers={sortedTeamMembers}
         addTeamMember={addTeamMember}
         removeTeamMember={removeTeamMember}
         updateTeamMemberHours={updateTeamMemberHours}

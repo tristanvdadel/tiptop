@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth, set } from 'date-fns';
+import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth, set, getWeek, format } from 'date-fns';
+import { nl } from 'date-fns/locale';
 
 // Define types
 export type TeamMember = {
@@ -348,6 +349,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return currentPeriod.autoCloseDate;
   };
 
+  const generateAutomaticPeriodName = (startDate: Date, periodDuration: PeriodDuration): string => {
+    switch (periodDuration) {
+      case 'day':
+        // "Maandag 12 april 2023"
+        return format(startDate, 'EEEE d MMMM yyyy', { locale: nl });
+      case 'week':
+        // "Week 14 2023"
+        const weekNumber = getWeek(startDate);
+        return `Week ${weekNumber} ${format(startDate, 'yyyy')}`;
+      case 'month':
+        // "April 2023"
+        return format(startDate, 'MMMM yyyy', { locale: nl });
+      default:
+        return "";
+    }
+  };
+
   const addTip = (amount: number, note?: string, customDate?: string) => {
     if (!currentPeriod) {
       if (hasReachedLimit()) {
@@ -562,19 +580,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       endCurrentPeriod();
     }
     
-    const startDate = new Date().toISOString();
+    const startDate = new Date();
+    const startDateISO = startDate.toISOString();
     let autoCloseDate = null;
     
     if (autoClosePeriods) {
-      autoCloseDate = calculateAutoCloseDate(startDate, periodDuration);
+      autoCloseDate = calculateAutoCloseDate(startDateISO, periodDuration);
+    }
+    
+    let periodName = "";
+    if (autoClosePeriods) {
+      periodName = generateAutomaticPeriodName(startDate, periodDuration);
     }
     
     const newPeriod: Period = {
       id: generateId(),
-      startDate,
+      startDate: startDateISO,
       isActive: true,
       tips: [],
       isPaid: false,
+      ...(periodName && { name: periodName }),
       ...(autoCloseDate && { autoCloseDate }),
     };
     

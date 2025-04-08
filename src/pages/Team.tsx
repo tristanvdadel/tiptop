@@ -33,7 +33,14 @@ const Team = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    setSelectedPeriods([]);
+    // Check if the URL has payoutSummary=true and set state accordingly
+    const urlParams = new URLSearchParams(window.location.search);
+    const showSummary = urlParams.get('payoutSummary') === 'true';
+    setShowPayoutSummary(showSummary);
+    
+    if (!showSummary) {
+      setSelectedPeriods([]);
+    }
   }, []);
 
   const togglePeriodSelection = (periodId: string) => {
@@ -79,6 +86,7 @@ const Team = () => {
     markPeriodsAsPaid(selectedPeriods, customDistribution);
     setShowPayoutSummary(true);
     
+    // Update URL to include payoutSummary parameter
     const url = new URL(window.location.href);
     url.searchParams.set('payoutSummary', 'true');
     window.history.pushState({}, '', url.toString());
@@ -123,6 +131,7 @@ const Team = () => {
       <div>
         <PayoutSummary onClose={() => {
           setShowPayoutSummary(false);
+          // Remove the payoutSummary parameter from URL when closing
           const url = new URL(window.location.href);
           url.searchParams.delete('payoutSummary');
           window.history.pushState({}, '', url.toString());

@@ -2,11 +2,11 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Plus, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileText, DollarSign, Crown, Calendar, Pencil } from 'lucide-react';
+import { Plus, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileText, DollarSign, Crown, Calendar } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -14,7 +14,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const Periods = () => {
   const {
@@ -137,15 +136,6 @@ const Periods = () => {
     }
   };
   
-  const handleEditClick = () => {
-    if (currentPeriod) {
-      setPeriodToEdit(currentPeriod.id);
-      setEditPeriodName(currentPeriod.name || '');
-      setEditPeriodNotes(currentPeriod.notes || '');
-      setShowEditPeriodDialog(true);
-    }
-  };
-  
   const handleEditPeriod = (periodId: string) => {
     const period = periods.find(p => p.id === periodId);
     if (period) {
@@ -219,26 +209,12 @@ const Periods = () => {
       {currentPeriod && <Card className="border-[#9b87f5]/30 bg-[#9b87f5]/5">
           <CardHeader className="pb-2">
             <CardTitle className="flex justify-between items-center text-base">
-              <div className="flex items-center gap-2">
-                <span className="flex items-center">
-                  <span className="text-xs px-2 py-0.5 bg-tier-free/10 text-tier-free rounded-full mr-2">
-                    Actief
-                  </span>
-                  {currentPeriod.name || "Huidige periode"}
+              <span className="flex items-center">
+                <span className="text-xs px-2 py-0.5 bg-tier-free/10 text-tier-free rounded-full mr-2">
+                  Actief
                 </span>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleEditClick}>
-                        <Pencil size={16} className="text-muted-foreground" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Naam van periode wijzigen</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
+                {currentPeriod.name || "Huidige periode"}
+              </span>
               <span className="text-sm font-normal text-muted-foreground">
                 Gestart: {formatPeriodDate(currentPeriod.startDate)}
               </span>

@@ -170,14 +170,14 @@ export const PayoutSummary = ({
     setBalancesUpdated(true);
 
     toast({
-      title: "Uitbetaling voltooid",
-      description: "De saldo's zijn opgeslagen. Je kunt de uitbetaling terugvinden in de geschiedenis.",
+      title: "Gefeliciteerd!",
+      description: "De uitbetaling is voltooid. De saldo's zijn opgeslagen. Je kan de uitbetaling terugvinden in de geschiedenis.",
       variant: "default"
     });
 
     setTimeout(() => {
       navigate('/');
-    }, 1000);
+    }, 1500);
   };
 
   const applyRounding = () => {
@@ -338,7 +338,10 @@ export const PayoutSummary = ({
               {!balancesUpdated && isEditing ? <Button variant="goldGradient" onClick={saveChanges}>
                   <Save className="h-4 w-4 mr-2" />
                   Uitbetaling afronden
-                </Button> : balancesUpdated ? null : <>
+                </Button> : balancesUpdated ? <Button variant="goldGradient" onClick={() => navigate('/')}>
+                    <Home className="h-4 w-4 mr-2" />
+                    Naar startpagina
+                  </Button> : <>
                     <Button variant="outline" onClick={handleCopyToClipboard}>
                       <Copy className="h-4 w-4 mr-2" />
                       Kopiëren

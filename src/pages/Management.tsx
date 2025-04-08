@@ -248,9 +248,12 @@ const Management = () => {
             role: 'admin',
             permissions: {
               add_tips: true,
+              edit_tips: true,
               add_hours: true,
               view_team: true,
-              view_reports: true
+              view_reports: true,
+              close_periods: true,
+              manage_payouts: true
             }
           }
         ]);
@@ -288,9 +291,9 @@ const Management = () => {
       
       const fullPermissions = {
         ...permissions,
-        edit_tips: role === 'admin' || false,
-        close_periods: role === 'admin' || false,
-        manage_payouts: role === 'admin' || false
+        edit_tips: role === 'admin' || permissions.edit_tips || false,
+        close_periods: role === 'admin' || permissions.close_periods || false,
+        manage_payouts: role === 'admin' || permissions.manage_payouts || false
       };
       
       const { error } = await supabase
@@ -456,7 +459,12 @@ const Management = () => {
         .eq('role', 'admin')
         .maybeSingle();
         
-      if (adminError || !adminMembership) {
+      if (adminError) {
+        console.error("Error checking admin status:", adminError);
+        throw new Error("Er is een fout opgetreden bij het verifiëren van je rechten.");
+      }
+      
+      if (!adminMembership) {
         throw new Error("Je hebt geen rechten om dit team te verwijderen.");
       }
       
@@ -514,7 +522,7 @@ const Management = () => {
         </Alert>
       )}
       
-      <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue={hasAnyTeam ? "teams" : "join"}>
+      <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue={hasAnyTeam ? "teams" : "teams"}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="teams">Mijn teams</TabsTrigger>
           <TabsTrigger value="permissions" className="flex items-center gap-1">
@@ -676,7 +684,10 @@ const Management = () => {
                               add_tips: true,
                               add_hours: true,
                               view_team: true,
-                              view_reports: false
+                              view_reports: false,
+                              edit_tips: false,
+                              close_periods: false,
+                              manage_payouts: false
                             })}
                             variant="outline"
                           >
@@ -687,7 +698,10 @@ const Management = () => {
                               add_tips: true,
                               add_hours: true,
                               view_team: true,
-                              view_reports: true
+                              view_reports: true,
+                              edit_tips: true,
+                              close_periods: true,
+                              manage_payouts: true
                             })}
                             variant="outline"
                           >
@@ -783,31 +797,6 @@ const Management = () => {
         
         <TabsContent value="payouts" className="mt-4">
           <PayoutHistory />
-        </TabsContent>
-        
-        <TabsContent value="join" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Team toetreden met code</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="inviteCode">Uitnodigingscode</Label>
-                  <Input
-                    id="inviteCode"
-                    placeholder="Voer code in"
-                    value={inviteCode}
-                    onChange={(e) => setInviteCode(e.target.value)}
-                  />
-                </div>
-                <Button onClick={handleJoinTeam} disabled={!inviteCode.trim()}>
-                  <LogIn className="mr-2 h-4 w-4" />
-                  Team toetreden
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
       

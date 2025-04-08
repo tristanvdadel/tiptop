@@ -64,6 +64,7 @@ const Navbar = ({ disabled = false, onDisabledClick }: NavbarProps) => {
   const handleNavClick = (e: React.MouseEvent) => {
     if (disabled && onDisabledClick) {
       onDisabledClick(e);
+      return;
     }
   };
 

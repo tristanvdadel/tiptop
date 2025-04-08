@@ -18,21 +18,22 @@ const Layout = ({ children }: LayoutProps) => {
 
   // Function to handle navigation attempts during payout process
   const handleDisabledNavigation = (e: React.MouseEvent) => {
-    if (isPayoutSummary) {
-      e.preventDefault();
-      toast({
-        title: "Uitbetaling afronden",
-        description: "Rond eerst het huidige uitbetalingsproces af voordat je verder gaat.",
-        variant: "destructive"
-      });
-    }
+    e.preventDefault();
+    toast({
+      title: "Uitbetaling afronden",
+      description: "Rond eerst het huidige uitbetalingsproces af voordat je verder gaat.",
+      variant: "destructive"
+    });
   };
 
   return (
     <div className="min-h-screen flex flex-col">
-      {!isFastTip && (
+      {!isFastTip && !isPayoutSummary && (
+        <Navbar />
+      )}
+      {!isFastTip && isPayoutSummary && (
         <Navbar 
-          disabled={isPayoutSummary} 
+          disabled={true} 
           onDisabledClick={handleDisabledNavigation} 
         />
       )}

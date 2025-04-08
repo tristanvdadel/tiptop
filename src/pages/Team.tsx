@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { TeamMember } from '@/contexts/AppContext';
@@ -7,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Users } from 'lucide-react';
 import { PayoutSummary } from '@/components/PayoutSummary';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import TeamMemberList from '@/components/team/TeamMemberList';
 import PeriodSelector from '@/components/team/PeriodSelector';
 import TipDistribution from '@/components/team/TipDistribution';
@@ -31,17 +30,18 @@ const Team = () => {
   const [showPayoutSummary, setShowPayoutSummary] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     // Check if the URL has payoutSummary=true and set state accordingly
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(location.search);
     const showSummary = urlParams.get('payoutSummary') === 'true';
     setShowPayoutSummary(showSummary);
     
     if (!showSummary) {
       setSelectedPeriods([]);
     }
-  }, []);
+  }, [location.search]);
 
   const togglePeriodSelection = (periodId: string) => {
     setSelectedPeriods(prev => {
@@ -87,9 +87,7 @@ const Team = () => {
     setShowPayoutSummary(true);
     
     // Update URL to include payoutSummary parameter
-    const url = new URL(window.location.href);
-    url.searchParams.set('payoutSummary', 'true');
-    window.history.pushState({}, '', url.toString());
+    navigate('/team?payoutSummary=true');
   };
 
   const calculateTotalTipsAndHours = useCallback(() => {
@@ -132,9 +130,7 @@ const Team = () => {
         <PayoutSummary onClose={() => {
           setShowPayoutSummary(false);
           // Remove the payoutSummary parameter from URL when closing
-          const url = new URL(window.location.href);
-          url.searchParams.delete('payoutSummary');
-          window.history.pushState({}, '', url.toString());
+          navigate('/team');
         }} />
       </div>
     );

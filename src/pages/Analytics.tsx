@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger }
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ScrollArea } from '@/components/ui/scroll-area';
+
 const Analytics = () => {
   const {
     periods,
@@ -18,10 +20,13 @@ const Analytics = () => {
     teamMembers,
     payouts
   } = useApp();
+  
   const isMobile = useIsMobile();
+  
   const averageTipPerHour = useMemo(() => {
     return calculateAverageTipPerHour();
   }, [calculateAverageTipPerHour]);
+  
   const periodData = useMemo(() => {
     return periods.map(period => {
       const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
@@ -43,6 +48,7 @@ const Analytics = () => {
       };
     }).sort((a, b) => a.timestamp - b.timestamp);
   }, [periods, calculateAverageTipPerHour]);
+  
   const lineChartData = useMemo(() => {
     const filteredData = periodData.filter(period => period.total > 0);
     if (filteredData.length > 10) {
@@ -50,6 +56,7 @@ const Analytics = () => {
     }
     return filteredData;
   }, [periodData]);
+  
   const chartConfig = useMemo(() => {
     return {
       average: {
@@ -58,6 +65,7 @@ const Analytics = () => {
       }
     };
   }, []);
+  
   const getEmptyStateMessage = () => {
     const allPeriods = periods;
     const periodsWithTips = allPeriods.some(period => period.tips.length > 0);
@@ -71,6 +79,7 @@ const Analytics = () => {
     }
     return ""; // Fallback, should not happen
   };
+  
   const AverageTipCard = () => <Card className="mb-4 w-full">
       <CardContent className="p-4">
         {averageTipPerHour > 0 ? <div className="flex justify-between items-center bg-gradient-to-r from-[#9b87f5]/10 to-[#7E69AB]/5 border-[#9b87f5]/20 rounded-md p-3">
@@ -81,7 +90,7 @@ const Analytics = () => {
                 <TooltipProvider>
                   <UITooltip>
                     <TooltipTrigger asChild>
-                      
+                      <span className="text-xs text-muted-foreground">Gemiddelde over alle periodes</span>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>Gemiddelde berekend over alle periodes (incl. uitbetaald)</p>
@@ -96,7 +105,9 @@ const Analytics = () => {
           </div>}
       </CardContent>
     </Card>;
+  
   const hasAnyPeriodWithTips = periods.some(period => period.tips.length > 0);
+  
   return <div className="space-y-4 w-full max-w-full px-1 sm:px-4">
       <h1 className="text-xl font-bold">Analyse</h1>
       
@@ -185,4 +196,5 @@ const Analytics = () => {
       </Card>
     </div>;
 };
+
 export default Analytics;

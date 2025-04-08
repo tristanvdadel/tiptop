@@ -24,7 +24,6 @@ import AuthGuard from "./components/AuthGuard";
 const queryClient = new QueryClient();
 
 const App = () => {
-  // Initialize everything at the component level for clarity
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>

@@ -37,7 +37,7 @@ const Layout = ({ children }: LayoutProps) => {
           onDisabledClick={handleDisabledNavigation} 
         />
       )}
-      <main className="flex-grow container mx-auto px-4 pb-20 pt-4 w-full">
+      <main className="flex-grow container mx-auto px-4 pt-4 w-full pb-24">
         {children}
       </main>
     </div>
@@ -45,3 +45,4 @@ const Layout = ({ children }: LayoutProps) => {
 };
 
 export default Layout;
+

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, ArrowLeft, Download, Copy, Calculator, Save, Wallet } from 'lucide-react';
+import { Check, ArrowLeft, Download, Copy, Calculator, Save, Wallet, Home } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
@@ -9,17 +9,21 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useNavigate } from 'react-router-dom';
+
 interface PayoutSummaryProps {
   onClose: () => void;
 }
+
 type RoundingOption = 'none' | '0.50' | '1.00' | '2.00' | '5.00' | '10.00';
 interface PayoutDetailWithEdits {
   memberId: string;
-  amount: number; // This is now the calculated amount WITHOUT balance
-  actualAmount: number; // This is the amount with balance, potentially rounded
+  amount: number;
+  actualAmount: number;
   balance: number | undefined;
   isEdited: boolean;
 }
+
 export const PayoutSummary = ({
   onClose
 }: PayoutSummaryProps) => {
@@ -33,14 +37,19 @@ export const PayoutSummary = ({
   const {
     toast
   } = useToast();
+  const navigate = useNavigate();
+
   const [isEditing, setIsEditing] = useState(false);
   const [editedDistribution, setEditedDistribution] = useState<PayoutDetailWithEdits[]>([]);
   const [roundingOption, setRoundingOption] = useState<RoundingOption>('none');
   const [balancesUpdated, setBalancesUpdated] = useState(false);
+
   const latestPayout = mostRecentPayout || (payouts.length > 0 ? payouts[payouts.length - 1] : null);
+
   const findTeamMember = (id: string) => {
     return teamMembers.find(member => member.id === id);
   };
+
   useEffect(() => {
     if (latestPayout) {
       const initialEditableDistribution = latestPayout.distribution.map(item => {
@@ -58,6 +67,7 @@ export const PayoutSummary = ({
       setEditedDistribution(initialEditableDistribution);
     }
   }, [latestPayout]);
+
   const handleCopyToClipboard = () => {
     if (!latestPayout) return;
     const payoutDate = new Date(latestPayout.date).toLocaleDateString('nl');
@@ -74,6 +84,7 @@ export const PayoutSummary = ({
       });
     });
   };
+
   const downloadCSV = () => {
     if (!latestPayout) return;
     const headers = "Naam,Berekend bedrag,Saldo,Totaal te ontvangen,Daadwerkelijk uitbetaald,Nieuw saldo\n";
@@ -104,6 +115,7 @@ export const PayoutSummary = ({
       description: "De uitbetalingsgegevens zijn gedownload als CSV-bestand."
     });
   };
+
   const handleAmountChange = (memberId: string, actualAmount: string) => {
     const amount = parseFloat(actualAmount);
     if (isNaN(amount) || amount < 0) return;
@@ -113,6 +125,7 @@ export const PayoutSummary = ({
       isEdited: true
     } : item));
   };
+
   const calculateNewBalances = () => {
     if (!editedDistribution.length) return;
     const updatedDistribution = editedDistribution.map(item => {
@@ -128,8 +141,10 @@ export const PayoutSummary = ({
     });
     setEditedDistribution(updatedDistribution);
   };
+
   const saveChanges = () => {
     if (!latestPayout || !editedDistribution.length) return;
+
     editedDistribution.forEach(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
       if (member) {
@@ -137,24 +152,34 @@ export const PayoutSummary = ({
         clearTeamMemberHours(item.memberId);
       }
     });
+
     const updatedDistribution = editedDistribution.map(item => ({
       memberId: item.memberId,
       amount: item.amount,
       actualAmount: item.actualAmount,
       balance: latestPayout.distribution.find(d => d.memberId === item.memberId)?.balance || 0
     }));
+
     const updatedPayout = {
       ...latestPayout,
       distribution: updatedDistribution
     };
+
     useApp().setMostRecentPayout(updatedPayout);
     setIsEditing(false);
     setBalancesUpdated(true);
+
     toast({
-      title: "Uitbetaling afgerond",
-      description: "De uitbetalingen en saldi zijn bijgewerkt. Uren zijn gereset."
+      title: "Uitbetaling voltooid",
+      description: "De saldo's zijn opgeslagen. Je kunt de uitbetaling terugvinden in de geschiedenis.",
+      variant: "default"
     });
+
+    setTimeout(() => {
+      navigate('/');
+    }, 1000);
   };
+
   const applyRounding = () => {
     if (!editedDistribution.length || roundingOption === 'none') return;
     const roundingValue = parseFloat(roundingOption);
@@ -186,15 +211,18 @@ export const PayoutSummary = ({
       description: `Alle bedragen zijn naar beneden afgerond op €${roundingOption}.`
     });
   };
+
   useEffect(() => {
     if (isEditing) {
       calculateNewBalances();
     }
   }, [editedDistribution, isEditing]);
+
   const reopenEditor = () => {
     setBalancesUpdated(false);
     setIsEditing(true);
   };
+
   return <Card className="w-full max-w-3xl mx-auto">
       <CardHeader className="border-b">
         <CardTitle className="text-xl flex items-center">
@@ -331,4 +359,5 @@ export const PayoutSummary = ({
       </CardContent>
     </Card>;
 };
+
 export default PayoutSummary;

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -144,8 +143,14 @@ const FastTip = () => {
   };
   
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-amber-100/30 via-amber-50/40 to-amber-100/30">
-      <header className="bg-amber-500 dark:bg-amber-600 p-4 flex items-center justify-between shadow-sm">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-amber-100/30 via-amber-50/40 to-amber-100/30 relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-50 z-0">
+        <Sparkles className="absolute top-12 left-24 text-amber-300 animate-pulse" size={24} />
+        <Sparkles className="absolute bottom-24 right-12 text-amber-300 animate-pulse delay-500" size={32} />
+        <Sparkles className="absolute top-1/3 right-1/4 text-amber-200 animate-pulse delay-300" size={20} />
+      </div>
+
+      <header className="bg-amber-500 dark:bg-amber-600 p-4 flex items-center justify-between shadow-sm relative z-10">
         <div className="flex items-center">
           <Button 
             variant="ghost" 
@@ -195,11 +200,11 @@ const FastTip = () => {
         </Dialog>
       </header>
       
-      <div className="flex-grow flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white/30 dark:bg-gray-900/30 backdrop-blur-lg shadow-xl rounded-xl p-6 border border-amber-200/50 dark:border-amber-700/30 relative overflow-hidden transition-all hover:shadow-amber-300/30">
+      <div className="flex-grow flex flex-col items-center justify-center p-4 relative z-10">
+        <div className="w-full max-w-md bg-white/30 dark:bg-gray-900/30 backdrop-blur-lg shadow-xl rounded-xl p-6 border border-amber-200/50 dark:border-amber-700/30 relative overflow-hidden transition-all hover:shadow-amber-300/30 hover:scale-[1.02] transform duration-300 ease-in-out">
           <div className="relative z-10">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-medium mb-2 text-amber-900 dark:text-amber-100">Bedrag</h2>
+              <h2 className="text-2xl font-medium mb-2 text-amber-900 dark:text-amber-100 animate-fade-in">Bedrag</h2>
               <div className="relative inline-block">
                 <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-2xl text-amber-800 dark:text-amber-200">€</span>
                 <Input
@@ -208,7 +213,7 @@ const FastTip = () => {
                   onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
                   onKeyDown={handleKeyDown}
                   placeholder="0.00"
-                  className="text-center text-3xl h-16 w-48 pl-10 pr-4 bg-white/50 dark:bg-gray-800/30 border-amber-300 dark:border-amber-700 dark:text-white dark:placeholder:text-amber-200/50"
+                  className="text-center text-3xl h-16 w-48 pl-10 pr-4 bg-white/50 dark:bg-gray-800/30 border-amber-300 dark:border-amber-700 dark:text-white dark:placeholder:text-amber-200/50 focus:ring-2 focus:ring-amber-400 transition-all"
                 />
               </div>
             </div>
@@ -218,7 +223,7 @@ const FastTip = () => {
                 <Button 
                   key={value}
                   variant="outline" 
-                  className="text-lg py-6 bg-white/50 dark:bg-gray-800/40 border-amber-300 text-amber-900 hover:bg-amber-400 hover:text-white transition-all dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-500 dark:hover:text-white" 
+                  className="text-lg py-6 bg-white/50 dark:bg-gray-800/40 border-amber-300 text-amber-900 hover:bg-amber-400 hover:text-white transition-all dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-500 dark:hover:text-white transform hover:scale-105 active:scale-95" 
                   onClick={() => handleAddAmount(value)}
                 >
                   +{value}
@@ -233,7 +238,7 @@ const FastTip = () => {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal bg-white/50 dark:bg-gray-800/30 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-white",
+                      "w-full justify-start text-left font-normal bg-white/50 dark:bg-gray-800/30 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-white hover:bg-amber-50 dark:hover:bg-gray-800/50 transition-all",
                       showDateWarning && "border-amber-500 text-amber-600"
                     )}
                   >
@@ -266,7 +271,7 @@ const FastTip = () => {
                 onChange={(e) => setNote(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
-                className="w-full placeholder:italic bg-white/50 dark:bg-gray-800/30 border-amber-300 dark:border-amber-700 dark:text-white dark:placeholder:text-amber-200/50"
+                className="w-full placeholder:italic bg-white/50 dark:bg-gray-800/30 border-amber-300 dark:border-amber-700 dark:text-white dark:placeholder:text-amber-200/50 focus:ring-2 focus:ring-amber-400 transition-all"
                 rows={3}
               />
             </div>
@@ -285,11 +290,11 @@ const FastTip = () => {
             
             <Button 
               variant="goldGradient"
-              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg"
+              className="w-full py-6 text-lg relative group overflow-hidden shadow-lg hover:scale-[1.02] transform transition-transform duration-300 ease-in-out"
               disabled={amount <= 0}
               onClick={handleSave}
             >
-              <Sparkles size={20} className="mr-2 animate-pulse" /> 
+              <Sparkles size={20} className="mr-2 animate-pulse group-hover:animate-spin" /> 
               <span className="relative z-10">Top Tip</span>
             </Button>
           </div>

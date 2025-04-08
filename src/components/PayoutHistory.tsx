@@ -6,16 +6,19 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { useApp } from '@/contexts/AppContext';
-import { History, FileText, Download, ArrowUpDown, ArrowUp, ArrowDown, Save } from 'lucide-react';
+import { History, FileText, Download, ArrowUpDown, ArrowUp, ArrowDown, Save, Calculator } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 type SortField = 'date' | 'calculatedAmount' | 'actualAmount';
 type SortDirection = 'asc' | 'desc';
+type RoundingOption = 'none' | '0.05' | '0.10' | '0.50' | '1.00';
 
 interface PayoutDetailWithEdits {
   memberId: string;
@@ -34,6 +37,7 @@ const PayoutHistory = () => {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [editedDistribution, setEditedDistribution] = useState<PayoutDetailWithEdits[]>([]);
   const [isEditing, setIsEditing] = useState(false);
+  const [roundingOption, setRoundingOption] = useState<RoundingOption>('none');
   
   const formatDate = (dateString: string): string => {
     try {
@@ -66,6 +70,7 @@ const PayoutHistory = () => {
     
     setEditedDistribution(initialEditableDistribution);
     setIsEditing(false);
+    setRoundingOption('none');
     setDetailsOpen(true);
   };
 
@@ -188,6 +193,45 @@ const PayoutHistory = () => {
     toast({
       title: "Wijzigingen opgeslagen",
       description: "De uitbetalingen en saldi zijn bijgewerkt."
+    });
+  };
+
+  const applyRounding = () => {
+    if (!editedDistribution.length || roundingOption === 'none') return;
+    
+    const roundingValue = parseFloat(roundingOption);
+    
+    const roundedDistribution = editedDistribution.map(item => {
+      // Round the actual amount based on the selected rounding option
+      let roundedAmount = item.amount;
+      
+      if (roundingValue === 0.05) {
+        // Round to nearest 0.05
+        roundedAmount = Math.round(item.amount / 0.05) * 0.05;
+      } else if (roundingValue === 0.10) {
+        // Round to nearest 0.10
+        roundedAmount = Math.round(item.amount / 0.10) * 0.10;
+      } else if (roundingValue === 0.50) {
+        // Round to nearest 0.50
+        roundedAmount = Math.round(item.amount / 0.50) * 0.50;
+      } else if (roundingValue === 1.00) {
+        // Round to nearest 1.00
+        roundedAmount = Math.round(item.amount);
+      }
+      
+      return {
+        ...item,
+        actualAmount: parseFloat(roundedAmount.toFixed(2)),
+        isEdited: roundedAmount !== item.amount
+      };
+    });
+    
+    setEditedDistribution(roundedDistribution);
+    calculateNewBalances();
+    
+    toast({
+      title: "Bedragen afgerond",
+      description: `Alle bedragen zijn afgerond op €${roundingOption}.`
     });
   };
 
@@ -378,6 +422,40 @@ const PayoutHistory = () => {
                     {isEditing ? "Annuleren" : "Aanpassen"}
                   </Button>
                 </div>
+                
+                {isEditing && (
+                  <div className="bg-muted/30 p-3 rounded-md mb-3">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="rounding-select" className="text-sm whitespace-nowrap">Afronden op:</Label>
+                      <Select
+                        value={roundingOption}
+                        onValueChange={(value) => setRoundingOption(value as RoundingOption)}
+                      >
+                        <SelectTrigger id="rounding-select" className="h-8">
+                          <SelectValue placeholder="Geen afronding" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Geen afronding</SelectItem>
+                          <SelectItem value="0.05">€0.05</SelectItem>
+                          <SelectItem value="0.10">€0.10</SelectItem>
+                          <SelectItem value="0.50">€0.50</SelectItem>
+                          <SelectItem value="1.00">€1.00</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={applyRounding} 
+                        className="h-8 gap-1"
+                        disabled={roundingOption === 'none'}
+                      >
+                        <Calculator className="h-4 w-4" />
+                        Toepassen
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="border rounded-md overflow-hidden">
                   <Table>

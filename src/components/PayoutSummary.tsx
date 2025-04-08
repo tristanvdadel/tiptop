@@ -32,7 +32,8 @@ export const PayoutSummary = ({
     teamMembers,
     mostRecentPayout,
     updateTeamMemberBalance,
-    clearTeamMemberHours
+    clearTeamMemberHours,
+    setMostRecentPayout
   } = useApp();
   const {
     toast
@@ -165,7 +166,7 @@ export const PayoutSummary = ({
       distribution: updatedDistribution
     };
 
-    useApp().setMostRecentPayout(updatedPayout);
+    setMostRecentPayout(updatedPayout);
     setIsEditing(false);
     setBalancesUpdated(true);
 

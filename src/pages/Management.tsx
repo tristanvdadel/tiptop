@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Link, LogIn, History, Shield } from 'lucide-react';
+import { PlusCircle, Users, Link, LogIn, History, Shield, MoveHorizontal } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -16,17 +15,27 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import PayoutHistory from '@/components/PayoutHistory';
 import TeamMemberPermissions from '@/components/TeamMemberPermissions';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue 
+} from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const Management = () => {
   const location = useLocation();
   const initialTabFromState = location.state?.initialTab;
   
   const [userTeams, setUserTeams] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [userTeamMemberships, setUserTeamMemberships] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [loadingTeams, setLoadingTeams] = useState(true);
+  const [loadingMembers, setLoadingMembers] = useState(false);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
   const [user, setUser] = useState(null);
   const [error, setError] = useState(null);
@@ -75,12 +84,8 @@ const Management = () => {
           setUserTeamMemberships(teamMembers || []);
           setHasAnyTeam(teamMembers && teamMembers.length > 0);
           
-          const adminMemberships = teamMembers?.filter(tm => tm.role === 'admin') || [];
-          
-          if (adminMemberships.length > 0) {
-            setIsAdmin(true);
-            
-            const teamIds = adminMemberships.map(tm => tm.team_id);
+          if (teamMembers && teamMembers.length > 0) {
+            const teamIds = teamMembers.map(tm => tm.team_id);
             const { data: teams, error: teamsError } = await supabase
               .from('teams')
               .select('*')
@@ -96,6 +101,9 @@ const Management = () => {
                 setSelectedTeamId(teams[0].id);
               }
             }
+            
+            const adminMemberships = teamMembers?.filter(tm => tm.role === 'admin') || [];
+            setIsAdmin(adminMemberships.length > 0);
           }
         } catch (err) {
           console.error('Error in team fetch:', err);
@@ -111,7 +119,68 @@ const Management = () => {
     };
     
     checkUser();
-  }, [navigate, toast, selectedTeamId]);
+  }, [navigate, toast]);
+
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      if (!selectedTeamId) return;
+      
+      setLoadingMembers(true);
+      try {
+        const { data: members, error: membersError } = await supabase
+          .from('team_members')
+          .select('*')
+          .eq('team_id', selectedTeamId);
+          
+        if (membersError) {
+          console.error('Error fetching team members:', membersError);
+          throw membersError;
+        }
+        
+        const userIds = members.map(member => member.user_id);
+        
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, avatar_url')
+          .in('id', userIds);
+          
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+          throw profilesError;
+        }
+        
+        const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
+        
+        if (usersError) {
+          console.error('Error fetching users:', usersError);
+        }
+        
+        const enrichedMembers = members.map(member => {
+          const profile = profiles?.find(p => p.id === member.user_id) || {};
+          const userEmail = users?.find(u => u.id === member.user_id)?.email || 'Onbekend';
+          
+          return {
+            ...member,
+            profile,
+            email: userEmail
+          };
+        });
+        
+        setTeamMembers(enrichedMembers);
+      } catch (error) {
+        console.error('Error loading team members:', error);
+        toast({
+          title: "Fout bij ophalen teamleden",
+          description: error.message,
+          variant: "destructive"
+        });
+      } finally {
+        setLoadingMembers(false);
+      }
+    };
+    
+    fetchTeamMembers();
+  }, [selectedTeamId, toast]);
 
   const handleCreateTeam = async () => {
     if (!newTeamName.trim() || !user) return;
@@ -181,7 +250,6 @@ const Management = () => {
       const code = Math.random().toString(36).substring(2, 10).toUpperCase();
       const expiresAt = addDays(new Date(), 7).toISOString();
       
-      // Add new permissions
       const fullPermissions = {
         ...permissions,
         edit_tips: role === 'admin' || false,
@@ -286,6 +354,10 @@ const Management = () => {
     }
   };
 
+  const handleTeamChange = (teamId) => {
+    setSelectedTeamId(teamId);
+  };
+
   return (
     <div className="container mx-auto px-4 py-6 space-y-6 pb-20">
       <h1 className="text-2xl font-bold">Beheer</h1>
@@ -298,6 +370,31 @@ const Management = () => {
             {error}
           </AlertDescription>
         </Alert>
+      )}
+      
+      {!loadingTeams && userTeams.length > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <MoveHorizontal className="mr-2 h-5 w-5" />
+              Wissel tussen teams
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedTeamId} onValueChange={handleTeamChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecteer een team" />
+              </SelectTrigger>
+              <SelectContent>
+                {userTeams.map(team => (
+                  <SelectItem key={team.id} value={team.id}>
+                    {team.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
       )}
       
       <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue="teams">
@@ -320,26 +417,38 @@ const Management = () => {
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Team selecteren</CardTitle>
+                  <CardTitle>Team leden</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-4">
-                    {userTeams.map(team => (
-                      <Button 
-                        key={team.id}
-                        variant={selectedTeamId === team.id ? "default" : "outline"}
-                        className="justify-start"
-                        onClick={() => setSelectedTeamId(team.id)}
-                      >
-                        <Users className="mr-2 h-4 w-4" />
-                        {team.name}
-                      </Button>
-                    ))}
-                  </div>
+                  {loadingMembers ? (
+                    <div className="py-4 text-center">Laden van teamleden...</div>
+                  ) : teamMembers.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Naam</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Rol</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {teamMembers.map((member) => (
+                          <TableRow key={member.id}>
+                            <TableCell>
+                              {member.profile?.first_name || ''} {member.profile?.last_name || 'Gebruiker'}
+                            </TableCell>
+                            <TableCell>{member.email}</TableCell>
+                            <TableCell className="capitalize">{member.role}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="py-4 text-center">Geen teamleden gevonden</div>
+                  )}
                 </CardContent>
               </Card>
               
-              {/* Add code input section even when user already has teams */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">

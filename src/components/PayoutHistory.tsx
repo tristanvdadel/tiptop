@@ -54,11 +54,14 @@ const PayoutHistory = () => {
       return `${member?.name || 'Onbekend lid'},${item.amount.toFixed(2)},${(item.actualAmount || item.amount).toFixed(2)},${(item.balance || 0).toFixed(2)}`;
     }).join('\n');
     
-    const csv = headers + rows;
+    const payoutInfo = `Uitbetaling datum:,${formatDate(selectedPayout.date)}\n`;
+    const payerInfo = selectedPayout.paidBy ? `Uitbetaald door:,${selectedPayout.paidBy}\n` : '';
+    
+    const csv = payoutInfo + payerInfo + '\n' + headers + rows;
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    const payoutDate = formatDate(selectedPayout.date).replace(/\s/g, '_');
+    const payoutDate = new Date(selectedPayout.date).toLocaleDateString('nl').replace(/\//g, '-');
     
     link.setAttribute('href', url);
     link.setAttribute('download', `fooi-uitbetaling-${payoutDate}.csv`);
@@ -77,8 +80,9 @@ const PayoutHistory = () => {
   const downloadExcel = () => {
     if (!selectedPayout) return;
     
-    const headers = `Uitbetaling datum:,${formatDate(selectedPayout.date)}\n\n`;
-    const tableHeaders = "Naam,Berekend bedrag,Balans,Uitbetaald bedrag,Nieuw saldo\n";
+    const headers = `Uitbetaling datum:,${formatDate(selectedPayout.date)}\n`;
+    const payerInfo = selectedPayout.paidBy ? `Uitbetaald door:,${selectedPayout.paidBy}\n` : '';
+    const tableHeaders = "\nNaam,Berekend bedrag,Balans,Uitbetaald bedrag,Nieuw saldo\n";
     
     const rows = selectedPayout.distribution.map(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
@@ -92,7 +96,7 @@ const PayoutHistory = () => {
     
     const totalRow = `\nTotaal,,${selectedPayout.distribution.reduce((sum, item) => sum + (item.actualAmount || item.amount), 0).toFixed(2)}`;
     
-    const excel = headers + tableHeaders + rows + totalRow;
+    const excel = headers + payerInfo + tableHeaders + rows + totalRow;
     const blob = new Blob([excel], { type: 'application/vnd.ms-excel' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -131,6 +135,10 @@ const PayoutHistory = () => {
       doc.setFontSize(12);
       doc.text(`Factuurnummer: TIPS-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`, 150, 40, { align: "right" });
       doc.text(`Datum: ${payoutDate}`, 150, 45, { align: "right" });
+      
+      if (selectedPayout.paidBy) {
+        doc.text(`Uitbetaald door: ${selectedPayout.paidBy}`, 150, 50, { align: "right" });
+      }
       
       doc.setFontSize(11);
       doc.setTextColor(100, 100, 100);

@@ -45,6 +45,8 @@ export type Period = {
 export type PayoutData = {
   periodIds: string[];
   date: string;
+  paidBy?: string; // Name of the person who made the payout
+  paidById?: string; // ID of the person who made the payout
   distribution: {
     memberId: string;
     amount: number;
@@ -803,10 +805,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }));
     }
     
+    let paidBy = 'Onbekend';
+    let paidById = '';
+    
+    try {
+      const userString = localStorage.getItem('supabase.auth.token');
+      if (userString) {
+        const userData = JSON.parse(userString);
+        if (userData?.currentSession?.user) {
+          const user = userData.currentSession.user;
+          paidBy = user.email ? user.email.split('@')[0] : 'Onbekend';
+          paidById = user.id || '';
+        }
+      }
+    } catch (error) {
+      console.error('Error getting user info:', error);
+    }
+    
     const newPayout: PayoutData = {
       periodIds,
       date: new Date().toISOString(),
       distribution,
+      paidBy,
+      paidById,
     };
     
     setPayouts(prev => [...prev, newPayout]);

@@ -1,4 +1,3 @@
-
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
@@ -21,19 +20,26 @@ const PeriodSummary = () => {
     startNewPeriod,
     endCurrentPeriod,
     hasReachedPeriodLimit,
-    autoClosePeriods
+    autoClosePeriods,
+    calculateAverageTipPerHour
   } = useApp();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCloseConfirmDialogOpen, setIsCloseConfirmDialogOpen] = useState(false);
   const [periodName, setPeriodName] = useState('');
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
 
   const totalTip = useMemo(() => {
     if (!currentPeriod) return 0;
     return currentPeriod.tips.reduce((sum, tip) => sum + tip.amount, 0);
   }, [currentPeriod]);
+  
+  const averageTipPerHour = useMemo(() => {
+    if (!currentPeriod) return 0;
+    if (currentPeriod.averageTipPerHour !== undefined) {
+      return currentPeriod.averageTipPerHour;
+    }
+    return calculateAverageTipPerHour(currentPeriod.id);
+  }, [currentPeriod, calculateAverageTipPerHour]);
 
   const handleEditClick = () => {
     if (currentPeriod) {
@@ -163,12 +169,10 @@ const PeriodSummary = () => {
             <span>{currentPeriod.tips.length}</span>
           </div>
           
-          {currentPeriod.averageTipPerHour !== undefined && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Gemiddelde fooi per uur</span>
-              <span className="font-medium">€{currentPeriod.averageTipPerHour.toFixed(2)}</span>
-            </div>
-          )}
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Gemiddelde fooi per uur</span>
+            <span className="font-medium">€{averageTipPerHour.toFixed(2)}</span>
+          </div>
           
           {autoClosePeriods && currentPeriod.autoCloseDate && <div className="flex justify-between">
               <span className="text-muted-foreground flex items-center">

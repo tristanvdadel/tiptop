@@ -39,6 +39,7 @@ export type Period = {
   isPaid?: boolean; // Track if the period has been paid out
   notes?: string; // Added notes field
   autoCloseDate?: string; // Added auto-close date
+  averageTipPerHour?: number; // Added to store the average tip per hour
 };
 
 export type PayoutData = {
@@ -812,11 +813,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setMostRecentPayout(newPayout);
     
     setPeriods(prev => 
-      prev.map(period => 
-        periodIds.includes(period.id) 
-          ? { ...period, isPaid: true } 
-          : period
-      )
+      prev.map(period => {
+        if (periodIds.includes(period.id)) {
+          // Calculate and store the average tip per hour for this period
+          const periodAverage = calculateAverageTipPerHour(period.id);
+          
+          return { 
+            ...period, 
+            isPaid: true,
+            averageTipPerHour: periodAverage
+          };
+        }
+        return period;
+      })
     );
     
     setTeamMembers(prev => 

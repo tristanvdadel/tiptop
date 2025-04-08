@@ -24,7 +24,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   return (
     <div className="flex justify-end space-x-2 pt-4">
       {!balancesUpdated && isEditing ? (
-        <Button variant="goldGradient" onClick={saveChanges}>
+        <Button variant="default" className="bg-green-500 hover:bg-green-600" onClick={saveChanges}>
           <Save className="h-4 w-4 mr-2" />
           Uitbetaling afronden
         </Button>

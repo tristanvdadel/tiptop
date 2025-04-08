@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, ArrowLeft, Download, Copy, Calculator } from 'lucide-react';
+import { Check, ArrowLeft, Download, Copy, Calculator, Save, Wallet } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedDistribution, setEditedDistribution] = useState<PayoutDetailWithEdits[]>([]);
   const [roundingOption, setRoundingOption] = useState<RoundingOption>('none');
+  const [balancesUpdated, setBalancesUpdated] = useState(false);
   
   // Use the most recent payout provided by context, or fall back to the last one in the array
   const latestPayout = mostRecentPayout || (payouts.length > 0 ? payouts[payouts.length - 1] : null);
@@ -168,9 +169,10 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     });
     
     setIsEditing(false);
+    setBalancesUpdated(true);
     toast({
-      title: "Wijzigingen opgeslagen",
-      description: "De uitbetalingen en saldi zijn bijgewerkt."
+      title: "Uitbetaling afgerond",
+      description: "De uitbetalingen en saldi zijn bijgewerkt.",
     });
   };
 
@@ -259,6 +261,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
                   size="sm" 
                   onClick={() => setIsEditing(!isEditing)}
                   className="h-8"
+                  disabled={balancesUpdated}
                 >
                   {isEditing ? "Annuleren" : "Aanpassen"}
                 </Button>
@@ -380,6 +383,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
             <div className="flex justify-end space-x-2 pt-4">
               {isEditing ? (
                 <Button variant="goldGradient" onClick={saveChanges}>
+                  <Save className="h-4 w-4 mr-2" />
                   Wijzigingen opslaan
                 </Button>
               ) : (
@@ -403,14 +407,25 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
         )}
         
         <div className="mt-8">
-          <Button 
-            onClick={onClose}
-            className="w-full"
-            variant="outline"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Terug naar team overzicht
-          </Button>
+          {balancesUpdated ? (
+            <Button 
+              onClick={onClose}
+              className="w-full"
+              variant="goldGradient"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Terug naar team overzicht
+            </Button>
+          ) : (
+            <Button 
+              onClick={() => isEditing ? saveChanges() : setIsEditing(true)}
+              className="w-full"
+              variant="goldGradient"
+            >
+              <Wallet className="h-4 w-4 mr-2" />
+              {isEditing ? "Uitbetaling afronden & saldo opslaan" : "Uitbetaling aanpassen & saldo bijwerken"}
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

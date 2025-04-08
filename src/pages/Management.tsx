@@ -5,36 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Link, LogIn, History, Shield, MoveHorizontal, LogOut, Trash2 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
-import { supabase } from "@/integrations/supabase/client";
+import { Shield, History, Link } from 'lucide-react';
+import { supabase, getUserEmail } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Separator } from "@/components/ui/separator";
 import { useNavigate, useLocation } from "react-router-dom";
 import { addDays } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import PayoutHistory from '@/components/PayoutHistory';
 import TeamMemberPermissions from '@/components/TeamMemberPermissions';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue 
-} from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import TeamOverview from '@/components/TeamOverview';
+import TeamInvite from '@/components/TeamInvite';
+import TeamJoin from '@/components/TeamJoin';
+import TeamCreate from '@/components/TeamCreate';
 
 const Management = () => {
   const location = useLocation();
@@ -172,38 +155,19 @@ const Management = () => {
           setSelectedMembershipId(currentMembership.id);
         }
         
-        try {
-          const { data, error: usersError } = await supabase.auth.admin.listUsers();
+        // Use our helper function to get emails safely
+        const enrichedMembers = await Promise.all(members.map(async (member) => {
+          const profile = profiles?.find(p => p.id === member.user_id) || {};
+          const userEmail = await getUserEmail(member.user_id);
           
-          if (usersError) throw usersError;
-          
-          const enrichedMembers = members.map(member => {
-            const profile = profiles?.find(p => p.id === member.user_id) || {};
-            const userInfo = data?.users?.find(u => u.id === member.user_id);
-            const userEmail = userInfo?.email || 'Onbekend';
-            
-            return {
-              ...member,
-              profile,
-              email: userEmail
-            };
-          });
-          
-          setTeamMembers(enrichedMembers);
-        } catch (error) {
-          console.error('Error fetching user emails:', error);
-          const enrichedMembers = members.map(member => {
-            const profile = profiles?.find(p => p.id === member.user_id) || {};
-            
-            return {
-              ...member,
-              profile,
-              email: 'Onbekend'
-            };
-          });
-          
-          setTeamMembers(enrichedMembers);
-        }
+          return {
+            ...member,
+            profile,
+            email: userEmail
+          };
+        }));
+        
+        setTeamMembers(enrichedMembers);
       } catch (error) {
         console.error('Error loading team members:', error);
         toast({
@@ -542,253 +506,36 @@ const Management = () => {
             <div className="flex justify-center py-8">Laden...</div>
           ) : userTeams.length > 0 ? (
             <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <MoveHorizontal className="mr-2 h-5 w-5" />
-                    Team beheer
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {userTeams.length > 1 && (
-                      <div className="space-y-2">
-                        <Label>Wissel tussen teams</Label>
-                        <Select value={selectedTeamId} onValueChange={handleTeamChange}>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Selecteer een team" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {userTeams.map(team => (
-                              <SelectItem key={team.id} value={team.id}>
-                                {team.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    
-                    <div className="space-y-2">
-                      <Label>Toetreden met code</Label>
-                      <div className="flex space-x-2">
-                        <Input
-                          placeholder="Voer uitnodigingscode in"
-                          value={inviteCode}
-                          onChange={(e) => setInviteCode(e.target.value)}
-                        />
-                        <Button onClick={handleJoinTeam} disabled={!inviteCode.trim()}>
-                          <LogIn className="mr-2 h-4 w-4" />
-                          Toetreden
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    <div className="flex space-x-2">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="outline" className="flex-1">
-                            <LogOut className="mr-2 h-4 w-4" />
-                            Team verlaten
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Team verlaten</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Weet je zeker dat je dit team wilt verlaten? Je kunt later opnieuw lid worden met een uitnodigingscode.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Annuleren</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleLeaveTeam}>Verlaten</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                      
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" className="flex-1">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Team verwijderen
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Team verwijderen</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Weet je zeker dat je dit team wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.
-                              Alle teamleden, uitnodigingen en gegevens van dit team worden permanent verwijderd.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Annuleren</AlertDialogCancel>
-                            <AlertDialogAction 
-                              onClick={handleDeleteTeam} 
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Verwijderen
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Team leden</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {loadingMembers ? (
-                    <div className="py-4 text-center">Laden van teamleden...</div>
-                  ) : teamMembers.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Naam</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Rol</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {teamMembers.map((member) => (
-                          <TableRow key={member.id}>
-                            <TableCell>
-                              {member.profile?.first_name || ''} {member.profile?.last_name || 'Gebruiker'}
-                            </TableCell>
-                            <TableCell>{member.email}</TableCell>
-                            <TableCell className="capitalize">{member.role}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  ) : (
-                    <div className="py-4 text-center">Geen teamleden gevonden</div>
-                  )}
-                </CardContent>
-              </Card>
+              <TeamOverview 
+                userTeams={userTeams}
+                teamMembers={teamMembers}
+                loadingMembers={loadingMembers}
+                selectedTeamId={selectedTeamId}
+                selectedMembershipId={selectedMembershipId}
+                onTeamChange={handleTeamChange}
+                onLeaveTeam={handleLeaveTeam}
+                onDeleteTeam={handleDeleteTeam}
+              />
               
-              {selectedTeamId && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Team uitnodiging aanmaken</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div>
-                        <Label>Rol</Label>
-                        <div className="flex items-center space-x-2 mt-1.5">
-                          <Button 
-                            onClick={() => handleGenerateInvite('member', {
-                              add_tips: true,
-                              add_hours: true,
-                              view_team: true,
-                              view_reports: false,
-                              edit_tips: false,
-                              close_periods: false,
-                              manage_payouts: false
-                            })}
-                            variant="outline"
-                          >
-                            Teamlid (standaard)
-                          </Button>
-                          <Button 
-                            onClick={() => handleGenerateInvite('admin', {
-                              add_tips: true,
-                              add_hours: true,
-                              view_team: true,
-                              view_reports: true,
-                              edit_tips: true,
-                              close_periods: true,
-                              manage_payouts: true
-                            })}
-                            variant="outline"
-                          >
-                            Admin
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      {inviteCode && (
-                        <div className="mt-4 space-y-4">
-                          <Separator />
-                          
-                          <div className="flex flex-col items-center justify-center space-y-4">
-                            <Label>Uitnodigingscode:</Label>
-                            <div className="text-2xl font-mono tracking-wider bg-muted p-2 rounded">
-                              {inviteCode}
-                            </div>
-                            
-                            <Button
-                              onClick={() => {
-                                navigator.clipboard.writeText(inviteCode);
-                                toast({
-                                  title: "Gekopieerd",
-                                  description: "Uitnodigingscode is gekopieerd naar het klembord."
-                                });
-                              }}
-                              className="mt-2"
-                            >
-                              Kopieer code
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              <TeamInvite 
+                selectedTeamId={selectedTeamId}
+                onGenerateInvite={handleGenerateInvite}
+                inviteCode={inviteCode}
+              />
             </div>
           ) : (
             <div className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Team toetreden met code</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="inviteCode">Uitnodigingscode</Label>
-                      <Input
-                        id="inviteCode"
-                        placeholder="Voer code in"
-                        value={inviteCode}
-                        onChange={(e) => setInviteCode(e.target.value)}
-                      />
-                    </div>
-                    <Button onClick={handleJoinTeam} disabled={!inviteCode.trim()}>
-                      <LogIn className="mr-2 h-4 w-4" />
-                      Team toetreden
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              <TeamJoin 
+                inviteCode={inviteCode}
+                onInviteCodeChange={setInviteCode}
+                onJoinTeam={handleJoinTeam}
+              />
               
-              <Card>
-                <CardHeader>
-                  <CardTitle>Nieuw team aanmaken</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="teamName">Teamnaam</Label>
-                      <Input
-                        id="teamName"
-                        placeholder="Bijv. Café De Kroeg"
-                        value={newTeamName}
-                        onChange={(e) => setNewTeamName(e.target.value)}
-                      />
-                    </div>
-                    <Button onClick={handleCreateTeam} disabled={!newTeamName.trim()}>
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                      Team aanmaken
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              <TeamCreate 
+                newTeamName={newTeamName}
+                onNewTeamNameChange={setNewTeamName}
+                onCreateTeam={handleCreateTeam}
+              />
             </div>
           )}
         </TabsContent>

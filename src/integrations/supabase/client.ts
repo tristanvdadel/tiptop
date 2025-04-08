@@ -28,12 +28,14 @@ export const getUserEmail = async (userId: string) => {
     // First try to get from profile if we have it
     const { data: profile } = await supabase
       .from('profiles')
-      .select('id, email')
+      .select('id')
       .eq('id', userId)
       .single();
       
-    if (profile && profile.email) {
-      return profile.email;
+    if (profile) {
+      // Since email isn't stored in the profiles table, we'll return a placeholder
+      // In a real application, you might implement this differently
+      return 'Onbekend';
     }
     
     // Return unknown if we can't get the email

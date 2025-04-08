@@ -1,3 +1,4 @@
+
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
@@ -161,6 +162,13 @@ const PeriodSummary = () => {
             <span className="text-muted-foreground">Aantal invoeren</span>
             <span>{currentPeriod.tips.length}</span>
           </div>
+          
+          {currentPeriod.averageTipPerHour !== undefined && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Gemiddelde fooi per uur</span>
+              <span className="font-medium">€{currentPeriod.averageTipPerHour.toFixed(2)}</span>
+            </div>
+          )}
           
           {autoClosePeriods && currentPeriod.autoCloseDate && <div className="flex justify-between">
               <span className="text-muted-foreground flex items-center">

@@ -745,8 +745,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     
     const validPeriods = periodsToCalculate.map(period => {
-      const periodTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
+      if (period.isPaid && period.averageTipPerHour !== undefined) {
+        return {
+          average: period.averageTipPerHour
+        };
+      }
       
+      const periodTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
       const periodHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
       
       if (periodHours === 0) {
@@ -758,7 +763,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         hours: periodHours,
         average: periodTips / periodHours
       };
-    }).filter(p => p !== null) as Array<{tips: number, hours: number, average: number}>;
+    }).filter(p => p !== null) as Array<{tips?: number, hours?: number, average: number}>;
     
     if (validPeriods.length === 0) {
       return 0;

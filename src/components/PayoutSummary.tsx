@@ -130,23 +130,28 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   const calculateNewBalances = () => {
     if (!editedDistribution.length) return;
     
-    // Calculate balance differences for one time only, not cumulative
+    // Updated balance calculation logic
     const updatedDistribution = editedDistribution.map(item => {
       const originalAmount = item.amount;
       const newActualAmount = item.actualAmount;
+      
       // Get the original balance from the most recent payout
       const originalBalance = latestPayout?.distribution.find(d => d.memberId === item.memberId)?.balance || 0;
       
-      let newBalance = originalBalance;
+      // Calculate new balance based on formula:
+      // New Balance = Original Balance + (Original Amount - Actual Payout)
+      // If Actual Amount == Original Amount + Original Balance, the new balance will be 0
+      let newBalance = 0;
       
-      // If actual amount is less than calculated, add the difference to balance
-      if (newActualAmount < originalAmount + originalBalance) {
-        newBalance += ((originalAmount + originalBalance) - newActualAmount);
-      } 
-      // If actual amount is more than calculated, subtract the difference from balance
-      else if (newActualAmount > originalAmount + originalBalance) {
-        newBalance -= (newActualAmount - (originalAmount + originalBalance));
+      const totalOwed = originalAmount + originalBalance;
+      if (newActualAmount < totalOwed) {
+        // If we pay less than owed, add the difference to balance
+        newBalance = totalOwed - newActualAmount;
+      } else if (newActualAmount > totalOwed) {
+        // If we pay more than owed, create a negative balance
+        newBalance = -(newActualAmount - totalOwed);
       }
+      // If exactly equal, balance becomes 0 (default value)
       
       return {
         ...item,

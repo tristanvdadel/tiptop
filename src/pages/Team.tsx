@@ -17,18 +17,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useNavigate } from 'react-router-dom';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-type RoundingOption = 'none' | '0.05' | '0.10' | '0.50' | '1.00';
-
-interface PayoutDetailWithEdits {
-  memberId: string;
-  amount: number;
-  actualAmount: number;
-  balance: number | undefined;
-  isEdited: boolean;
-}
 
 const Team = () => {
   const {
@@ -58,9 +46,6 @@ const Team = () => {
   }>({});
   const [editingMember, setEditingMember] = useState<string | null>(null);
   const [editMemberName, setEditMemberName] = useState('');
-  const [isPayoutPreparationOpen, setIsPayoutPreparationOpen] = useState(false);
-  const [editedDistribution, setEditedDistribution] = useState<PayoutDetailWithEdits[]>([]);
-  const [roundingOption, setRoundingOption] = useState<RoundingOption>('none');
   const {
     toast
   } = useToast();
@@ -185,113 +170,6 @@ const Team = () => {
     }
   };
 
-  const handlePreparePayoutClick = () => {
-    if (selectedPeriods.length === 0) {
-      toast({
-        title: "Selecteer perioden",
-        description: "Selecteer minimaal één periode voor uitbetaling.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const initialEditableDistribution = distribution.map(member => ({
-      memberId: member.id,
-      amount: member.tipAmount || 0,
-      actualAmount: member.tipAmount || 0,
-      balance: member.balance,
-      isEdited: false
-    }));
-    
-    setEditedDistribution(initialEditableDistribution);
-    setRoundingOption('none');
-    setIsPayoutPreparationOpen(true);
-  };
-
-  const handleAmountChange = (memberId: string, actualAmount: string) => {
-    const amount = parseFloat(actualAmount);
-    
-    if (isNaN(amount) || amount < 0) return;
-    
-    setEditedDistribution(prev => 
-      prev.map(item => 
-        item.memberId === memberId 
-          ? { 
-              ...item, 
-              actualAmount: amount,
-              isEdited: true
-            } 
-          : item
-      )
-    );
-  };
-
-  const calculateNewBalances = () => {
-    if (!editedDistribution.length) return;
-    
-    const updatedDistribution = editedDistribution.map(item => {
-      const originalAmount = item.amount;
-      const newActualAmount = item.actualAmount;
-      
-      const member = teamMembers.find(m => m.id === item.memberId);
-      const currentBalance = member?.balance || 0;
-      
-      let newBalance = currentBalance;
-      
-      if (newActualAmount < originalAmount) {
-        newBalance += (originalAmount - newActualAmount);
-      } else if (newActualAmount > originalAmount) {
-        newBalance -= (newActualAmount - originalAmount);
-      }
-      
-      return {
-        ...item,
-        balance: parseFloat(newBalance.toFixed(2))
-      };
-    });
-    
-    setEditedDistribution(updatedDistribution);
-  };
-
-  useEffect(() => {
-    if (editedDistribution.length > 0) {
-      calculateNewBalances();
-    }
-  }, [isPayoutPreparationOpen]);
-
-  const applyRounding = () => {
-    if (!editedDistribution.length || roundingOption === 'none') return;
-    
-    const roundingValue = parseFloat(roundingOption);
-    
-    const roundedDistribution = editedDistribution.map(item => {
-      let roundedAmount = item.amount;
-      
-      if (roundingValue === 0.05) {
-        roundedAmount = Math.floor(item.amount / 0.05) * 0.05;
-      } else if (roundingValue === 0.10) {
-        roundedAmount = Math.floor(item.amount / 0.10) * 0.10;
-      } else if (roundingValue === 0.50) {
-        roundedAmount = Math.floor(item.amount / 0.50) * 0.50;
-      } else if (roundingValue === 1.00) {
-        roundedAmount = Math.floor(item.amount);
-      }
-      
-      return {
-        ...item,
-        actualAmount: parseFloat(roundedAmount.toFixed(2)),
-        isEdited: roundedAmount !== item.amount
-      };
-    });
-    
-    setEditedDistribution(roundedDistribution);
-    
-    toast({
-      title: "Bedragen afgerond",
-      description: `Alle bedragen zijn naar beneden afgerond op €${roundingOption}.`
-    });
-  };
-
   const handlePayout = () => {
     if (selectedPeriods.length === 0) {
       toast({
@@ -302,11 +180,11 @@ const Team = () => {
       return;
     }
 
-    const customDistribution = editedDistribution.map(item => ({
-      memberId: item.memberId,
-      amount: item.amount,
-      actualAmount: item.actualAmount,
-      balance: item.balance
+    const customDistribution = distribution.map(member => ({
+      memberId: member.id,
+      amount: member.tipAmount || 0,
+      actualAmount: member.tipAmount || 0,
+      balance: member.balance
     }));
     
     markPeriodsAsPaid(selectedPeriods, customDistribution);
@@ -315,7 +193,6 @@ const Team = () => {
       clearTeamMemberHours(member.id);
     });
     
-    setIsPayoutPreparationOpen(false);
     setIsPayoutModalOpen(false);
     setShowPayoutSummary(true);
     
@@ -606,135 +483,14 @@ const Team = () => {
         <div className="flex gap-2">
           <Button 
             variant="goldGradient" 
-            onClick={handlePreparePayoutClick} 
+            onClick={handlePayout} 
             disabled={selectedPeriods.length === 0} 
             className="w-full md:w-auto"
           >
-            Voorbereiden uitbetaling
+            Uitbetaling voltooien
           </Button>
         </div>
       }
-      
-      <Dialog open={isPayoutPreparationOpen} onOpenChange={setIsPayoutPreparationOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Receipt className="h-5 w-5" />
-              Uitbetaling voorbereiden
-            </DialogTitle>
-            <DialogDescription>
-              Pas de bedragen aan indien nodig voordat je de uitbetaling markeert als voltooid.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="bg-muted/30 p-3 rounded-md mb-3">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="rounding-select" className="text-sm whitespace-nowrap">Afronden op:</Label>
-                <Select
-                  value={roundingOption}
-                  onValueChange={(value) => setRoundingOption(value as RoundingOption)}
-                >
-                  <SelectTrigger id="rounding-select" className="h-8">
-                    <SelectValue placeholder="Geen afronding" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Geen afronding</SelectItem>
-                    <SelectItem value="0.05">€0.05</SelectItem>
-                    <SelectItem value="0.10">€0.10</SelectItem>
-                    <SelectItem value="0.50">€0.50</SelectItem>
-                    <SelectItem value="1.00">€1.00</SelectItem>
-                  </SelectContent>
-                </Select>
-                
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={applyRounding} 
-                  className="h-8 gap-1"
-                  disabled={roundingOption === 'none'}
-                >
-                  Toepassen
-                </Button>
-              </div>
-            </div>
-            
-            <div className="border rounded-md overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Naam</TableHead>
-                    <TableHead className="text-right">Berekend</TableHead>
-                    <TableHead className="text-right">Uitbetalen</TableHead>
-                    <TableHead className="text-right">Saldo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {editedDistribution.map((item, idx) => {
-                    const member = teamMembers.find(m => m.id === item.memberId);
-                    
-                    return (
-                      <TableRow key={idx} className={item.isEdited ? "bg-amber-50" : ""}>
-                        <TableCell>{member?.name || 'Onbekend lid'}</TableCell>
-                        <TableCell className="text-right">€{item.amount.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-medium">
-                          <Input 
-                            type="number" 
-                            value={item.actualAmount} 
-                            onChange={(e) => handleAmountChange(item.memberId, e.target.value)}
-                            className="w-24 text-right inline-block h-8"
-                            min="0"
-                            step="0.01"
-                          />
-                        </TableCell>
-                        <TableCell className={`text-right ${item.balance && item.balance > 0 ? 'text-green-600' : item.balance && item.balance < 0 ? 'text-red-600' : ''}`}>
-                          {item.balance !== undefined && item.balance !== 0 ? 
-                            `€${Math.abs(item.balance).toFixed(2)} ${item.balance > 0 ? '+' : '-'}` : 
-                            '-'
-                          }
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-                <tfoot>
-                  <tr className="border-t">
-                    <td className="p-2 font-bold">Totaal</td>
-                    <td className="p-2 text-right">
-                      €{editedDistribution.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}
-                    </td>
-                    <td className="p-2 text-right font-bold">
-                      €{editedDistribution.reduce((sum, item) => sum + item.actualAmount, 0).toFixed(2)}
-                    </td>
-                    <td className="p-2"></td>
-                  </tr>
-                </tfoot>
-              </Table>
-            </div>
-            
-            <div className="bg-blue-50 border border-blue-200 p-4 rounded-md mt-4">
-              <p>
-                Na uitbetaling worden uren automatisch gereset en wordt een nieuw saldo berekend op basis van de aangepaste uitbetaling.
-              </p>
-            </div>
-            
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button 
-                variant="outline" 
-                onClick={() => setIsPayoutPreparationOpen(false)}
-              >
-                Annuleren
-              </Button>
-              <Button 
-                variant="goldGradient" 
-                onClick={handlePayout}
-              >
-                Uitbetaling voltooien
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
       
       <AlertDialog open={isPayoutModalOpen} onOpenChange={setIsPayoutModalOpen}>
         <AlertDialogContent>

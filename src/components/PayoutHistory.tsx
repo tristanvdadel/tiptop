@@ -8,7 +8,6 @@ import { nl } from 'date-fns/locale';
 import { useApp } from '@/contexts/AppContext';
 import { History, FileText, Download, ArrowUpDown, ArrowUp, ArrowDown, Save, Calculator } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -18,7 +17,7 @@ import { Label } from "@/components/ui/label";
 
 type SortField = 'date' | 'calculatedAmount' | 'actualAmount';
 type SortDirection = 'asc' | 'desc';
-type RoundingOption = 'none' | '0.05' | '0.10' | '0.50' | '1.00';
+type RoundingOption = 'none' | '0.50' | '1.00' | '2.00' | '5.00' | '10.00';
 
 interface PayoutDetailWithEdits {
   memberId: string;
@@ -202,21 +201,24 @@ const PayoutHistory = () => {
     const roundingValue = parseFloat(roundingOption);
     
     const roundedDistribution = editedDistribution.map(item => {
-      // Round the actual amount based on the selected rounding option
+      // Round DOWN the actual amount based on the selected rounding option
       let roundedAmount = item.amount;
       
-      if (roundingValue === 0.05) {
-        // Round to nearest 0.05
-        roundedAmount = Math.round(item.amount / 0.05) * 0.05;
-      } else if (roundingValue === 0.10) {
-        // Round to nearest 0.10
-        roundedAmount = Math.round(item.amount / 0.10) * 0.10;
-      } else if (roundingValue === 0.50) {
-        // Round to nearest 0.50
-        roundedAmount = Math.round(item.amount / 0.50) * 0.50;
+      if (roundingValue === 0.50) {
+        // Round down to nearest 0.50
+        roundedAmount = Math.floor(item.amount / 0.50) * 0.50;
       } else if (roundingValue === 1.00) {
-        // Round to nearest 1.00
-        roundedAmount = Math.round(item.amount);
+        // Round down to nearest 1.00
+        roundedAmount = Math.floor(item.amount);
+      } else if (roundingValue === 2.00) {
+        // Round down to nearest 2.00
+        roundedAmount = Math.floor(item.amount / 2.00) * 2.00;
+      } else if (roundingValue === 5.00) {
+        // Round down to nearest 5.00
+        roundedAmount = Math.floor(item.amount / 5.00) * 5.00;
+      } else if (roundingValue === 10.00) {
+        // Round down to nearest 10.00
+        roundedAmount = Math.floor(item.amount / 10.00) * 10.00;
       }
       
       return {
@@ -231,7 +233,7 @@ const PayoutHistory = () => {
     
     toast({
       title: "Bedragen afgerond",
-      description: `Alle bedragen zijn afgerond op €${roundingOption}.`
+      description: `Alle bedragen zijn naar beneden afgerond op €${roundingOption}.`
     });
   };
 
@@ -436,10 +438,11 @@ const PayoutHistory = () => {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Geen afronding</SelectItem>
-                          <SelectItem value="0.05">€0.05</SelectItem>
-                          <SelectItem value="0.10">€0.10</SelectItem>
                           <SelectItem value="0.50">€0.50</SelectItem>
                           <SelectItem value="1.00">€1.00</SelectItem>
+                          <SelectItem value="2.00">€2.00</SelectItem>
+                          <SelectItem value="5.00">€5.00</SelectItem>
+                          <SelectItem value="10.00">€10.00</SelectItem>
                         </SelectContent>
                       </Select>
                       

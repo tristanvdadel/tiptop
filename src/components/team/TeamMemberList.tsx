@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Slider } from "@/components/ui/slider";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -40,6 +41,7 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
   }>({});
   const [editingMember, setEditingMember] = useState<string | null>(null);
   const [editMemberName, setEditMemberName] = useState('');
+  const [scrollPosition, setScrollPosition] = useState(0);
   const { toast } = useToast();
 
   React.useEffect(() => {
@@ -137,6 +139,29 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
     return balance > 0 ? 'text-green-600' : 'text-red-600';
   };
 
+  // Calculate the maximum scroll height based on the number of team members
+  const calculateMaxScroll = () => {
+    const baseHeight = 300; // Base height in pixels
+    const itemHeight = 80; // Approximate height per team member row
+    const totalHeight = teamMembers.length * itemHeight;
+    return Math.max(0, totalHeight - baseHeight);
+  };
+
+  const maxScroll = calculateMaxScroll();
+  
+  // Handle slider change
+  const handleSliderChange = (value: number[]) => {
+    setScrollPosition(value[0]);
+    
+    // Apply the scroll position to the ScrollArea
+    const scrollElement = document.querySelector('.members-scroll-area');
+    if (scrollElement) {
+      const maxScrollTop = scrollElement.scrollHeight - scrollElement.clientHeight;
+      const scrollTop = (value[0] / 100) * maxScrollTop;
+      scrollElement.scrollTop = scrollTop;
+    }
+  };
+
   return (
     <>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
@@ -169,7 +194,7 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-hidden">
-              <ScrollArea className="max-h-[600px]">
+              <ScrollArea className="members-scroll-area max-h-[600px]">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -328,6 +353,24 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
                   </TableBody>
                 </Table>
               </ScrollArea>
+              
+              {teamMembers.length > 7 && (
+                <div className="px-4 py-2 border-t">
+                  <div className="flex items-center">
+                    <span className="text-xs text-gray-500 mr-2">Scroll</span>
+                    <div className="flex-1">
+                      <Slider
+                        value={[scrollPosition]}
+                        min={0}
+                        max={100}
+                        step={1}
+                        onValueChange={handleSliderChange}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

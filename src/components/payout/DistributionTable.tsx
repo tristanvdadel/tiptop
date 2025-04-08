@@ -43,17 +43,17 @@ const DistributionTable: React.FC<DistributionTableProps> = ({
   
   return (
     <div className="border rounded-md overflow-hidden">
-      <div className={`relative ${isMobile ? 'overflow-x-auto' : ''}`} ref={scrollRef}>
+      <div className="relative overflow-x-auto" ref={scrollRef}>
         <ScrollArea className="h-[300px]">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead style={isMobile ? fixedColumnStyle : {}}>Naam</TableHead>
-                <TableHead className="text-right">Berekend</TableHead>
-                <TableHead className="text-right">Saldo</TableHead>
-                <TableHead className="text-right">Totaal</TableHead>
-                <TableHead className="text-right">Uitbetaald</TableHead>
-                <TableHead className="text-right">Nieuw saldo</TableHead>
+                <TableHead style={fixedColumnStyle} className="bg-white">Naam</TableHead>
+                <TableHead className="text-right min-w-[100px]">Berekend</TableHead>
+                <TableHead className="text-right min-w-[100px]">Saldo</TableHead>
+                <TableHead className="text-right min-w-[100px]">Totaal</TableHead>
+                <TableHead className="text-right min-w-[100px]">Uitbetaald</TableHead>
+                <TableHead className="text-right min-w-[100px]">Nieuw saldo</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -68,8 +68,8 @@ const DistributionTable: React.FC<DistributionTableProps> = ({
                 return (
                   <TableRow key={index} className={isEditing && item.isEdited ? "bg-amber-50" : ""}>
                     <TableCell 
-                      style={isMobile ? fixedColumnStyle : {}}
-                      className={`${isMobile ? 'min-w-[120px]' : ''}`}
+                      style={fixedColumnStyle}
+                      className="bg-white min-w-[120px]"
                     >
                       {member ? member.name : 'Onbekend teamlid'}
                     </TableCell>

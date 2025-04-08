@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +11,13 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { addDays } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import PayoutHistory from '@/components/PayoutHistory';
 import TeamMemberPermissions from '@/components/TeamMemberPermissions';
 import TeamOverview from '@/components/TeamOverview';
@@ -155,7 +161,6 @@ const Management = () => {
           setSelectedMembershipId(currentMembership.id);
         }
         
-        // Use our helper function to get emails safely
         const enrichedMembers = await Promise.all(members.map(async (member) => {
           const profile = profiles?.find(p => p.id === member.user_id) || {};
           const userEmail = await getUserEmail(member.user_id);
@@ -379,7 +384,6 @@ const Management = () => {
         
       if (adminsError) throw adminsError;
       
-      // Fix: Ensure teamAdmins is an array before accessing its length
       const isLastAdmin = teamAdmins && teamAdmins.length === 1 && 
                           teamAdmins[0] && teamAdmins[0].id === selectedMembershipId;
       
@@ -506,16 +510,33 @@ const Management = () => {
             <div className="flex justify-center py-8">Laden...</div>
           ) : userTeams.length > 0 ? (
             <div className="space-y-6">
-              <TeamOverview 
-                userTeams={userTeams}
-                teamMembers={teamMembers}
-                loadingMembers={loadingMembers}
-                selectedTeamId={selectedTeamId}
-                selectedMembershipId={selectedMembershipId}
-                onTeamChange={handleTeamChange}
-                onLeaveTeam={handleLeaveTeam}
-                onDeleteTeam={handleDeleteTeam}
-              />
+              <Carousel
+                className="w-full"
+                opts={{
+                  align: "start",
+                }}
+              >
+                <CarouselContent className="-ml-1">
+                  <CarouselItem className="pl-1">
+                    <div className="p-1">
+                      <TeamOverview 
+                        userTeams={userTeams}
+                        teamMembers={teamMembers}
+                        loadingMembers={loadingMembers}
+                        selectedTeamId={selectedTeamId}
+                        selectedMembershipId={selectedMembershipId}
+                        onTeamChange={handleTeamChange}
+                        onLeaveTeam={handleLeaveTeam}
+                        onDeleteTeam={handleDeleteTeam}
+                      />
+                    </div>
+                  </CarouselItem>
+                </CarouselContent>
+                <div className="hidden md:flex">
+                  <CarouselPrevious className="left-1" />
+                  <CarouselNext className="right-1" />
+                </div>
+              </Carousel>
               
               <TeamInvite 
                 selectedTeamId={selectedTeamId}

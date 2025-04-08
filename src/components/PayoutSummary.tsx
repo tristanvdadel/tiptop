@@ -82,12 +82,18 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   const downloadCSV = () => {
     if (!latestPayout) return;
     
-    const headers = "Naam,Berekend bedrag,Saldo,Totaal te ontvangen,Daadwerkelijk uitbetaald\n";
+    const headers = "Naam,Berekend bedrag,Saldo,Totaal te ontvangen,Daadwerkelijk uitbetaald,Nieuw saldo\n";
     const rows = latestPayout.distribution.map(item => {
       const member = findTeamMember(item.memberId);
-      const balance = item.balance || 0;
-      const total = item.amount + balance;
-      return `${member?.name || 'Onbekend lid'},${item.amount.toFixed(2)},${balance.toFixed(2)},${total.toFixed(2)},${(item.actualAmount || item.amount).toFixed(2)}`;
+      const originalBalance = item.balance || 0;
+      const calculatedAmount = item.amount;
+      const totalToReceive = calculatedAmount + originalBalance;
+      const actuallyPaid = item.actualAmount || item.amount;
+      
+      // Calculate new balance (what's left after payment)
+      const newBalance = totalToReceive - actuallyPaid;
+      
+      return `${member?.name || 'Onbekend lid'},${calculatedAmount.toFixed(2)},${originalBalance.toFixed(2)},${totalToReceive.toFixed(2)},${actuallyPaid.toFixed(2)},${newBalance.toFixed(2)}`;
     }).join('\n');
     
     const csv = headers + rows;
@@ -130,28 +136,18 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   const calculateNewBalances = () => {
     if (!editedDistribution.length) return;
     
-    // Updated balance calculation logic
+    // Correct balance calculation logic:
+    // The new balance equals the original amount + original balance - actual amount paid
     const updatedDistribution = editedDistribution.map(item => {
       const originalAmount = item.amount;
-      const newActualAmount = item.actualAmount;
-      
-      // Get the original balance from the most recent payout
+      const actualAmount = item.actualAmount;
       const originalBalance = latestPayout?.distribution.find(d => d.memberId === item.memberId)?.balance || 0;
       
-      // Calculate new balance based on formula:
-      // New Balance = Original Balance + (Original Amount - Actual Payout)
-      // If Actual Amount == Original Amount + Original Balance, the new balance will be 0
-      let newBalance = 0;
-      
+      // Total owed = Original calculated amount + Original balance
       const totalOwed = originalAmount + originalBalance;
-      if (newActualAmount < totalOwed) {
-        // If we pay less than owed, add the difference to balance
-        newBalance = totalOwed - newActualAmount;
-      } else if (newActualAmount > totalOwed) {
-        // If we pay more than owed, create a negative balance
-        newBalance = -(newActualAmount - totalOwed);
-      }
-      // If exactly equal, balance becomes 0 (default value)
+      
+      // New balance = Total owed - Actual amount paid
+      const newBalance = totalOwed - actualAmount;
       
       return {
         ...item,
@@ -189,7 +185,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     // First create the rounded distribution without recalculating balances
     const roundedDistribution = editedDistribution.map(item => {
       // Get original balance to add to amount for rounding calculation
-      const originalBalance = item.balance || 0;
+      const originalBalance = latestPayout?.distribution.find(d => d.memberId === item.memberId)?.balance || 0;
       const totalAmount = item.amount + originalBalance;
       
       // Round DOWN the total amount based on the selected rounding option
@@ -219,8 +215,11 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       };
     });
     
-    // Set the rounded distribution and then calculate balances
+    // Set the rounded distribution
     setEditedDistribution(roundedDistribution);
+    
+    // Recalculate balances based on new actual amounts
+    calculateNewBalances();
     
     toast({
       title: "Bedragen afgerond",
@@ -228,12 +227,12 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     });
   };
 
-  // Calculate new balances whenever distribution changes, but only once
+  // Calculate new balances whenever edited distribution changes during editing
   useEffect(() => {
     if (isEditing) {
       calculateNewBalances();
     }
-  }, [isEditing]); // Only recalculate when editing mode changes
+  }, [editedDistribution, isEditing]);
   
   return (
     <Card className="w-full max-w-3xl mx-auto">
@@ -261,15 +260,16 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-medium">Verdeling:</h3>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setIsEditing(!isEditing)}
-                  className="h-8"
-                  disabled={balancesUpdated}
-                >
-                  {isEditing ? "Annuleren" : "Aanpassen"}
-                </Button>
+                {!balancesUpdated && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setIsEditing(!isEditing)}
+                    className="h-8"
+                  >
+                    {isEditing ? "Annuleren" : "Aanpassen"}
+                  </Button>
+                )}
               </div>
               
               {isEditing && (
@@ -323,12 +323,16 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
                     {(isEditing ? editedDistribution : latestPayout.distribution).map((item, index) => {
                       const member = findTeamMember(item.memberId);
                       const amount = item.amount;
-                      const originalBalance = item.balance || 0;
+                      const originalBalance = latestPayout.distribution.find(d => d.memberId === item.memberId)?.balance || 0;
                       const totalAmount = amount + originalBalance;
                       const actualAmount = isEditing 
                         ? item.actualAmount 
                         : (item.actualAmount || item.amount);
-                      const newBalance = isEditing ? item.balance : item.balance;
+                      
+                      // Calculate new balance
+                      const newBalance = isEditing 
+                        ? item.balance 
+                        : totalAmount - (item.actualAmount || item.amount);
                       
                       return (
                         <TableRow key={index} className={isEditing && (item as any).isEdited ? "bg-amber-50" : ""}>
@@ -386,22 +390,24 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
             </div>
             
             <div className="flex justify-end space-x-2 pt-4">
-              {isEditing ? (
+              {!balancesUpdated && isEditing ? (
                 <Button variant="goldGradient" onClick={saveChanges}>
                   <Save className="h-4 w-4 mr-2" />
                   Wijzigingen opslaan
                 </Button>
               ) : (
-                <>
-                  <Button variant="outline" onClick={handleCopyToClipboard}>
-                    <Copy className="h-4 w-4 mr-2" />
-                    Kopiëren
-                  </Button>
-                  <Button variant="outline" onClick={downloadCSV}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download CSV
-                  </Button>
-                </>
+                balancesUpdated ? null : (
+                  <>
+                    <Button variant="outline" onClick={handleCopyToClipboard}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Kopiëren
+                    </Button>
+                    <Button variant="outline" onClick={downloadCSV}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download CSV
+                    </Button>
+                  </>
+                )
               )}
             </div>
           </div>
@@ -428,7 +434,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
               variant="goldGradient"
             >
               <Wallet className="h-4 w-4 mr-2" />
-              {isEditing ? "Uitbetaling afronden & saldo opslaan" : "Uitbetaling aanpassen & saldo bijwerken"}
+              Uitbetaling afronden
             </Button>
           )}
         </div>

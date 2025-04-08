@@ -39,7 +39,6 @@ const Team = () => {
   }>({});
   const [distribution, setDistribution] = useState<TeamMember[]>([]);
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
-  const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
   const [showPayoutSummary, setShowPayoutSummary] = useState(false);
   const [openMemberDetails, setOpenMemberDetails] = useState<{
     [key: string]: boolean;
@@ -188,15 +187,7 @@ const Team = () => {
     }));
     
     markPeriodsAsPaid(selectedPeriods, customDistribution);
-    
-    teamMembers.forEach(member => {
-      clearTeamMemberHours(member.id);
-    });
-    
-    setIsPayoutModalOpen(false);
     setShowPayoutSummary(true);
-    
-    setSelectedPeriods([]);
   };
 
   const formatDate = (dateString: string): string => {
@@ -491,19 +482,6 @@ const Team = () => {
           </Button>
         </div>
       }
-      
-      <AlertDialog open={isPayoutModalOpen} onOpenChange={setIsPayoutModalOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
-            <AlertDialogDescription>De geselecteerde periodes worden gemarkeerd als uitbetaald.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setIsPayoutModalOpen(false)}>Annuleren</AlertDialogCancel>
-            <AlertDialogAction onClick={handlePayout}>Markeer als uitbetaald</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>;
 };
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,7 +40,7 @@ export const PayoutSummary = ({
   } = useToast();
   const navigate = useNavigate();
 
-  const [isEditing, setIsEditing] = useState(true); // Set to true by default
+  const [isEditing, setIsEditing] = useState(true);
   const [editedDistribution, setEditedDistribution] = useState<PayoutDetailWithEdits[]>([]);
   const [roundingOption, setRoundingOption] = useState<RoundingOption>('none');
   const [balancesUpdated, setBalancesUpdated] = useState(false);
@@ -69,6 +68,22 @@ export const PayoutSummary = ({
       setEditedDistribution(initialEditableDistribution);
     }
   }, [latestPayout]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('payoutSummary')) {
+      url.searchParams.set('payoutSummary', 'true');
+      window.history.pushState({}, '', url.toString());
+    }
+    
+    return () => {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('payoutSummary')) {
+        url.searchParams.delete('payoutSummary');
+        window.history.pushState({}, '', url.toString());
+      }
+    };
+  }, []);
 
   const handleCopyToClipboard = () => {
     if (!latestPayout) return;
@@ -250,7 +265,6 @@ export const PayoutSummary = ({
                 {balancesUpdated ? <Button variant="outline" size="sm" onClick={reopenEditor} className="h-8">
                     Opnieuw aanpassen
                   </Button> : 
-                  // Only show this button if we're not already editing and balances aren't updated
                   !isEditing && <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8">
                     Aanpassen
                   </Button>}

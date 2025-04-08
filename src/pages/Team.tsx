@@ -188,6 +188,10 @@ const Team = () => {
     
     markPeriodsAsPaid(selectedPeriods, customDistribution);
     setShowPayoutSummary(true);
+    
+    const url = new URL(window.location.href);
+    url.searchParams.set('payoutSummary', 'true');
+    window.history.pushState({}, '', url.toString());
   };
 
   const formatDate = (dateString: string): string => {
@@ -245,7 +249,12 @@ const Team = () => {
 
   if (showPayoutSummary) {
     return <div>
-        <PayoutSummary onClose={() => setShowPayoutSummary(false)} />
+        <PayoutSummary onClose={() => {
+          setShowPayoutSummary(false);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('payoutSummary');
+          window.history.pushState({}, '', url.toString());
+        }} />
       </div>;
   }
 

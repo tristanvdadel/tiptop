@@ -147,9 +147,9 @@ const PayoutHistory = () => {
     const updatedDistribution = editedDistribution.map(item => {
       const originalAmount = item.amount;
       const newActualAmount = item.actualAmount;
-      const currentBalance = item.balance || 0;
+      const originalBalance = selectedPayout.distribution.find(d => d.memberId === item.memberId)?.balance || 0;
       
-      let newBalance = currentBalance;
+      let newBalance = originalBalance;
       
       if (newActualAmount < originalAmount) {
         newBalance += (originalAmount - newActualAmount);
@@ -214,7 +214,6 @@ const PayoutHistory = () => {
     });
     
     setEditedDistribution(roundedDistribution);
-    calculateNewBalances();
     
     toast({
       title: "Bedragen afgerond",
@@ -226,7 +225,7 @@ const PayoutHistory = () => {
     if (isEditing) {
       calculateNewBalances();
     }
-  }, [editedDistribution, isEditing]);
+  }, [isEditing]);
 
   const sortedPayouts = useMemo(() => {
     if (!payouts || payouts.length === 0) return [];

@@ -232,7 +232,9 @@ const Team = () => {
     const updatedDistribution = editedDistribution.map(item => {
       const originalAmount = item.amount;
       const newActualAmount = item.actualAmount;
-      const currentBalance = item.balance || 0;
+      
+      const member = teamMembers.find(m => m.id === item.memberId);
+      const currentBalance = member?.balance || 0;
       
       let newBalance = currentBalance;
       
@@ -255,7 +257,7 @@ const Team = () => {
     if (editedDistribution.length > 0) {
       calculateNewBalances();
     }
-  }, [editedDistribution]);
+  }, [isPayoutPreparationOpen]);
 
   const applyRounding = () => {
     if (!editedDistribution.length || roundingOption === 'none') return;

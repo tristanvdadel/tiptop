@@ -126,13 +126,14 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   const calculateNewBalances = () => {
     if (!editedDistribution.length) return;
     
-    // Calculate balance differences
+    // Calculate balance differences for one time only, not cumulative
     const updatedDistribution = editedDistribution.map(item => {
       const originalAmount = item.amount;
       const newActualAmount = item.actualAmount;
-      const currentBalance = item.balance || 0;
+      // Get the original balance from the most recent payout
+      const originalBalance = latestPayout?.distribution.find(d => d.memberId === item.memberId)?.balance || 0;
       
-      let newBalance = currentBalance;
+      let newBalance = originalBalance;
       
       // If actual amount is less than calculated, add the difference to balance
       if (newActualAmount < originalAmount) {
@@ -155,8 +156,6 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
   const saveChanges = () => {
     if (!latestPayout || !editedDistribution.length) return;
     
-    calculateNewBalances();
-    
     // Apply the changes to the balances in the team members
     editedDistribution.forEach(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
@@ -164,9 +163,6 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
         updateTeamMemberBalance(item.memberId, item.balance || 0);
       }
     });
-    
-    // TODO: In a real implementation, you would update the payout in your storage
-    // For now, we'll just show a success message
     
     setIsEditing(false);
     toast({
@@ -180,6 +176,7 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     
     const roundingValue = parseFloat(roundingOption);
     
+    // First create the rounded distribution without recalculating balances
     const roundedDistribution = editedDistribution.map(item => {
       // Round DOWN the actual amount based on the selected rounding option
       let roundedAmount = item.amount;
@@ -208,8 +205,8 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
       };
     });
     
+    // Set the rounded distribution and then calculate balances
     setEditedDistribution(roundedDistribution);
-    calculateNewBalances();
     
     toast({
       title: "Bedragen afgerond",
@@ -217,12 +214,12 @@ export const PayoutSummary = ({ onClose }: PayoutSummaryProps) => {
     });
   };
 
-  // Calculate new balances whenever distribution changes
+  // Calculate new balances whenever distribution changes, but only once
   useEffect(() => {
     if (isEditing) {
       calculateNewBalances();
     }
-  }, [editedDistribution, isEditing]);
+  }, [isEditing]); // Only recalculate when editing mode changes
   
   return (
     <Card className="w-full max-w-3xl mx-auto">

@@ -1,10 +1,11 @@
+
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Users, Link, LogIn, History, Shield, MoveHorizontal } from 'lucide-react';
+import { PlusCircle, Users, Link, LogIn, History, Shield, MoveHorizontal, LogOut, Trash2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +24,17 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const Management = () => {
   const location = useLocation();
@@ -37,6 +49,7 @@ const Management = () => {
   const [loadingTeams, setLoadingTeams] = useState(true);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
+  const [selectedMembershipId, setSelectedMembershipId] = useState(null);
   const [user, setUser] = useState(null);
   const [error, setError] = useState(null);
   const [hasAnyTeam, setHasAnyTeam] = useState(false);
@@ -99,6 +112,12 @@ const Management = () => {
               
               if (teams && teams.length > 0 && !selectedTeamId) {
                 setSelectedTeamId(teams[0].id);
+                
+                // Find the membership ID for the selected team
+                const membership = teamMembers.find(tm => tm.team_id === teams[0].id);
+                if (membership) {
+                  setSelectedMembershipId(membership.id);
+                }
               }
             }
             
@@ -148,7 +167,14 @@ const Management = () => {
           console.error('Error fetching profiles:', profilesError);
           throw profilesError;
         }
+
+        // Find the current user's membership ID for this team
+        const currentMembership = members.find(m => m.user_id === user?.id);
+        if (currentMembership) {
+          setSelectedMembershipId(currentMembership.id);
+        }
         
+        // Get user emails
         const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
         
         if (usersError) {
@@ -180,7 +206,7 @@ const Management = () => {
     };
     
     fetchTeamMembers();
-  }, [selectedTeamId, toast]);
+  }, [selectedTeamId, toast, user]);
 
   const handleCreateTeam = async () => {
     if (!newTeamName.trim() || !user) return;
@@ -356,6 +382,121 @@ const Management = () => {
 
   const handleTeamChange = (teamId) => {
     setSelectedTeamId(teamId);
+    
+    // Find the membership ID for the selected team
+    const membership = userTeamMemberships.find(tm => tm.team_id === teamId);
+    if (membership) {
+      setSelectedMembershipId(membership.id);
+    }
+  };
+  
+  const handleLeaveTeam = async () => {
+    if (!selectedTeamId || !selectedMembershipId || !user) return;
+    
+    try {
+      // Check if user is the only admin in the team
+      const { data: teamAdmins, error: adminsError } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('team_id', selectedTeamId)
+        .eq('role', 'admin');
+        
+      if (adminsError) throw adminsError;
+      
+      const isLastAdmin = teamAdmins.length === 1 && 
+                          teamAdmins[0].id === selectedMembershipId;
+      
+      if (isLastAdmin) {
+        throw new Error("Je kunt het team niet verlaten omdat je de enige beheerder bent. Maak eerst een ander lid beheerder of verwijder het team.");
+      }
+      
+      // Delete the team membership
+      const { error: deleteError } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('id', selectedMembershipId);
+        
+      if (deleteError) throw deleteError;
+      
+      toast({
+        title: "Team verlaten",
+        description: "Je bent niet langer lid van dit team."
+      });
+      
+      // Refresh the page after a short delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error leaving team:', error);
+      toast({
+        title: "Fout bij verlaten team",
+        description: error.message || "Er is een fout opgetreden bij het verlaten van het team.",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  const handleDeleteTeam = async () => {
+    if (!selectedTeamId || !user) return;
+    
+    try {
+      // Check if user is a team admin
+      const { data: adminMembership, error: adminError } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('team_id', selectedTeamId)
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+        
+      if (adminError || !adminMembership) {
+        throw new Error("Je hebt geen rechten om dit team te verwijderen.");
+      }
+      
+      // Delete all team members
+      const { error: memberDeleteError } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('team_id', selectedTeamId);
+        
+      if (memberDeleteError) throw memberDeleteError;
+      
+      // Delete all invites
+      const { error: inviteDeleteError } = await supabase
+        .from('invites')
+        .delete()
+        .eq('team_id', selectedTeamId);
+        
+      if (inviteDeleteError) throw inviteDeleteError;
+      
+      // Delete the team
+      const { error: teamDeleteError } = await supabase
+        .from('teams')
+        .delete()
+        .eq('id', selectedTeamId);
+        
+      if (teamDeleteError) throw teamDeleteError;
+      
+      toast({
+        title: "Team verwijderd",
+        description: "Het team is succesvol verwijderd."
+      });
+      
+      // Refresh the page after a short delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error deleting team:', error);
+      toast({
+        title: "Fout bij verwijderen team",
+        description: error.message || "Er is een fout opgetreden bij het verwijderen van het team.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -370,31 +511,6 @@ const Management = () => {
             {error}
           </AlertDescription>
         </Alert>
-      )}
-      
-      {!loadingTeams && userTeams.length > 1 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <MoveHorizontal className="mr-2 h-5 w-5" />
-              Wissel tussen teams
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select value={selectedTeamId} onValueChange={handleTeamChange}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecteer een team" />
-              </SelectTrigger>
-              <SelectContent>
-                {userTeams.map(team => (
-                  <SelectItem key={team.id} value={team.id}>
-                    {team.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
       )}
       
       <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue="teams">
@@ -415,6 +531,101 @@ const Management = () => {
             <div className="flex justify-center py-8">Laden...</div>
           ) : userTeams.length > 0 ? (
             <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <MoveHorizontal className="mr-2 h-5 w-5" />
+                    Team beheer
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {userTeams.length > 1 && (
+                      <div className="space-y-2">
+                        <Label>Wissel tussen teams</Label>
+                        <Select value={selectedTeamId} onValueChange={handleTeamChange}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Selecteer een team" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {userTeams.map(team => (
+                              <SelectItem key={team.id} value={team.id}>
+                                {team.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <Label>Toetreden met code</Label>
+                      <div className="flex space-x-2">
+                        <Input
+                          placeholder="Voer uitnodigingscode in"
+                          value={inviteCode}
+                          onChange={(e) => setInviteCode(e.target.value)}
+                        />
+                        <Button onClick={handleJoinTeam} disabled={!inviteCode.trim()}>
+                          <LogIn className="mr-2 h-4 w-4" />
+                          Toetreden
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="flex space-x-2">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" className="flex-1">
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Team verlaten
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Team verlaten</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Weet je zeker dat je dit team wilt verlaten? Je kunt later opnieuw lid worden met een uitnodigingscode.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleLeaveTeam}>Verlaten</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" className="flex-1">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Team verwijderen
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Team verwijderen</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Weet je zeker dat je dit team wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.
+                              Alle teamleden, uitnodigingen en gegevens van dit team worden permanent verwijderd.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={handleDeleteTeam} 
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Verwijderen
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle>Team leden</CardTitle>
@@ -446,32 +657,6 @@ const Management = () => {
                   ) : (
                     <div className="py-4 text-center">Geen teamleden gevonden</div>
                   )}
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <LogIn className="mr-2 h-5 w-5" />
-                    Team toetreden met code
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="inviteCode">Uitnodigingscode</Label>
-                      <Input
-                        id="inviteCode"
-                        placeholder="Voer code in"
-                        value={inviteCode}
-                        onChange={(e) => setInviteCode(e.target.value)}
-                      />
-                    </div>
-                    <Button onClick={handleJoinTeam} disabled={!inviteCode.trim()}>
-                      <LogIn className="mr-2 h-4 w-4" />
-                      Team toetreden
-                    </Button>
-                  </div>
                 </CardContent>
               </Card>
               

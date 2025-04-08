@@ -59,6 +59,13 @@ const Settings = () => {
     }
   }, [getNextAutoCloseDate, currentPeriod]);
 
+  useEffect(() => {
+    const storedName = localStorage.getItem('userName');
+    if (storedName) {
+      setUserName(storedName);
+    }
+  }, []);
+
   const handlePeriodDurationChange = (value: string) => {
     const newDuration = value as PeriodDuration;
     setPeriodDuration(newDuration);
@@ -140,6 +147,9 @@ const Settings = () => {
     name: string;
   }) => {
     setUserName(data.name);
+    
+    localStorage.setItem('userName', data.name);
+    
     toast({
       title: "Profiel bijgewerkt",
       description: "Je profielgegevens zijn succesvol opgeslagen."

@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth, set, getWeek, format } from 'date-fns';
@@ -45,6 +46,8 @@ export type Period = {
 export type PayoutData = {
   periodIds: string[];
   date: string;
+  payerName?: string;     // Name of the person who made the payout
+  payoutTime?: string;    // Time when the payout was made
   distribution: {
     memberId: string;
     amount: number;
@@ -803,9 +806,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }));
     }
     
+    // Get the current user name from localStorage
+    const payerName = localStorage.getItem('userName') || 'Onbekend';
+    
     const newPayout: PayoutData = {
       periodIds,
       date: new Date().toISOString(),
+      payerName: payerName,
+      payoutTime: new Date().toISOString(),
       distribution,
     };
     

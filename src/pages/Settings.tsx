@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, getUser } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useApp, PeriodDuration } from "@/contexts/AppContext";
 import { format } from "date-fns";
@@ -29,7 +29,7 @@ const Settings = () => {
   const [language, setLanguage] = useState("nl");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userName, setUserName] = useState("Gebruiker");
-  const [userEmail] = useState("gebruiker@example.com");
+  const [userEmail, setUserEmail] = useState("");
   const navigate = useNavigate();
   
   const { 
@@ -60,6 +60,42 @@ const Settings = () => {
   }, [getNextAutoCloseDate, currentPeriod]);
 
   useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const user = await getUser();
+        if (user) {
+          setUserEmail(user.email || "");
+          
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, avatar_url')
+            .eq('id', user.id)
+            .single();
+            
+          if (profile) {
+            if (profile.first_name || profile.last_name) {
+              const fullName = [profile.first_name, profile.last_name]
+                .filter(Boolean)
+                .join(' ');
+              
+              if (fullName) {
+                setUserName(fullName);
+                localStorage.setItem('userName', fullName);
+              }
+            }
+            
+            if (profile.avatar_url) {
+              setProfileImage(profile.avatar_url);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+    
+    fetchUserData();
+    
     const storedName = localStorage.getItem('userName');
     if (storedName) {
       setUserName(storedName);
@@ -126,13 +162,14 @@ const Settings = () => {
     }
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = e => {
+      reader.onload = async (e) => {
         if (e.target?.result) {
           setProfileImage(e.target.result as string);
+          
           toast({
             title: "Profielfoto bijgewerkt",
             description: "Je nieuwe profielfoto is succesvol opgeslagen."
@@ -143,11 +180,10 @@ const Settings = () => {
     }
   };
 
-  const handleProfileSave = (data: {
+  const handleProfileSave = async (data: {
     name: string;
   }) => {
     setUserName(data.name);
-    
     localStorage.setItem('userName', data.name);
     
     toast({
@@ -170,7 +206,7 @@ const Settings = () => {
     }
   });
 
-  const onSubmitPassword = (data: {
+  const onSubmitPassword = async (data: {
     currentPassword: string;
     newPassword: string;
     confirmPassword: string;
@@ -183,12 +219,27 @@ const Settings = () => {
       });
       return;
     }
-    console.log("Wachtwoord wijzigen:", data);
-    toast({
-      title: "Wachtwoord bijgewerkt",
-      description: "Je wachtwoord is succesvol gewijzigd."
-    });
-    passwordForm.reset();
+    
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: data.newPassword
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Wachtwoord bijgewerkt",
+        description: "Je wachtwoord is succesvol gewijzigd."
+      });
+      
+      passwordForm.reset();
+    } catch (error: any) {
+      toast({
+        title: "Fout bij wijzigen wachtwoord",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleSignOut = async () => {

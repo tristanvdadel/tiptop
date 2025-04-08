@@ -1,4 +1,3 @@
-
 import React, { useState, KeyboardEvent } from 'react';
 import { TeamMember, HourRegistration } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
@@ -139,7 +138,6 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
     return balance > 0 ? 'text-green-600' : 'text-red-600';
   };
 
-  // Calculate the maximum scroll height based on the number of team members
   const calculateMaxScroll = () => {
     const baseHeight = 300; // Base height in pixels
     const itemHeight = 80; // Approximate height per team member row
@@ -149,11 +147,9 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
 
   const maxScroll = calculateMaxScroll();
   
-  // Handle slider change
   const handleSliderChange = (value: number[]) => {
     setScrollPosition(value[0]);
     
-    // Apply the scroll position to the ScrollArea
     const scrollElement = document.querySelector('.members-scroll-area');
     if (scrollElement) {
       const maxScrollTop = scrollElement.scrollHeight - scrollElement.clientHeight;
@@ -193,7 +189,7 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-hidden">
+            <div className="overflow-hidden relative">
               <ScrollArea className="members-scroll-area max-h-[600px]">
                 <Table>
                   <TableHeader>
@@ -355,20 +351,17 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
               </ScrollArea>
               
               {teamMembers.length > 7 && (
-                <div className="px-4 py-2 border-t">
-                  <div className="flex items-center">
-                    <span className="text-xs text-gray-500 mr-2">Scroll</span>
-                    <div className="flex-1">
-                      <Slider
-                        value={[scrollPosition]}
-                        min={0}
-                        max={100}
-                        step={1}
-                        onValueChange={handleSliderChange}
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
+                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 h-[300px] flex flex-col items-center">
+                  <span className="text-xs text-gray-500 mb-2 rotate-[-90deg]">Scroll</span>
+                  <Slider
+                    value={[scrollPosition]}
+                    min={0}
+                    max={100}
+                    step={1}
+                    orientation="vertical"
+                    onValueChange={handleSliderChange}
+                    className="h-[300px]"
+                  />
                 </div>
               )}
             </div>

@@ -737,36 +737,34 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         periodsToCalculate = [period];
       }
     } else {
-      periodsToCalculate = periods;
+      periodsToCalculate = periods.filter(p => p.tips.length > 0);
     }
     
     if (!periodsToCalculate.length) {
       return 0;
     }
     
-    const totalTips = periodsToCalculate.reduce(
-      (sum, period) => sum + period.tips.reduce((s, tip) => s + tip.amount, 0),
-      0
-    );
-    
-    const totalHours = teamMembers.reduce((sum, member) => {
-      const currentHours = member.hours;
+    const validPeriods = periodsToCalculate.map(period => {
+      const periodTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
       
-      const savedHours = member.hourRegistrations 
-        ? member.hourRegistrations.reduce((s, reg) => s + reg.hours, 0) 
-        : 0;
+      const periodHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
       
-      return sum + currentHours + savedHours;
-    }, 0);
+      if (periodHours === 0) {
+        return null;
+      }
+      
+      return {
+        tips: periodTips,
+        hours: periodHours,
+        average: periodTips / periodHours
+      };
+    }).filter(p => p !== null) as Array<{tips: number, hours: number, average: number}>;
     
-    if (totalHours === 0 && totalTips > 0) {
-      const defaultHourlyRate = 10;
-      return totalTips / defaultHourlyRate;
-    }
-    
-    if (totalHours === 0) {
+    if (validPeriods.length === 0) {
       return 0;
     }
+    
+    const totalAverage = validPeriods.reduce((sum, period) => sum + period.average, 0) / validPeriods.length;
     
     let adjustmentFactor = 1;
     
@@ -782,7 +780,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         break;
     }
     
-    return (totalTips / totalHours) * adjustmentFactor;
+    return totalAverage * adjustmentFactor;
   };
 
   const markPeriodsAsPaid = (periodIds: string[], customDistribution?: PayoutData['distribution']) => {

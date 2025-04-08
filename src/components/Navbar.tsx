@@ -1,3 +1,4 @@
+
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Calendar, Users, BarChart, Zap, Settings, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -5,7 +6,12 @@ import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-const Navbar = () => {
+interface NavbarProps {
+  disabled?: boolean;
+  onDisabledClick?: (e: React.MouseEvent) => void;
+}
+
+const Navbar = ({ disabled = false, onDisabledClick }: NavbarProps) => {
   const location = useLocation();
   const [teamName, setTeamName] = useState<string | null>(null);
   
@@ -55,8 +61,17 @@ const Navbar = () => {
     { to: '/settings', icon: <Settings size={20} className="text-black" />, label: 'Instellingen' },
   ];
 
+  const handleNavClick = (e: React.MouseEvent) => {
+    if (disabled && onDisabledClick) {
+      onDisabledClick(e);
+    }
+  };
+
   return (
-    <header className="bg-yellow-400 border-b border-yellow-500">
+    <header className={cn(
+      "bg-yellow-400 border-b border-yellow-500",
+      disabled && "opacity-80"
+    )}>
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <div className="flex items-center">
           <h1 className="text-2xl font-bold mr-2 text-black">TipTop</h1>
@@ -67,34 +82,61 @@ const Navbar = () => {
           )}
         </div>
         <div className="flex gap-2">
-          <Link to="/fast-tip">
+          {disabled ? (
             <Button 
               variant="default" 
-              className="bg-yellow-500 text-black hover:bg-yellow-600"
+              className="bg-yellow-500 text-black hover:bg-yellow-600 opacity-70 cursor-not-allowed"
+              onClick={handleNavClick}
             >
               <Zap size={16} className="mr-1 text-black" /> 
               <span>FastTip</span>
             </Button>
-          </Link>
+          ) : (
+            <Link to="/fast-tip">
+              <Button 
+                variant="default" 
+                className="bg-yellow-500 text-black hover:bg-yellow-600"
+              >
+                <Zap size={16} className="mr-1 text-black" /> 
+                <span>FastTip</span>
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
       
       <nav className="fixed bottom-0 left-0 right-0 bg-yellow-400 border-t z-50">
         <div className="flex justify-around items-center">
           {navItems.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={cn(
-                "flex flex-col items-center py-2 px-4 text-xs w-1/6",
-                location.pathname === item.to
-                  ? "bg-yellow-500 text-black font-medium"
-                  : "text-black/70"
-              )}
-            >
-              {item.icon}
-              <span className="mt-1">{item.label}</span>
-            </Link>
+            disabled ? (
+              <div
+                key={item.to}
+                className={cn(
+                  "flex flex-col items-center py-2 px-4 text-xs w-1/6 cursor-not-allowed",
+                  location.pathname === item.to
+                    ? "bg-yellow-500 text-black font-medium opacity-60"
+                    : "text-black/70 opacity-60"
+                )}
+                onClick={handleNavClick}
+              >
+                {item.icon}
+                <span className="mt-1">{item.label}</span>
+              </div>
+            ) : (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={cn(
+                  "flex flex-col items-center py-2 px-4 text-xs w-1/6",
+                  location.pathname === item.to
+                    ? "bg-yellow-500 text-black font-medium"
+                    : "text-black/70"
+                )}
+              >
+                {item.icon}
+                <span className="mt-1">{item.label}</span>
+              </Link>
+            )
           ))}
         </div>
       </nav>

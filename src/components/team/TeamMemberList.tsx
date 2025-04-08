@@ -9,7 +9,6 @@ import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Slider } from "@/components/ui/slider";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -189,85 +188,83 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-hidden relative">
-              <ScrollArea className="members-scroll-area max-h-[600px]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[180px]">Naam</TableHead>
-                      <TableHead className="w-[120px]">Saldo</TableHead>
-                      <TableHead className="w-[80px] text-right">Uren</TableHead>
-                      <TableHead className="w-[180px]">Toevoegen</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {teamMembers.map(member => (
-                      <TableRow key={member.id}>
-                        <TableCell className="py-2">
-                          <Collapsible>
-                            <CollapsibleTrigger className="font-medium hover:underline cursor-pointer flex items-center" onClick={() => toggleMemberDetails(member.id)}>
-                              {member.name}
-                              {openMemberDetails[member.id] ? <ChevronUp size={16} className="ml-1" /> : <ChevronDown size={16} className="ml-1" />}
-                            </CollapsibleTrigger>
-                            <CollapsibleContent>
-                              <div className="bg-muted/30 p-3 rounded-b-md mt-2 mb-2">
-                                <div className="flex items-center justify-between mb-3">
-                                  <h3 className="text-sm font-medium mb-2 flex items-center">
-                                    <Clock className="h-4 w-4 mr-2" />
-                                    Urenoverzicht voor {member.name}
-                                  </h3>
-                                  <div className="flex items-center gap-2">
-                                    {editingMember === member.id ? (
-                                      <div className="flex items-center gap-2">
-                                        <Input 
-                                          type="text" 
-                                          value={editMemberName} 
-                                          onChange={e => setEditMemberName(e.target.value)} 
-                                          className="h-8 w-32" 
-                                          placeholder="Nieuwe naam" 
-                                        />
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon" 
-                                          onClick={handleUpdateMemberName} 
-                                          className="h-8 w-8"
-                                        >
-                                          <Check className="h-4 w-4" />
-                                        </Button>
-                                      </div>
-                                    ) : (
-                                      <>
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon" 
-                                          onClick={() => startEditMemberName(member)} 
-                                          className="h-8 w-8 text-gray-500 hover:text-amber-500"
-                                        >
-                                          <Pencil className="h-4 w-4" />
-                                        </Button>
-                                        <AlertDialog>
-                                          <AlertDialogTrigger asChild>
-                                            <Button 
-                                              variant="ghost" 
-                                              size="icon" 
-                                              className="h-8 w-8 text-red-500 hover:text-red-700"
-                                            >
-                                              <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                          </AlertDialogTrigger>
-                                          <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                              <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
-                                              <AlertDialogDescription>
-                                                Dit teamlid wordt permanent verwijderd inclusief urenregistraties en saldo.
-                                              </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                              <AlertDialogCancel>Annuleren</AlertDialogCancel>
-                                              <AlertDialogAction onClick={() => removeTeamMember(member.id)}>Verwijderen</AlertDialogAction>
-                                            </AlertDialogFooter>
-                                          </AlertDialogContent>
-                                        </AlertDialog>
+            <ScrollArea className="h-[600px] w-full">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[180px]">Naam</TableHead>
+                    <TableHead className="w-[120px]">Saldo</TableHead>
+                    <TableHead className="w-[80px] text-right">Uren</TableHead>
+                    <TableHead className="w-[180px]">Toevoegen</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {teamMembers.map(member => (
+                    <TableRow key={member.id}>
+                      <TableCell className="py-2">
+                        <Collapsible>
+                          <CollapsibleTrigger className="font-medium hover:underline cursor-pointer flex items-center" onClick={() => toggleMemberDetails(member.id)}>
+                            {member.name}
+                            {openMemberDetails[member.id] ? <ChevronUp size={16} className="ml-1" /> : <ChevronDown size={16} className="ml-1" />}
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="bg-muted/30 p-3 rounded-b-md mt-2 mb-2">
+                              <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-sm font-medium mb-2 flex items-center">
+                                  <Clock className="h-4 w-4 mr-2" />
+                                  Urenoverzicht voor {member.name}
+                                </h3>
+                                <div className="flex items-center gap-2">
+                                  {editingMember === member.id ? (
+                                    <div className="flex items-center gap-2">
+                                      <Input 
+                                        type="text" 
+                                        value={editMemberName} 
+                                        onChange={e => setEditMemberName(e.target.value)} 
+                                        className="h-8 w-32" 
+                                        placeholder="Nieuwe naam" 
+                                      />
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        onClick={handleUpdateMemberName} 
+                                        className="h-8 w-8"
+                                      >
+                                        <Check className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        onClick={() => startEditMemberName(member)} 
+                                        className="h-8 w-8 text-gray-500 hover:text-amber-500"
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="h-8 w-8 text-red-500 hover:text-red-700"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              Dit teamlid wordt permanent verwijderd inclusief urenregistraties en saldo.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => removeTeamMember(member.id)}>Verwijderen</AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
                                       </>
                                     )}
                                   </div>
@@ -349,31 +346,15 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
                   </TableBody>
                 </Table>
               </ScrollArea>
-              
-              {teamMembers.length > 7 && (
-                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 h-[300px] flex flex-col items-center">
-                  <span className="text-xs text-gray-500 mb-2 rotate-[-90deg]">Scroll</span>
-                  <Slider
-                    value={[scrollPosition]}
-                    min={0}
-                    max={100}
-                    step={1}
-                    orientation="vertical"
-                    onValueChange={handleSliderChange}
-                    className="h-[300px]"
-                  />
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="mb-6">
-          <CardContent className="p-6 text-center">
-            <p>Nog geen teamleden toegevoegd</p>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="mb-6">
+            <CardContent className="p-6 text-center">
+              <p>Nog geen teamleden toegevoegd</p>
+            </CardContent>
+          </Card>
+        )}
     </>
   );
 };

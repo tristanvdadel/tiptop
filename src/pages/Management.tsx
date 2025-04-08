@@ -339,6 +339,33 @@ const Management = () => {
                 </CardContent>
               </Card>
               
+              {/* Add code input section even when user already has teams */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <LogIn className="mr-2 h-5 w-5" />
+                    Team toetreden met code
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="inviteCode">Uitnodigingscode</Label>
+                      <Input
+                        id="inviteCode"
+                        placeholder="Voer code in"
+                        value={inviteCode}
+                        onChange={(e) => setInviteCode(e.target.value)}
+                      />
+                    </div>
+                    <Button onClick={handleJoinTeam} disabled={!inviteCode.trim()}>
+                      <LogIn className="mr-2 h-4 w-4" />
+                      Team toetreden
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+              
               {selectedTeamId && (
                 <Card>
                   <CardHeader>

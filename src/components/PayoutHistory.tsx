@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -58,7 +57,6 @@ const PayoutHistory = () => {
   const handleRowClick = (payout) => {
     setSelectedPayout(payout);
     
-    // Initialize editable distribution with actual amounts
     const initialEditableDistribution = payout.distribution.map(item => ({
       memberId: item.memberId,
       amount: item.amount,
@@ -146,7 +144,6 @@ const PayoutHistory = () => {
   const calculateNewBalances = () => {
     if (!selectedPayout || !editedDistribution.length) return;
     
-    // Calculate balance differences
     const updatedDistribution = editedDistribution.map(item => {
       const originalAmount = item.amount;
       const newActualAmount = item.actualAmount;
@@ -154,11 +151,9 @@ const PayoutHistory = () => {
       
       let newBalance = currentBalance;
       
-      // If actual amount is less than calculated, add the difference to balance
       if (newActualAmount < originalAmount) {
         newBalance += (originalAmount - newActualAmount);
       } 
-      // If actual amount is more than calculated, subtract the difference from balance
       else if (newActualAmount > originalAmount) {
         newBalance -= (newActualAmount - originalAmount);
       }
@@ -177,16 +172,12 @@ const PayoutHistory = () => {
     
     calculateNewBalances();
     
-    // Apply the changes to the balances in the team members
     editedDistribution.forEach(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
       if (member) {
         updateTeamMemberBalance(item.memberId, item.balance || 0);
       }
     });
-    
-    // TODO: In a real implementation, you would update the payout in your storage
-    // For now, we'll just show a success message
     
     setIsEditing(false);
     toast({
@@ -201,23 +192,17 @@ const PayoutHistory = () => {
     const roundingValue = parseFloat(roundingOption);
     
     const roundedDistribution = editedDistribution.map(item => {
-      // Round DOWN the actual amount based on the selected rounding option
       let roundedAmount = item.amount;
       
       if (roundingValue === 0.50) {
-        // Round down to nearest 0.50
         roundedAmount = Math.floor(item.amount / 0.50) * 0.50;
       } else if (roundingValue === 1.00) {
-        // Round down to nearest 1.00
         roundedAmount = Math.floor(item.amount);
       } else if (roundingValue === 2.00) {
-        // Round down to nearest 2.00
         roundedAmount = Math.floor(item.amount / 2.00) * 2.00;
       } else if (roundingValue === 5.00) {
-        // Round down to nearest 5.00
         roundedAmount = Math.floor(item.amount / 5.00) * 5.00;
       } else if (roundingValue === 10.00) {
-        // Round down to nearest 10.00
         roundedAmount = Math.floor(item.amount / 10.00) * 10.00;
       }
       

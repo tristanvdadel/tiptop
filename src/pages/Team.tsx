@@ -266,13 +266,13 @@ const Team = () => {
       let roundedAmount = item.amount;
       
       if (roundingValue === 0.05) {
-        roundedAmount = Math.round(item.amount / 0.05) * 0.05;
+        roundedAmount = Math.floor(item.amount / 0.05) * 0.05;
       } else if (roundingValue === 0.10) {
-        roundedAmount = Math.round(item.amount / 0.10) * 0.10;
+        roundedAmount = Math.floor(item.amount / 0.10) * 0.10;
       } else if (roundingValue === 0.50) {
-        roundedAmount = Math.round(item.amount / 0.50) * 0.50;
+        roundedAmount = Math.floor(item.amount / 0.50) * 0.50;
       } else if (roundingValue === 1.00) {
-        roundedAmount = Math.round(item.amount);
+        roundedAmount = Math.floor(item.amount);
       }
       
       return {
@@ -286,7 +286,7 @@ const Team = () => {
     
     toast({
       title: "Bedragen afgerond",
-      description: `Alle bedragen zijn afgerond op €${roundingOption}.`
+      description: `Alle bedragen zijn naar beneden afgerond op €${roundingOption}.`
     });
   };
 

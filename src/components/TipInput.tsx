@@ -20,7 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 const presets = [5, 10, 20, 50, 100];
 
 const TipInput = () => {
-  const { addTip, currentPeriod, startNewPeriod } = useApp();
+  const { addTip, currentPeriod, startNewPeriod, autoClosePeriods, periodDuration, calculateAutoCloseDate } = useApp();
   const [amount, setAmount] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [showNote, setShowNote] = useState<boolean>(false);
@@ -48,10 +48,22 @@ const TipInput = () => {
     
     // Check if there's an active period, if not, create one first
     if (!currentPeriod) {
-      // Start a new period
-      startNewPeriod();
+      // Start a new period with proper auto-close settings
+      const newPeriod = startNewPeriod();
+      
+      // Ensure auto-close is set if enabled
+      if (autoClosePeriods && newPeriod) {
+        const startDate = new Date().toISOString();
+        const autoCloseDate = calculateAutoCloseDate(startDate, periodDuration);
+        
+        // Notify user about the auto-close setting
+        toast({
+          title: "Nieuwe periode gestart",
+          description: `Deze periode wordt automatisch afgesloten op ${new Date(autoCloseDate).toLocaleDateString('nl-NL')}.`,
+        });
+      }
+      
       // Then immediately add the tip to the new period
-      // No need for setTimeout as startNewPeriod is synchronous
       addTip(parsedAmount, note.trim() || undefined, date.toISOString());
       resetForm();
     } else {

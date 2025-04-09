@@ -1,31 +1,85 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
 
-const AuthGuard = ({ children }: { children: React.ReactNode }) => {
-  const [session, setSession] = useState(null);
-  const navigate = useNavigate();
+import { ReactNode, useEffect, useState } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
+
+interface AuthGuardProps {
+  children: ReactNode;
+  requiredPermission?: string;
+}
+
+const AuthGuard = ({ children, requiredPermission }: AuthGuardProps) => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [hasPermission, setHasPermission] = useState<boolean>(true);
+  const location = useLocation();
 
   useEffect(() => {
-    const fetchSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-
-      supabase.auth.onAuthStateChange((_event, session) => {
-        setSession(session);
-      });
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getUser();
+      const isAuthed = !!data.user;
+      setIsAuthenticated(isAuthed);
+      
+      // If we need to check permissions and the user is authenticated
+      if (requiredPermission && isAuthed && data.user) {
+        try {
+          // Get the team member record to check permissions
+          const { data: teamMember, error } = await supabase
+            .from('team_members')
+            .select('permissions, role')
+            .eq('user_id', data.user.id)
+            .single();
+            
+          if (error && error.code !== 'PGRST116') {
+            console.error('Error checking permissions:', error);
+            setHasPermission(false);
+            return;
+          }
+          
+          // Admin role has all permissions
+          if (teamMember?.role === 'admin') {
+            setHasPermission(true);
+            return;
+          }
+          
+          // Check if the user has the required permission
+          const hasRequiredPermission = teamMember?.permissions 
+            ? !!teamMember.permissions[requiredPermission as keyof typeof teamMember.permissions]
+            : false;
+            
+          setHasPermission(hasRequiredPermission);
+        } catch (error) {
+          console.error('Error in permission check:', error);
+          setHasPermission(false);
+        }
+      }
     };
+    
+    checkAuth();
+    
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session);
+    });
+    
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [requiredPermission]);
 
-    fetchSession();
-  }, [navigate]);
-
-  if (session === null) {
-    return null;
+  if (isAuthenticated === null) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
-  if (!session) {
-    navigate('/login');
-    return null;
+  if (!isAuthenticated) {
+    return <Navigate to="/splash" state={{ from: location }} replace />;
+  }
+  
+  if (requiredPermission && !hasPermission) {
+    return <Navigate to="/" state={{ from: location, permissionDenied: true }} replace />;
   }
 
   return <>{children}</>;

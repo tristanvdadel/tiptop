@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const presets = [5, 10, 20, 50, 100];
 
@@ -26,6 +27,8 @@ const TipInput = () => {
   const [showNote, setShowNote] = useState<boolean>(false);
   const [date, setDate] = useState<Date>(new Date());
   const [showDateWarning, setShowDateWarning] = useState(false);
+  const [userPermissions, setUserPermissions] = useState<any>(null);
+  const [canAddTips, setCanAddTips] = useState(true);
   const { toast } = useToast();
   
   const placeholders = [
@@ -38,8 +41,60 @@ const TipInput = () => {
     placeholders[Math.floor(Math.random() * placeholders.length)]
   );
 
+  useEffect(() => {
+    const checkPermissions = async () => {
+      try {
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          setCanAddTips(false);
+          return;
+        }
+        
+        // Get team member record with permissions
+        const { data: teamMember, error } = await supabase
+          .from('team_members')
+          .select('permissions, role')
+          .eq('user_id', user.id)
+          .single();
+          
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error checking permissions:', error);
+          setCanAddTips(false);
+          return;
+        }
+        
+        // Admin role can do everything
+        if (teamMember?.role === 'admin') {
+          setCanAddTips(true);
+          setUserPermissions(teamMember.permissions);
+          return;
+        }
+        
+        // Check add_tips permission
+        setCanAddTips(teamMember?.permissions?.add_tips ?? false);
+        setUserPermissions(teamMember?.permissions);
+      } catch (error) {
+        console.error('Error checking permissions:', error);
+        setCanAddTips(false);
+      }
+    };
+    
+    checkPermissions();
+  }, []);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!canAddTips) {
+      toast({
+        title: "Geen toegang",
+        description: "Je hebt geen toestemming om fooi toe te voegen.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
@@ -94,6 +149,19 @@ const TipInput = () => {
       }
     }
   };
+
+  if (!canAddTips) {
+    return (
+      <Card>
+        <CardContent className="p-4">
+          <h2 className="text-lg font-medium mb-4">Fooi toevoegen</h2>
+          <div className="text-center py-4 text-muted-foreground">
+            Je hebt geen toestemming om fooi toe te voegen.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

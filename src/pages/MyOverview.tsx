@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Clock } from 'lucide-react';
+import { BarChart, Clock, Trophy, UserRound } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -133,11 +133,35 @@ const MyOverview = () => {
   };
   
   return <div className="space-y-6">
-      
+      <h1 className="text-2xl font-bold">Mijn Overzicht</h1>
       
       <Card>
-        
-        
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium flex items-center">
+            <UserRound size={16} className="mr-2" />
+            Gebruiker informatie
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Naam</span>
+              <span className="font-medium">{user.name}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Uren gewerkt</span>
+              <span className="font-medium">{totalHours} uur</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Totale fooi</span>
+              <span className="font-medium">€{totalTip.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Rol</span>
+              <span className="font-medium capitalize">{user.role || 'Lid'}</span>
+            </div>
+          </div>
+        </CardContent>
       </Card>
       
       {user.hourRegistrations && user.hourRegistrations.length > 0 && <Card>
@@ -161,7 +185,10 @@ const MyOverview = () => {
       
       <div className="mt-6">
         <Link to="/analytics">
-          
+          <Button variant="outline" className="w-full flex items-center gap-2">
+            <BarChart size={16} />
+            Bekijk statistieken
+          </Button>
         </Link>
       </div>
     </div>;

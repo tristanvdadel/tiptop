@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,6 +38,7 @@ const Settings = () => {
   const [hour, setHour] = useState(closingTime.hour.toString().padStart(2, '0'));
   const [minute, setMinute] = useState(closingTime.minute.toString().padStart(2, '0'));
   const nextCloseDate = getNextAutoCloseDate();
+  const { toast } = useToast();
 
   // Add state for user info
   const [userEmail, setUserEmail] = useState<string | null>(null);

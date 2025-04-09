@@ -1,5 +1,5 @@
 
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import Layout from '@/components/Layout';
 import NotFound from '@/pages/NotFound';
@@ -29,7 +29,7 @@ function App() {
             <Routes>
               <Route path="/splash" element={<Splash />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
+              <Route path="/" element={<AuthGuard><Layout><Outlet /></Layout></AuthGuard>}>
                 <Route index element={<Index />} />
                 <Route path="team" element={<Team />} />
                 <Route path="analytics" element={<Analytics />} />

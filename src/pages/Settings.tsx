@@ -17,7 +17,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 const Settings = () => {
@@ -38,7 +37,6 @@ const Settings = () => {
   const [hour, setHour] = useState(closingTime.hour.toString().padStart(2, '0'));
   const [minute, setMinute] = useState(closingTime.minute.toString().padStart(2, '0'));
   const nextCloseDate = getNextAutoCloseDate();
-  const { toast } = useToast();
 
   // Add state for user info
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -105,21 +103,16 @@ const Settings = () => {
     const hours = parseInt(hour, 10);
     const minutes = parseInt(minute, 10);
     
-    if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-      toast({
-        title: "Ongeldige tijd",
-        description: "Vul een geldige tijd in (uren: 0-23, minuten: 0-59).",
-        variant: "destructive"
-      });
+    const isValidTime = !isNaN(hours) && !isNaN(minutes) && 
+                        hours >= 0 && hours <= 23 && 
+                        minutes >= 0 && minutes <= 59;
+    
+    if (!isValidTime) {
+      console.error("Ongeldige tijd");
       return;
     }
     
     setClosingTime({ hour: hours, minute: minutes });
-    
-    toast({
-      title: "Sluitingstijd ingesteld",
-      description: `Sluitingstijd is ingesteld op ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}.`,
-    });
   };
 
   return (

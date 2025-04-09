@@ -194,13 +194,13 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
       );
 
       toast({
-        title: "Bevoegdheden bijgewerkt",
-        description: `Bevoegdheid "${permission}" voor ${member.profile?.first_name || member.email} bijgewerkt.`,
+        title: "Permissions updated",
+        description: `Permission "${permission}" for ${member.profile?.first_name || member.email} updated.`,
       });
     } catch (error: any) {
       console.error('Error updating permissions:', error);
       toast({
-        title: "Fout bij bijwerken bevoegdheden",
+        title: "Error updating permissions",
         description: error.message,
         variant: "destructive",
       });

@@ -15,6 +15,7 @@ export type Database = {
           date: string
           hours: number
           id: string
+          processed: boolean | null
           team_member_id: string
         }
         Insert: {
@@ -22,6 +23,7 @@ export type Database = {
           date?: string
           hours: number
           id?: string
+          processed?: boolean | null
           team_member_id: string
         }
         Update: {
@@ -29,6 +31,7 @@ export type Database = {
           date?: string
           hours?: number
           id?: string
+          processed?: boolean | null
           team_member_id?: string
         }
         Relationships: [

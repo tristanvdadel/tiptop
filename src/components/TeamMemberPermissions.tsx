@@ -581,7 +581,7 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
                                     className="w-full"
                                     disabled={member.user_id === currentUserId}
                                   >
-                                    <UserRoundX className="h-4 w-4 mr-2" />
+                                    <UserRound className="h-4 w-4 mr-2" />
                                     Verwijderen
                                   </Button>
                                 </AlertDialogTrigger>

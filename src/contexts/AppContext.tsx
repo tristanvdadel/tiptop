@@ -2,7 +2,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { AppContextType } from './types';
+import { AppContextType, Period } from './types';
 import { PeriodProvider, usePeriod } from './PeriodContext';
 import { TipProvider, useTip } from './TipContext';
 import { TeamMemberProvider, useTeamMember } from './TeamMemberContext';

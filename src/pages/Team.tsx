@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TeamMember, HourRegistration } from '@/contexts/types';
 import TeamMemberList from '@/components/team/TeamMemberList';
@@ -15,6 +16,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import TeamCreate from '@/components/TeamCreate';
 import TeamJoin from '@/components/TeamJoin';
+import PayoutSummary from '@/components/PayoutSummary';
+import { useToast } from '@/hooks/use-toast';
 
 const Team = () => {
   const {

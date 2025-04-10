@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { QRCodeDialog } from '@/components/QRCodeDialog';
 import { Coins } from 'lucide-react';
+import { useApp } from '@/contexts/AppContext';
 
 const placeholders = [
   "Deze fooi verdien jij!",
@@ -11,9 +12,10 @@ const placeholders = [
 ];
 
 export const FastTip = () => {
+  const { addTip } = useApp();
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
-  const [amount, setAmount] = useState(0);
-  const [note, setNote] = useState('');
+  const [amount, setAmount] = useState(5);
+  const [note, setNote] = useState(placeholders[0]);
 
   const handleShowQrCode = () => {
     setAmount(5);

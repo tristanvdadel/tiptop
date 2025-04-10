@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,13 +44,7 @@ export const TipInput = () => {
       return;
     }
     
-    addTip({
-      id: crypto.randomUUID(),
-      amount: amountNumber,
-      note: note,
-      date: new Date().toISOString(),
-      createdBy: "current-user", // In a real app, get this from auth
-    });
+    addTip(amountNumber, note);
     
     toast({
       title: "Fooi toegevoegd",

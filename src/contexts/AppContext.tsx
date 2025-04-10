@@ -17,6 +17,7 @@ export type TeamMember = {
   user_id?: string; // Added for Supabase integration
   role?: string; // Added for Supabase integration
   permissions?: any; // Added for Supabase integration
+  hasAccount?: boolean; // Added to indicate if team member has a user account
 };
 
 export type HourRegistration = {
@@ -116,7 +117,6 @@ type AppContextType = {
   updateTeamMemberRole: (memberId: string, role: string) => Promise<void>;
 };
 
-// Define app limits
 const appLimits = {
   periods: Infinity,
   teamMembers: Infinity,
@@ -139,7 +139,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [teamId, setTeamId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Check if user is authenticated and get their team ID
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -150,7 +149,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
         
-        // Get user's team ID
         const { data: teamMember } = await supabase
           .from('team_members')
           .select('team_id')
@@ -174,10 +172,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     checkAuth();
     
-    // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        // Get user's team ID
         const { data: teamMember } = await supabase
           .from('team_members')
           .select('team_id')
@@ -199,7 +195,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
   
-  // Refresh team data from Supabase
   const refreshTeamData = async (tid?: string) => {
     const targetTeamId = tid || teamId;
     if (!targetTeamId) return;
@@ -209,7 +204,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const data = await fetchTeamData(targetTeamId);
       
       if (data) {
-        // Process and set team members
         const processedMembers = data.teamMembers.map(member => ({
           id: member.id,
           name: member.name,
@@ -218,11 +212,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           hourRegistrations: member.hourRegistrations || [],
           user_id: member.user_id,
           role: member.role,
-          permissions: member.permissions
+          permissions: member.permissions,
+          hasAccount: member.has_account
         }));
         setTeamMembers(processedMembers);
         
-        // Process and set periods
         const processedPeriods = data.periods.map(period => ({
           id: period.id,
           name: period.name,
@@ -244,23 +238,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }));
         setPeriods(processedPeriods);
         
-        // Set current period if any
         const activePeriod = processedPeriods.find(p => p.isActive);
         setCurrentPeriod(activePeriod || null);
         
-        // Process and set payouts
         if (data.payouts && data.payouts.length > 0) {
           setPayouts(data.payouts);
           setMostRecentPayout(data.payouts[data.payouts.length - 1]);
         }
         
-        // Set settings
         if (data.settings) {
           setAutoClosePeriods(data.settings.auto_close_periods);
           setPeriodDuration(data.settings.period_duration as PeriodDuration);
           setAlignWithCalendar(data.settings.align_with_calendar);
           
-          // Make sure closing_time is properly formatted
           if (data.settings.closing_time && 
               typeof data.settings.closing_time === 'object' &&
               'hour' in data.settings.closing_time &&
@@ -290,7 +280,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
-  // Load data from localStorage as fallback
   const loadLocalData = () => {
     const storedPeriods = localStorage.getItem('periods');
     const storedTeamMembers = localStorage.getItem('teamMembers');
@@ -339,7 +328,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setAutoClosePeriods(JSON.parse(storedAutoClosePeriods));
       } catch (error) {
         console.error("Error parsing autoClosePeriods from localStorage:", error);
-        setAutoClosePeriods(true); // Default to true if parsing fails
+        setAutoClosePeriods(true);
       }
     }
     
@@ -349,11 +338,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         if (parsedDuration === 'day' || parsedDuration === 'week' || parsedDuration === 'month') {
           setPeriodDuration(parsedDuration);
         } else {
-          setPeriodDuration('week'); // Default to week if invalid
+          setPeriodDuration('week');
         }
       } catch (error) {
         console.error("Error parsing periodDuration from localStorage:", error);
-        setPeriodDuration('week'); // Default to week if parsing fails
+        setPeriodDuration('week');
       }
     }
     
@@ -362,14 +351,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setAlignWithCalendar(JSON.parse(storedAlignWithCalendar));
       } catch (error) {
         console.error("Error parsing alignWithCalendar from localStorage:", error);
-        setAlignWithCalendar(false); // Default to false if parsing fails
+        setAlignWithCalendar(false);
       }
     }
 
     if (storedClosingTime) {
       try {
         const parsedClosingTime = JSON.parse(storedClosingTime);
-        // Check if the parsed value is an object with hour and minute properties
         if (
           typeof parsedClosingTime === 'object' && 
           parsedClosingTime !== null &&
@@ -383,23 +371,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             minute: parsedClosingTime.minute
           });
         } else {
-          // Default to midnight if invalid format
           console.error("Invalid closing time format in localStorage, using default");
           setClosingTime({ hour: 0, minute: 0 });
         }
       } catch (error) {
         console.error("Error parsing closingTime from localStorage:", error);
-        // Default to midnight if parsing fails
         setClosingTime({ hour: 0, minute: 0 });
       }
     }
   };
 
-  // Save data to localStorage and Supabase
   useEffect(() => {
     localStorage.setItem('periods', JSON.stringify(periods));
     
-    // If authenticated, sync to Supabase
     if (teamId && periods.length > 0) {
       const syncPeriods = async () => {
         try {
@@ -418,7 +402,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     localStorage.setItem('teamMembers', JSON.stringify(teamMembers));
     
-    // If authenticated, sync to Supabase
     if (teamId && teamMembers.length > 0) {
       const syncTeamMembers = async () => {
         try {
@@ -437,7 +420,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     localStorage.setItem('payouts', JSON.stringify(payouts));
     
-    // If authenticated, sync to Supabase
     if (teamId && payouts.length > 0) {
       const syncPayouts = async () => {
         try {
@@ -518,7 +500,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return () => clearInterval(interval);
   }, [currentPeriod, autoClosePeriods]);
 
-  // Update team member permissions in database
   const updateTeamMemberPermissions = async (memberId: string, permissions: any) => {
     if (!teamId) {
       toast({
@@ -537,7 +518,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) throw error;
       
-      // Update local state
       setTeamMembers(prev => 
         prev.map(member => 
           member.id === memberId ? { ...member, permissions } : member
@@ -560,7 +540,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
-  // Update team member role in database
   const updateTeamMemberRole = async (memberId: string, role: string) => {
     if (!teamId) {
       toast({
@@ -579,7 +558,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) throw error;
       
-      // Update local state
       setTeamMembers(prev => 
         prev.map(member => 
           member.id === memberId ? { ...member, role } : member
@@ -618,34 +596,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (alignWithCalendar) {
       switch (duration) {
         case 'day':
-          // For daily periods with calendar alignment, end at the end of the current day
           targetDate = new Date(date);
           targetDate.setHours(23, 59, 59, 999);
           break;
         case 'week':
-          // For weekly periods with calendar alignment, end on Sunday
           targetDate = endOfWeek(date, { weekStartsOn: 1 });
           break;
         case 'month':
-          // For monthly periods with calendar alignment, end on last day of month
           targetDate = endOfMonth(date);
           break;
         default:
           targetDate = addWeeks(date, 1);
       }
     } else {
-      // Original behavior without calendar alignment
       switch (duration) {
         case 'day':
-          // For daily periods, end at the specified time on the SAME day
           targetDate = new Date(date);
           break;
         case 'week':
-          // For weekly periods, end on the next Monday
           targetDate = nextMonday(date);
           break;
         case 'month':
-          // For monthly periods, end on the 1st of the next month
           targetDate = startOfMonth(addMonths(date, 1));
           break;
         default:
@@ -653,18 +624,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     
-    // Apply custom closing time, adjusting the date correctly
     const { hour, minute } = closingTime;
     
-    // Set the target date's time to the specified closing time
     targetDate.setHours(hour, minute, 0, 0);
     
-    // If the resulting datetime is earlier than now (for same-day periods),
-    // then we need to ensure we're not setting it in the past
     const now = new Date();
     if (duration === 'day' && targetDate < now) {
-      // If we're creating a period and the closing time has already passed today,
-      // then set the close time to tomorrow at the specified time
       targetDate.setDate(targetDate.getDate() + 1);
     }
     
@@ -699,14 +664,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const generateAutomaticPeriodName = (startDate: Date, periodDuration: PeriodDuration): string => {
     switch (periodDuration) {
       case 'day':
-        // "Maandag 12 april 2023"
         return format(startDate, 'EEEE d MMMM yyyy', { locale: nl });
       case 'week':
-        // "Week 14 2023"
         const weekNumber = getWeek(startDate);
         return `Week ${weekNumber} ${format(startDate, 'yyyy')}`;
       case 'month':
-        // "April 2023"
         return format(startDate, 'MMMM yyyy', { locale: nl });
       default:
         return "";
@@ -1008,28 +970,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     let periodsToCalculate: Period[] = [];
     
     if (periodIds && periodIds.length > 0) {
-      // Filter periods based on provided periodIds
       periodsToCalculate = periods.filter(period => periodIds.includes(period.id));
     } else if (currentPeriod) {
-      // If no periodIds provided and there's a current period, use that
       periodsToCalculate = [currentPeriod];
     } else {
-      // Otherwise return empty distribution
       return teamMembers.map(member => ({
         ...member,
         tipAmount: 0
       }));
     }
     
-    // Calculate total tips
     const totalTips = periodsToCalculate.reduce((total, period) => 
       total + period.tips.reduce((sum, tip) => sum + tip.amount, 0), 0);
     
-    // Calculate total hours
     const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
     
     if (totalHours === 0 || totalTips === 0) {
-      // If there are no hours or no tips, distribute evenly
       const equalShare = teamMembers.length > 0 ? totalTips / teamMembers.length : 0;
       return teamMembers.map(member => ({
         ...member,
@@ -1037,10 +993,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }));
     }
     
-    // Calculate tip per hour
     const tipPerHour = totalTips / totalHours;
     
-    // Distribute tips based on hours worked
     return teamMembers.map(member => {
       const tipAmount = member.hours * tipPerHour;
       return {
@@ -1072,15 +1026,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const markPeriodsAsPaid = (periodIds: string[], customDistribution?: PayoutData['distribution']) => {
     if (periodIds.length === 0) return;
     
-    // Calculate total tips for these periods
     const periodsToMark = periods.filter(period => periodIds.includes(period.id));
     const totalAmount = periodsToMark.reduce((total, period) => 
       total + period.tips.reduce((sum, tip) => sum + tip.amount, 0), 0);
     
-    // Create distribution if not provided
     let distribution = customDistribution;
     if (!distribution) {
-      // Calculate distribution based on hours
       const distributedMembers = calculateTipDistribution(periodIds);
       
       distribution = distributedMembers.map(member => ({
@@ -1089,7 +1040,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }));
     }
     
-    // Create payout record
     const payoutId = generateId();
     const payout: PayoutData = {
       id: payoutId,
@@ -1099,7 +1049,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       distribution
     };
     
-    // Update periods to mark as paid
     setPeriods(prev => 
       prev.map(period => 
         periodIds.includes(period.id)
@@ -1108,11 +1057,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       )
     );
     
-    // Save payout
     setPayouts(prev => [...prev, payout]);
     setMostRecentPayout(payout);
     
-    // Reset hours for team members after payout
     teamMembers.forEach(member => {
       clearTeamMemberHours(member.id);
     });
@@ -1139,7 +1086,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const periodToDelete = periods.find(p => p.id === periodId);
     if (!periodToDelete) return;
     
-    // If it's the current period, clear it
     if (currentPeriod && currentPeriod.id === periodId) {
       setCurrentPeriod(null);
     }
@@ -1165,7 +1111,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     setPeriods(updatedPeriods);
     
-    // If this is the current period, update it as well
     if (currentPeriod && currentPeriod.id === periodId) {
       setCurrentPeriod({
         ...currentPeriod,
@@ -1201,7 +1146,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     setPeriods(updatedPeriods);
     
-    // If this is the current period, update it as well
     if (currentPeriod && currentPeriod.id === periodId) {
       setCurrentPeriod({
         ...currentPeriod,
@@ -1238,7 +1182,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     setPeriods(updatedPeriods);
     
-    // If this is the current period, update it as well
     if (currentPeriod && currentPeriod.id === periodId) {
       setCurrentPeriod({
         ...currentPeriod,
@@ -1253,9 +1196,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  // Expose context values
   const contextValue: AppContextType = {
-    // State
     currentPeriod,
     periods,
     teamMembers,
@@ -1269,7 +1210,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     isLoading,
     teamId,
     
-    // Actions
     addTip,
     addTeamMember,
     removeTeamMember,

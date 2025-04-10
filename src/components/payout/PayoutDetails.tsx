@@ -1,58 +1,77 @@
 
-import React from 'react';
-import { PayoutData } from '@/contexts/AppContext';
-import { format } from 'date-fns';
-import { nl } from 'date-fns/locale';
-import { FileText } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TeamMember } from '@/contexts/AppContext';
+import { formatCurrency } from '@/lib/utils';
 
 interface PayoutDetailsProps {
-  payout: PayoutData;
+  distribution: TeamMember[];
+  totalTips: number;
+  totalHours: number;
 }
 
-const PayoutDetails: React.FC<PayoutDetailsProps> = ({ payout }) => {
-  const formatDateTime = (dateString: string): string => {
-    try {
-      return format(new Date(dateString), 'd MMMM yyyy HH:mm', { locale: nl });
-    } catch (e) {
-      return 'Ongeldige datum';
+const PayoutDetails = ({ distribution, totalTips, totalHours }: PayoutDetailsProps) => {
+  const [hourlyRate, setHourlyRate] = useState<number>(0);
+  
+  useEffect(() => {
+    if (totalHours > 0 && totalTips > 0) {
+      setHourlyRate(totalTips / totalHours);
+    } else {
+      setHourlyRate(0);
     }
-  };
+  }, [totalTips, totalHours]);
 
   return (
-    <div className="space-y-2">
-      <h3 className="font-medium mb-2 flex items-center gap-2">
-        <FileText className="h-4 w-4" />
-        Uitbetaling details:
-      </h3>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-y-1 gap-x-4 text-sm">
-        <div>
-          <span className="text-muted-foreground">Uitbetaald op:</span>{' '}
-          <span className="font-medium">{formatDateTime(payout.date)}</span>
+    <Card className="mb-4">
+      <CardContent className="pt-6">
+        <div className="text-sm font-medium mb-2">Overzicht fooi verdeling</div>
+        
+        <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
+          <div>Totale fooi:</div>
+          <div className="text-right font-medium">{formatCurrency(totalTips)}</div>
+          
+          <div>Totale uren:</div>
+          <div className="text-right font-medium">{totalHours.toFixed(1)}</div>
+          
+          <div>Fooi per uur:</div>
+          <div className="text-right font-medium">{formatCurrency(hourlyRate)}</div>
         </div>
         
-        {payout.periodIds && payout.periodIds.length > 0 && (
-          <div>
-            <span className="text-muted-foreground">Aantal periodes:</span>{' '}
-            <span className="font-medium">{payout.periodIds.length}</span>
-          </div>
-        )}
-        
-        {payout.payerName && (
-          <div>
-            <span className="text-muted-foreground">Uitgevoerd door:</span>{' '}
-            <span className="font-medium">{payout.payerName}</span>
-          </div>
-        )}
-        
-        {payout.payoutTime && (
-          <div>
-            <span className="text-muted-foreground">Tijdstip:</span>{' '}
-            <span className="font-medium">{formatDateTime(payout.payoutTime)}</span>
-          </div>
-        )}
-      </div>
-    </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Naam</TableHead>
+              <TableHead className="text-right">Uren</TableHead>
+              <TableHead className="text-right">Fooi</TableHead>
+              {distribution.some(member => member.balance !== 0) && (
+                <TableHead className="text-right">Balans</TableHead>
+              )}
+              {distribution.some(member => member.balance !== 0) && (
+                <TableHead className="text-right">Totaal</TableHead>
+              )}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {distribution.map((member) => (
+              <TableRow key={member.id}>
+                <TableCell>{member.name}</TableCell>
+                <TableCell className="text-right">{member.hours.toFixed(1)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(member.tipAmount || 0)}</TableCell>
+                {distribution.some(m => m.balance !== 0) && (
+                  <TableCell className="text-right">{formatCurrency(member.balance || 0)}</TableCell>
+                )}
+                {distribution.some(m => m.balance !== 0) && (
+                  <TableCell className="text-right font-medium">
+                    {formatCurrency((member.tipAmount || 0) + (member.balance || 0))}
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 };
 

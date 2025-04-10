@@ -172,6 +172,15 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
     const member = teamMembers.find(m => m.id === memberId);
     if (!member) return;
 
+    if (member.role === 'admin') {
+      toast({
+        title: "Cannot modify admin permissions",
+        description: "Admin gebruikers hebben altijd alle rechten.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const updatedPermissions = {
         ...member.permissions,
@@ -194,13 +203,13 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
       );
 
       toast({
-        title: "Permissions updated",
-        description: `Permission "${permission}" for ${member.profile?.first_name || member.email} updated.`,
+        title: "Bevoegdheden bijgewerkt",
+        description: `Bevoegdheid "${permission}" voor ${member.profile?.first_name || member.email} is bijgewerkt.`,
       });
     } catch (error: any) {
       console.error('Error updating permissions:', error);
       toast({
-        title: "Error updating permissions",
+        title: "Fout bij bijwerken bevoegdheden",
         description: error.message,
         variant: "destructive",
       });
@@ -213,7 +222,7 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
 
     if (member.user_id === currentUserId) {
       toast({
-        title: "Cannot change own role",
+        title: "Kan eigen rol niet wijzigen",
         description: "Je kunt je eigen rol niet wijzigen.",
         variant: "destructive",
       });
@@ -225,7 +234,7 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
         const adminCount = teamMembers.filter(m => m.role === 'admin').length;
         if (adminCount <= 1) {
           toast({
-            title: "Cannot remove last admin",
+            title: "Kan laatste admin niet verwijderen",
             description: "Er moet ten minste één beheerder zijn in het team.",
             variant: "destructive",
           });
@@ -256,13 +265,13 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
       );
 
       toast({
-        title: "Role updated",
-        description: `${member.profile?.first_name || member.email} is now a ${newRole}.`,
+        title: "Rol bijgewerkt",
+        description: `${member.profile?.first_name || member.email} is nu een ${newRole === 'admin' ? 'beheerder' : 'teamlid'}.`,
       });
     } catch (error: any) {
       console.error('Error updating role:', error);
       toast({
-        title: "Error updating role",
+        title: "Fout bij bijwerken rol",
         description: error.message,
         variant: "destructive",
       });
@@ -275,8 +284,8 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
 
     if (member.user_id === currentUserId) {
       toast({
-        title: "Cannot remove yourself",
-        description: "Je kunt jezelf niet verwijderen. Gebruik de optie 'Team verlaten' in de Teams tab.",
+        title: "Kan eigen rol niet wijzigen",
+        description: "Je kunt je eigen rol niet wijzigen.",
         variant: "destructive",
       });
       return;
@@ -286,7 +295,7 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
       const adminCount = teamMembers.filter(m => m.role === 'admin').length;
       if (adminCount <= 1) {
         toast({
-          title: "Cannot remove last admin",
+          title: "Kan laatste admin niet verwijderen",
           description: "Je kunt de laatste beheerder niet verwijderen.",
           variant: "destructive",
         });

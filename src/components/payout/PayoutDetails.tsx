@@ -5,22 +5,52 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TeamMember } from '@/contexts/AppContext';
 import { formatCurrency } from '@/lib/utils';
 
-interface PayoutDetailsProps {
-  distribution: TeamMember[];
-  totalTips: number;
-  totalHours: number;
+interface PayoutDetailItem {
+  memberId: string;
+  amount: number;
+  actualAmount?: number;
+  balance?: number;
 }
 
-const PayoutDetails = ({ distribution, totalTips, totalHours }: PayoutDetailsProps) => {
+interface PayoutData {
+  id: string;
+  date: string;
+  totalAmount: number;
+  distribution: PayoutDetailItem[];
+}
+
+interface PayoutDetailsProps {
+  distribution?: TeamMember[];
+  totalTips?: number;
+  totalHours?: number;
+  payout?: PayoutData;
+}
+
+const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDetailsProps) => {
   const [hourlyRate, setHourlyRate] = useState<number>(0);
   
   useEffect(() => {
-    if (totalHours > 0 && totalTips > 0) {
+    if (totalHours && totalHours > 0 && totalTips && totalTips > 0) {
       setHourlyRate(totalTips / totalHours);
     } else {
       setHourlyRate(0);
     }
   }, [totalTips, totalHours]);
+
+  // Convert payout data to the format needed for rendering if payout is provided
+  const displayDistribution = distribution || 
+    (payout?.distribution.map(item => {
+      const member = {
+        id: item.memberId,
+        name: '', // This will be filled by TeamMember lookup in the parent component
+        hours: 0,
+        tipAmount: item.amount,
+        balance: item.balance || 0
+      } as TeamMember;
+      return member;
+    }) || []);
+
+  const showBalance = displayDistribution.some(member => member.balance !== 0);
 
   return (
     <Card className="mb-4">
@@ -29,39 +59,49 @@ const PayoutDetails = ({ distribution, totalTips, totalHours }: PayoutDetailsPro
         
         <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
           <div>Totale fooi:</div>
-          <div className="text-right font-medium">{formatCurrency(totalTips)}</div>
+          <div className="text-right font-medium">
+            {formatCurrency(totalTips || payout?.totalAmount || 0)}
+          </div>
           
-          <div>Totale uren:</div>
-          <div className="text-right font-medium">{totalHours.toFixed(1)}</div>
-          
-          <div>Fooi per uur:</div>
-          <div className="text-right font-medium">{formatCurrency(hourlyRate)}</div>
+          {(totalHours !== undefined) && (
+            <>
+              <div>Totale uren:</div>
+              <div className="text-right font-medium">{totalHours.toFixed(1)}</div>
+              
+              <div>Fooi per uur:</div>
+              <div className="text-right font-medium">{formatCurrency(hourlyRate)}</div>
+            </>
+          )}
         </div>
         
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Naam</TableHead>
-              <TableHead className="text-right">Uren</TableHead>
+              {totalHours !== undefined && (
+                <TableHead className="text-right">Uren</TableHead>
+              )}
               <TableHead className="text-right">Fooi</TableHead>
-              {distribution.some(member => member.balance !== 0) && (
+              {showBalance && (
                 <TableHead className="text-right">Balans</TableHead>
               )}
-              {distribution.some(member => member.balance !== 0) && (
+              {showBalance && (
                 <TableHead className="text-right">Totaal</TableHead>
               )}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {distribution.map((member) => (
+            {displayDistribution.map((member) => (
               <TableRow key={member.id}>
                 <TableCell>{member.name}</TableCell>
-                <TableCell className="text-right">{member.hours.toFixed(1)}</TableCell>
+                {totalHours !== undefined && (
+                  <TableCell className="text-right">{member.hours.toFixed(1)}</TableCell>
+                )}
                 <TableCell className="text-right">{formatCurrency(member.tipAmount || 0)}</TableCell>
-                {distribution.some(m => m.balance !== 0) && (
+                {showBalance && (
                   <TableCell className="text-right">{formatCurrency(member.balance || 0)}</TableCell>
                 )}
-                {distribution.some(m => m.balance !== 0) && (
+                {showBalance && (
                   <TableCell className="text-right font-medium">
                     {formatCurrency((member.tipAmount || 0) + (member.balance || 0))}
                   </TableCell>

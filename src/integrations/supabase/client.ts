@@ -46,6 +46,100 @@ export const getUserEmail = async (userId: string) => {
   }
 };
 
+// Direct team member query functions to handle recursive policy errors
+export const getTeamMembers = async (teamId: string) => {
+  try {
+    const { data, error } = await supabase
+      .rpc('get_team_members', { team_id_param: teamId });
+    
+    if (error) {
+      console.error('Error fetching team members via RPC:', error);
+      
+      // Fallback to direct selection with less detailed attributes
+      // This may work even with recursive policies by requesting fewer fields
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('team_members')
+        .select('id, team_id, user_id, role')
+        .eq('team_id', teamId);
+      
+      if (fallbackError) {
+        console.error('Fallback error fetching team members:', fallbackError);
+        return { data: [], error: fallbackError };
+      }
+      
+      return { data: fallbackData, error: null };
+    }
+    
+    return { data, error: null };
+  } catch (error) {
+    console.error('Unexpected error in getTeamMembers:', error);
+    return { data: [], error };
+  }
+};
+
+export const getUserTeams = async (userId: string) => {
+  try {
+    // Try using a stored procedure first (which would be more resilient to RLS issues)
+    const { data, error } = await supabase
+      .rpc('get_user_teams', { user_id_param: userId });
+    
+    if (error) {
+      console.error('Error fetching teams via RPC:', error);
+      
+      // Fallback approach - get team IDs from memberships
+      const { data: memberships, error: membershipError } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', userId);
+        
+      if (membershipError) {
+        console.error('Error fetching team memberships:', membershipError);
+        
+        // Second fallback, try through raw SQL function
+        try {
+          // Try to get teams through the team table directly
+          const { data: teamsData, error: teamsError } = await supabase
+            .from('teams')
+            .select('*');
+            
+          if (teamsError) {
+            console.error('Error fetching teams directly:', teamsError);
+            return { data: [], error: teamsError };
+          }
+          
+          return { data: teamsData, error: null };
+        } catch (innerError) {
+          console.error('Inner error in team fetching:', innerError);
+          return { data: [], error: innerError };
+        }
+      }
+      
+      if (!memberships || memberships.length === 0) {
+        return { data: [], error: null };
+      }
+      
+      // Get team details for the memberships we found
+      const teamIds = memberships.map(m => m.team_id);
+      const { data: teamsData, error: teamsError } = await supabase
+        .from('teams')
+        .select('*')
+        .in('id', teamIds);
+        
+      if (teamsError) {
+        console.error('Error fetching teams by IDs:', teamsError);
+        return { data: [], error: teamsError };
+      }
+      
+      return { data: teamsData, error: null };
+    }
+    
+    return { data, error: null };
+  } catch (error) {
+    console.error('Unexpected error in getUserTeams:', error);
+    return { data: [], error };
+  }
+};
+
 // Interface extensions to help with TypeScript
 export interface Team {
   id: string;

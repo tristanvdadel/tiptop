@@ -1,8 +1,7 @@
-
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { supabase, isLoggedIn } from "@/integrations/supabase/client";
-import { Loader2, Coins, Sparkles, ArrowRight, TipJar, Users, ChartBar } from 'lucide-react';
+import { Loader2, Coins, Sparkles, ArrowRight, Users, ChartBar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Splash = () => {
@@ -18,7 +17,6 @@ const Splash = () => {
     
     checkAuth();
     
-    // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setAuthenticated(!!session);
@@ -34,7 +32,6 @@ const Splash = () => {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-amber-100/20 via-amber-50/30 to-amber-100/20 relative overflow-hidden">
-        {/* Background Sparkles */}
         <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-50">
           <Sparkles className="absolute top-12 left-24 text-amber-300 animate-pulse" size={24} />
           <Sparkles className="absolute bottom-24 right-12 text-amber-300 animate-pulse delay-500" size={32} />
@@ -64,10 +61,8 @@ const Splash = () => {
     return <Navigate to="/" replace />;
   }
   
-  // Updated splash screen with explanation and registration button
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-amber-100/20 via-amber-50/30 to-amber-100/20 relative overflow-hidden p-4">
-      {/* Background Sparkles */}
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-50">
         <Sparkles className="absolute top-12 left-24 text-amber-300 animate-pulse" size={24} />
         <Sparkles className="absolute bottom-24 right-12 text-amber-300 animate-pulse delay-500" size={32} />
@@ -89,7 +84,7 @@ const Splash = () => {
           <div className="space-y-6">
             <div className="flex items-start gap-4">
               <div className="bg-amber-100 p-3 rounded-full">
-                <TipJar className="h-6 w-6 text-amber-600" />
+                <Coins className="h-6 w-6 text-amber-600" />
               </div>
               <div>
                 <h3 className="font-medium text-lg">Houd fooi eenvoudig bij</h3>

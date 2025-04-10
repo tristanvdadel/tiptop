@@ -5,8 +5,7 @@ import { nl } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2 } from 'lucide-react';
-import { useApp } from '@/contexts/AppContext';
-import { TipEntry } from '@/contexts/types';
+import { TipEntry, useApp } from '@/contexts/AppContext';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +30,6 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [hasEditPermission, setHasEditPermission] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   
   const actualPeriodId = periodId || (currentPeriod ? currentPeriod.id : '');
@@ -71,36 +69,21 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
     checkPermissions();
   }, []);
 
-  const handleDelete = async () => {
-    setIsDeleting(true);
-    
+  const handleDelete = () => {
     if (!actualPeriodId) {
       toast({
         title: "Fout bij verwijderen",
         description: "Kan fooi niet verwijderen: geen periode gevonden.",
         variant: "destructive",
       });
-      setIsDeleting(false);
       return;
     }
-    
-    try {
-      await deleteTip(actualPeriodId, tip.id);
-      setIsDeleteDialogOpen(false);
-      toast({
-        title: "Fooi verwijderd",
-        description: "De fooi is succesvol verwijderd.",
-      });
-    } catch (error) {
-      console.error('Error deleting tip:', error);
-      toast({
-        title: "Fout bij verwijderen",
-        description: "Er is een fout opgetreden bij het verwijderen van de fooi.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeleting(false);
-    }
+    deleteTip(actualPeriodId, tip.id);
+    setIsDeleteDialogOpen(false);
+    toast({
+      title: "Fooi verwijderd",
+      description: "De fooi is succesvol verwijderd.",
+    });
   };
 
   return (
@@ -150,13 +133,9 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Annuleren</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDelete} 
-              className="bg-destructive text-destructive-foreground"
-              disabled={isDeleting}
-            >
-              {isDeleting ? "Verwijderen..." : "Verwijderen"}
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+              Verwijderen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

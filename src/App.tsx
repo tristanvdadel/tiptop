@@ -40,11 +40,11 @@ const App = () => {
                 
                 {/* Protected routes */}
                 <Route path="/" element={<AuthGuard><Layout><Index /></Layout></AuthGuard>} />
-                <Route path="/periods" element={<AuthGuard requiredPermission="close_periods"><Layout><Periods /></Layout></AuthGuard>} />
-                <Route path="/team" element={<AuthGuard requiredPermission="view_team"><Layout><Team /></Layout></AuthGuard>} />
+                <Route path="/periods" element={<AuthGuard><Layout><Periods /></Layout></AuthGuard>} />
+                <Route path="/team" element={<AuthGuard><Layout><Team /></Layout></AuthGuard>} />
                 <Route path="/management" element={<AuthGuard><Layout><Management /></Layout></AuthGuard>} />
                 <Route path="/my-overview" element={<AuthGuard><Layout><MyOverview /></Layout></AuthGuard>} />
-                <Route path="/analytics" element={<AuthGuard requiredPermission="view_reports"><Layout><Analytics /></Layout></AuthGuard>} />
+                <Route path="/analytics" element={<AuthGuard><Layout><Analytics /></Layout></AuthGuard>} />
                 <Route path="/settings" element={<AuthGuard><Layout><Settings /></Layout></AuthGuard>} />
                 <Route path="*" element={<AuthGuard><Layout><NotFound /></Layout></AuthGuard>} />
               </Routes>

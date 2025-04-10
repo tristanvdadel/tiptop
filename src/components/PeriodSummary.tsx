@@ -1,4 +1,3 @@
-
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
@@ -36,17 +35,10 @@ const PeriodSummary = () => {
   
   const averageTipPerHour = useMemo(() => {
     if (!currentPeriod) return 0;
-    
-    // First check if we have a stored value from previous calculations
-    if (currentPeriod.averageTipPerHour !== undefined && currentPeriod.averageTipPerHour !== null) {
+    if (currentPeriod.averageTipPerHour !== undefined) {
       return currentPeriod.averageTipPerHour;
     }
-    
-    // If not, calculate it fresh
-    const calculated = calculateAverageTipPerHour(currentPeriod.id);
-    
-    // Make sure we handle null/undefined by defaulting to 0
-    return calculated !== null && calculated !== undefined ? calculated : 0;
+    return calculateAverageTipPerHour(currentPeriod.id);
   }, [currentPeriod, calculateAverageTipPerHour]);
 
   const handleEditClick = () => {
@@ -174,7 +166,7 @@ const PeriodSummary = () => {
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Aantal invoeren</span>
-            <span>{currentPeriod?.tips.length || 0}</span>
+            <span>{currentPeriod.tips.length}</span>
           </div>
           
           <div className="flex justify-between">

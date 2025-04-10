@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ const Analytics = () => {
     periods,
     calculateAverageTipPerHour,
     teamMembers,
+    payouts
   } = useApp();
   
   const isMobile = useIsMobile();
@@ -26,23 +28,15 @@ const Analytics = () => {
   }, [calculateAverageTipPerHour]);
   
   const periodData = useMemo(() => {
-    if (!periods || periods.length === 0) return [];
-    
     return periods.map(period => {
-      const totalTips = period.tips ? period.tips.reduce((sum, tip) => sum + tip.amount, 0) : 0;
+      const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
       const startDate = format(new Date(period.startDate), 'd MMM', {
         locale: nl
       });
       const endDate = period.endDate ? format(new Date(period.endDate), 'd MMM', {
         locale: nl
       }) : 'Actief';
-      
-      // Use the saved average if available, otherwise calculate it
-      let averageTipPerHour = period.averageTipPerHour;
-      if (averageTipPerHour === undefined || averageTipPerHour === null) {
-        averageTipPerHour = calculateAverageTipPerHour(period.id);
-      }
-      
+      const averageTipPerHour = calculateAverageTipPerHour(period.id);
       const timestamp = new Date(period.startDate).getTime();
       return {
         name: `${startDate} - ${endDate}`,
@@ -73,14 +67,9 @@ const Analytics = () => {
   }, []);
   
   const getEmptyStateMessage = () => {
-    if (!periods || periods.length === 0) return "Er zijn nog geen periodes aangemaakt.";
-    
     const allPeriods = periods;
-    const periodsWithTips = allPeriods.some(period => period.tips && period.tips.length > 0);
-    const teamHasHours = teamMembers && teamMembers.some(member => 
-      member.hours > 0 || (member.hourRegistrations && member.hourRegistrations.length > 0)
-    );
-    
+    const periodsWithTips = allPeriods.some(period => period.tips.length > 0);
+    const teamHasHours = teamMembers.some(member => member.hours > 0 || member.hourRegistrations && member.hourRegistrations.length > 0);
     if (!periodsWithTips && !teamHasHours) {
       return "Er ontbreken uur gegevens en fooi gegevens. Voeg ze toe om een gemiddelde te zien.";
     } else if (!periodsWithTips) {
@@ -91,11 +80,9 @@ const Analytics = () => {
     return ""; // Fallback, should not happen
   };
   
-  const AverageTipCard = () => (
-    <Card className="mb-4 w-full">
+  const AverageTipCard = () => <Card className="mb-4 w-full">
       <CardContent className="p-4">
-        {averageTipPerHour > 0 ? (
-          <div className="flex justify-between items-center bg-gradient-to-r from-[#9b87f5]/10 to-[#7E69AB]/5 border-[#9b87f5]/20 rounded-md p-3">
+        {averageTipPerHour > 0 ? <div className="flex justify-between items-center bg-gradient-to-r from-[#9b87f5]/10 to-[#7E69AB]/5 border-[#9b87f5]/20 rounded-md p-3">
             <div className="flex items-center gap-2">
               <TrendingUp size={20} className="text-[#9b87f5]" />
               <div>
@@ -113,20 +100,15 @@ const Analytics = () => {
               </div>
             </div>
             <span className="font-bold text-[#9b87f5]">€{averageTipPerHour.toFixed(2)} / uur</span>
-          </div>
-        ) : (
-          <div className="text-center py-2 text-muted-foreground">
+          </div> : <div className="text-center py-2 text-muted-foreground">
             <p>{getEmptyStateMessage()}</p>
-          </div>
-        )}
+          </div>}
       </CardContent>
-    </Card>
-  );
+    </Card>;
   
-  const hasAnyPeriodWithTips = periods && periods.some(period => period.tips && period.tips.length > 0);
+  const hasAnyPeriodWithTips = periods.some(period => period.tips.length > 0);
   
-  return (
-    <div className="space-y-4 w-full max-w-full px-1 sm:px-4">
+  return <div className="space-y-4 w-full max-w-full px-1 sm:px-4">
       <h1 className="text-xl font-bold">Analyse</h1>
       
       <AverageTipCard />
@@ -142,74 +124,45 @@ const Analytics = () => {
             Deze grafiek toont het verloop van de gemiddelde fooi per uur over verschillende periodes, inclusief uitbetaalde periodes.
             {lineChartData.length < periodData.filter(period => period.total > 0).length && ` (Laatste ${lineChartData.length} periodes weergegeven)`}
           </p>
-          {hasAnyPeriodWithTips ? (
-            <div className="h-60 w-full overflow-x-auto">
+          {hasAnyPeriodWithTips ? <div className="h-60 w-full overflow-x-auto">
               <ChartContainer config={chartConfig} className="h-full min-w-[320px]">
-                <LineChart 
-                  data={lineChartData} 
-                  margin={{
-                    top: 10,
-                    right: isMobile ? 5 : 20,
-                    left: isMobile ? 5 : 20,
-                    bottom: isMobile ? 70 : 40
-                  }}
-                >
+                <LineChart data={lineChartData} margin={{
+              top: 10,
+              right: isMobile ? 5 : 20,
+              left: isMobile ? 5 : 20,
+              bottom: isMobile ? 70 : 40
+            }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="name" 
-                    tickMargin={5} 
-                    height={60} 
-                    tick={{
-                      fontSize: isMobile ? 8 : 10
-                    }} 
-                    interval={0} 
-                    angle={-45} 
-                    textAnchor="end" 
-                  />
-                  <YAxis 
-                    width={isMobile ? 30 : 40} 
-                    tick={{
-                      fontSize: isMobile ? 10 : 12
-                    }} 
-                  />
-                  <ChartTooltip 
-                    content={({active, payload}) => {
-                      if (active && payload && payload.length) {
-                        return <ChartTooltipContent 
-                          formatter={(value: number) => [`€${value.toFixed(2)}`, 'Gem. fooi per uur']} 
-                        />;
-                      }
-                      return null;
-                    }} 
-                  />
-                  <Legend 
-                    wrapperStyle={{
-                      fontSize: isMobile ? '10px' : '12px',
-                      marginTop: isMobile ? '10px' : '5px'
-                    }} 
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="average" 
-                    name="Gem. fooi per uur" 
-                    stroke="#33C3F0" 
-                    strokeWidth={2} 
-                    dot={{
-                      r: isMobile ? 3 : 5
-                    }} 
-                    activeDot={{
-                      r: isMobile ? 5 : 8
-                    }} 
-                  />
+                  <XAxis dataKey="name" tickMargin={5} height={60} tick={{
+                fontSize: isMobile ? 8 : 10
+              }} interval={0} angle={-45} textAnchor="end" />
+                  <YAxis width={isMobile ? 30 : 40} tick={{
+                fontSize: isMobile ? 10 : 12
+              }} />
+                  <ChartTooltip content={({
+                active,
+                payload
+              }) => {
+                if (active && payload && payload.length) {
+                  return <ChartTooltipContent formatter={(value: number) => [`€${value.toFixed(2)}`, 'Gem. fooi per uur']} />;
+                }
+                return null;
+              }} />
+                  <Legend wrapperStyle={{
+                fontSize: isMobile ? '10px' : '12px',
+                marginTop: isMobile ? '10px' : '5px'
+              }} />
+                  <Line type="monotone" dataKey="average" name="Gem. fooi per uur" stroke="#33C3F0" strokeWidth={2} dot={{
+                r: isMobile ? 3 : 5
+              }} activeDot={{
+                r: isMobile ? 5 : 8
+              }} />
                 </LineChart>
               </ChartContainer>
-            </div>
-          ) : (
-            <div className="text-center py-6 text-muted-foreground">
+            </div> : <div className="text-center py-6 text-muted-foreground">
               <p>Er zijn nog geen periodes met fooi gegevens.</p>
               <p className="mt-1">Voeg fooi toe aan een periode om deze grafiek te zien.</p>
-            </div>
-          )}
+            </div>}
         </CardContent>
       </Card>
       
@@ -221,36 +174,27 @@ const Analytics = () => {
           <p className="text-muted-foreground mb-2 text-sm">
             Het gemiddelde fooi per uur wordt berekend op basis van de totale fooi en de gewerkte uren van het team.
           </p>
-          {hasAnyPeriodWithTips ? (
-            <ScrollArea className="h-64 w-full">
+          {hasAnyPeriodWithTips ? <ScrollArea className="h-64 w-full">
               <div className="space-y-2 pr-2">
-                {periodData.filter(period => period.total > 0).reverse().map(period => (
-                  <div key={period.id} className="flex justify-between p-2 border rounded-md">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{period.name}</span>
-                      {period.isPaid && (
-                        <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
-                          Uitbetaald
-                        </span>
-                      )}
-                    </div>
-                    <div className="font-medium text-sm">
-                      €{period.average.toFixed(2)}/uur
-                    </div>
-                  </div>
-                ))}
+                {periodData.filter(period => period.total > 0).reverse().map(period => <div key={period.id} className="flex justify-between p-2 border rounded-md">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{period.name}</span>
+                        {period.isPaid && <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
+                            Uitbetaald
+                          </span>}
+                      </div>
+                      <div className="font-medium text-sm">
+                        €{period.average.toFixed(2)}/uur
+                      </div>
+                    </div>)}
               </div>
-            </ScrollArea>
-          ) : (
-            <div className="text-center py-6 text-muted-foreground">
+            </ScrollArea> : <div className="text-center py-6 text-muted-foreground">
               <p>Er zijn nog geen periodes met fooi gegevens.</p>
               <p className="mt-1">Voeg fooi toe aan een periode om deze lijst te zien.</p>
-            </div>
-          )}
+            </div>}
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 };
 
 export default Analytics;

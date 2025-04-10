@@ -1,3 +1,4 @@
+
 import React, { useState, KeyboardEvent } from 'react';
 import { TeamMember, HourRegistration } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
@@ -136,6 +137,15 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
     return balance > 0 ? 'text-green-600' : 'text-red-600';
   };
 
+  // Bereken de dynamische hoogte op basis van het aantal teamleden
+  const getScrollAreaHeight = (): string => {
+    if (teamMembers.length <= 0) return 'auto';
+    // Basis hoogte per rij ongeveer 50px
+    // Minimum hoogte van 100px, maximum hoogte van 600px
+    const calculatedHeight = Math.min(Math.max(teamMembers.length * 50, 100), 600);
+    return `${calculatedHeight}px`;
+  };
+
   return (
     <>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
@@ -167,7 +177,8 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <ScrollArea className="h-[600px] w-full">
+            {/* Dynamische hoogte voor ScrollArea op basis van aantal teamleden */}
+            <ScrollArea className={`w-full`} style={{ height: getScrollAreaHeight() }}>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -340,3 +351,4 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
 };
 
 export default TeamMemberList;
+

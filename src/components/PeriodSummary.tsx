@@ -35,10 +35,11 @@ const PeriodSummary = () => {
   
   const averageTipPerHour = useMemo(() => {
     if (!currentPeriod) return 0;
-    if (currentPeriod.averageTipPerHour !== undefined) {
+    if (currentPeriod.averageTipPerHour !== undefined && currentPeriod.averageTipPerHour !== null) {
       return currentPeriod.averageTipPerHour;
     }
-    return calculateAverageTipPerHour(currentPeriod.id);
+    const calculated = calculateAverageTipPerHour(currentPeriod.id);
+    return calculated !== null && calculated !== undefined ? calculated : 0;
   }, [currentPeriod, calculateAverageTipPerHour]);
 
   const handleEditClick = () => {

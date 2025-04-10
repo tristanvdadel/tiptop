@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useCallback } from 'react';
 import { PayoutData, TeamMember, Period } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -22,9 +21,9 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
   const [payouts, setPayouts] = useState<PayoutData[]>([]);
   const [mostRecentPayout, setMostRecentPayout] = useState<PayoutData | null>(null);
   const { toast } = useToast();
-  const { teamMembers } = useTeamMember();
-  // Access periods from TeamMember context
-  const { periods } = useTeamMember();
+  const teamMemberContext = useTeamMember();
+  const teamMembers = teamMemberContext?.teamMembers || [];
+  const periods = teamMemberContext?.periods || [];
 
   const fetchPayouts = useCallback(async () => {
     if (!teamId) return;

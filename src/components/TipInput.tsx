@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,7 +15,7 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, TeamMemberPermissions } from '@/integrations/supabase/client';
 
 const presets = [5, 10, 20, 50, 100];
 
@@ -73,8 +72,9 @@ const TipInput = () => {
         }
         
         // Check add_tips permission - Fix the type checking here
-        if (teamMember?.permissions && typeof teamMember.permissions === 'object') {
-          setCanAddTips(teamMember.permissions.add_tips === true);
+        const permissions = teamMember?.permissions as unknown as Record<string, boolean>;
+        if (permissions && typeof permissions === 'object' && !Array.isArray(permissions)) {
+          setCanAddTips(permissions.add_tips === true);
         } else {
           setCanAddTips(false);
         }

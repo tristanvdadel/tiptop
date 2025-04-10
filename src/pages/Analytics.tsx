@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,7 +36,13 @@ const Analytics = () => {
       const endDate = period.endDate ? format(new Date(period.endDate), 'd MMM', {
         locale: nl
       }) : 'Actief';
-      const averageTipPerHour = calculateAverageTipPerHour(period.id);
+      
+      // Use the saved average if available, otherwise calculate it
+      let averageTipPerHour = period.averageTipPerHour;
+      if (averageTipPerHour === undefined || averageTipPerHour === null) {
+        averageTipPerHour = calculateAverageTipPerHour(period.id);
+      }
+      
       const timestamp = new Date(period.startDate).getTime();
       return {
         name: `${startDate} - ${endDate}`,

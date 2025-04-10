@@ -419,25 +419,31 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
         return;
       }
       
-      const { error: deleteError } = await supabase
+      const { error: markProcessedError } = await supabase
         .from('hour_registrations')
-        .delete()
-        .eq('team_member_id', memberId);
+        .update({ processed: true })
+        .eq('team_member_id', memberId)
+        .is('processed', null);
       
-      if (deleteError) {
-        console.error('Error deleting hour registrations:', deleteError);
-        return;
+      if (markProcessedError) {
+        console.error('Error marking hour registrations as processed:', markProcessedError);
       }
       
       setTeamMembers(prev => 
         prev.map(member => 
-          member.id === memberId ? { ...member, hours: 0, hourRegistrations: [] } : member
+          member.id === memberId 
+            ? { 
+                ...member, 
+                hours: 0,
+                hourRegistrations: [] 
+              } 
+            : member
         )
       );
       
       toast({
         title: "Uren gewist",
-        description: "Alle uren zijn succesvol gewist.",
+        description: "Alle actieve uren zijn succesvol gewist. Historische gegevens blijven bewaard voor analyse.",
       });
     } catch (error) {
       console.error('Error clearing team member hours:', error);
@@ -447,7 +453,7 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
         variant: "destructive"
       });
     }
-  }, [toast]);
+  }, [toast, setTeamMembers]);
 
   const updateTeamMemberName = useCallback(async (memberId: string, newName: string): Promise<boolean> => {
     try {

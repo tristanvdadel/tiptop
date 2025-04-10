@@ -133,6 +133,7 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
     if (!teamId || periodIds.length === 0) return;
     
     try {
+      // Create the payout record
       const { data: payoutData, error: payoutError } = await supabase
         .from('payouts')
         .insert({
@@ -149,6 +150,7 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
         return;
       }
       
+      // Link periods to the payout
       const payoutPeriods = periodIds.map(periodId => ({
         payout_id: payoutData.id,
         period_id: periodId
@@ -163,6 +165,7 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
         return;
       }
       
+      // Mark periods as paid
       const { error: updateError } = await supabase
         .from('periods')
         .update({ is_paid: true })
@@ -173,6 +176,22 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
         return;
       }
       
+      // Calculate and store average tip per hour for each period before clearing hours
+      for (const periodId of periodIds) {
+        const avgTipPerHour = calculateAverageTipPerHour(periodId);
+        
+        // Store this value in the period for future reference
+        const { error: avgUpdateError } = await supabase
+          .from('periods')
+          .update({ average_tip_per_hour: avgTipPerHour })
+          .eq('id', periodId);
+        
+        if (avgUpdateError) {
+          console.error('Error storing average tip per hour:', avgUpdateError);
+        }
+      }
+      
+      // Handle distribution data
       if (customDistribution) {
         const payoutDistributions = customDistribution.map(item => ({
           payout_id: payoutData.id,
@@ -190,6 +209,7 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
           console.error('Error storing payout distributions:', distError);
         }
         
+        // Update team member balances
         for (const item of customDistribution) {
           if (item.balance !== undefined) {
             const { error: balanceError } = await supabase
@@ -217,13 +237,25 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
       setPayouts(prev => [newPayout, ...prev]);
       setMostRecentPayout(newPayout);
       
+      // Update periods in state, but preserve the average tip per hour
       setPeriods((prevPeriods: Period[]) => 
-        prevPeriods.map(p => periodIds.includes(p.id) ? { ...p, isPaid: true } : p)
+        prevPeriods.map(p => {
+          if (periodIds.includes(p.id)) {
+            // Calculate and store the average if not already set
+            const avgTipPerHour = p.averageTipPerHour || calculateAverageTipPerHour(p.id);
+            return { 
+              ...p, 
+              isPaid: true,
+              averageTipPerHour: avgTipPerHour 
+            };
+          }
+          return p;
+        })
       );
       
       toast({
         title: "Uitbetaling voltooid",
-        description: `De fooi is succesvol uitbetaald voor ${periodIds.length} periode(s).`,
+        description: `De fooi is succesvol uitbetaald voor ${periodIds.length} periode(s). Historische gegevens zijn bewaard voor analyse.`,
       });
     } catch (error) {
       console.error('Error in markPeriodsAsPaid:', error);
@@ -233,7 +265,7 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
         variant: "destructive"
       });
     }
-  }, [teamId, toast, setPayouts, setMostRecentPayout, setPeriods]);
+  }, [teamId, toast, setPayouts, setMostRecentPayout, setPeriods, calculateAverageTipPerHour]);
 
   return (
     <PayoutContext.Provider value={{

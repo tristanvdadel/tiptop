@@ -7,7 +7,7 @@ import { PeriodProvider, usePeriod } from './PeriodContext';
 import { TipProvider, useTip } from './TipContext';
 import { TeamMemberProvider, useTeamMember } from './TeamMemberContext';
 import { PayoutProvider, usePayout } from './PayoutContext';
-import { hasReachedLimit } from './utils';
+import { calculateAutoCloseDate, hasReachedLimit } from './utils';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -65,9 +65,7 @@ const AppProviderInner = ({ children, teamId }: { children: ReactNode, teamId: s
     setPeriodDuration: period.setPeriodDuration,
     scheduleAutoClose: period.scheduleAutoClose,
     calculateAutoCloseDate: (startDate, duration) => {
-      return period.alignWithCalendar 
-        ? period.scheduleAutoClose(startDate) 
-        : startDate;
+      return calculateAutoCloseDate(startDate, duration, period.alignWithCalendar, period.closingTime);
     },
     getNextAutoCloseDate: period.getNextAutoCloseDate,
     getFormattedClosingTime: period.getFormattedClosingTime,

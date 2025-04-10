@@ -42,6 +42,47 @@ export const PeriodProvider = ({ children, teamId }: { children: React.ReactNode
   const [closingTime, setClosingTime] = useState<{ hour: number; minute: number }>({ hour: 0, minute: 0 });
   const { toast } = useToast();
 
+  // Declare endCurrentPeriod here so it can be referenced by startNewPeriod
+  const endCurrentPeriod = useCallback(async () => {
+    if (!currentPeriod || !teamId) return;
+    
+    try {
+      // Update the period to mark it as inactive
+      const { error } = await supabase
+        .from('periods')
+        .update({
+          is_active: false,
+          end_date: new Date().toISOString()
+        })
+        .eq('id', currentPeriod.id);
+      
+      if (error) {
+        console.error('Error ending current period:', error);
+        toast({
+          title: "Fout bij afsluiten periode",
+          description: "Er is een fout opgetreden bij het afsluiten van de huidige periode.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Refresh periods to get the latest data
+      await fetchPeriods();
+      
+      toast({
+        title: "Periode afgesloten",
+        description: "De huidige periode is succesvol afgesloten.",
+      });
+    } catch (error) {
+      console.error('Error ending current period:', error);
+      toast({
+        title: "Fout bij afsluiten periode",
+        description: "Er is een fout opgetreden bij het afsluiten van de huidige periode.",
+        variant: "destructive"
+      });
+    }
+  }, [currentPeriod, teamId, toast, fetchPeriods]);
+
   const fetchPeriods = useCallback(async () => {
     if (!teamId) return;
     
@@ -177,46 +218,7 @@ export const PeriodProvider = ({ children, teamId }: { children: React.ReactNode
     }
   }, [currentPeriod, teamId, autoClosePeriods, periodDuration, alignWithCalendar, closingTime, toast, fetchPeriods, endCurrentPeriod]);
 
-  const endCurrentPeriod = useCallback(async () => {
-    if (!currentPeriod || !teamId) return;
-    
-    try {
-      // Update the period to mark it as inactive
-      const { error } = await supabase
-        .from('periods')
-        .update({
-          is_active: false,
-          end_date: new Date().toISOString()
-        })
-        .eq('id', currentPeriod.id);
-      
-      if (error) {
-        console.error('Error ending current period:', error);
-        toast({
-          title: "Fout bij afsluiten periode",
-          description: "Er is een fout opgetreden bij het afsluiten van de huidige periode.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Refresh periods to get the latest data
-      await fetchPeriods();
-      
-      toast({
-        title: "Periode afgesloten",
-        description: "De huidige periode is succesvol afgesloten.",
-      });
-    } catch (error) {
-      console.error('Error ending current period:', error);
-      toast({
-        title: "Fout bij afsluiten periode",
-        description: "Er is een fout opgetreden bij het afsluiten van de huidige periode.",
-        variant: "destructive"
-      });
-    }
-  }, [currentPeriod, teamId, toast, fetchPeriods]);
-
+  // Delete a period by ID
   const deletePeriod = useCallback(async (periodId: string) => {
     if (!teamId) return;
     

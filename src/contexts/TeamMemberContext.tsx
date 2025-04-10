@@ -2,11 +2,12 @@ import { createContext, useContext, useState, useCallback } from 'react';
 import { TeamMember, HourRegistration } from './types';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { generateId } from './utils';
 
 type TeamMemberContextType = {
   teamMembers: TeamMember[];
   fetchTeamMembers: () => Promise<void>;
-  addTeamMember: (name: string) => Promise<void>;
+  addTeamMember: (name: string) => Promise<boolean>;
   removeTeamMember: (id: string) => Promise<void>;
   updateTeamMemberHours: (id: string, hours: number) => Promise<void>;
   deleteHourRegistration: (memberId: string, registrationId: string) => Promise<void>;
@@ -25,7 +26,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
     if (!teamId) return;
     
     try {
-      // First get all team members
       const { data: teamMembersData, error: teamMembersError } = await supabase
         .from('team_members')
         .select('id, user_id, role, permissions, balance, hours')
@@ -36,7 +36,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
         return;
       }
       
-      // Get profiles for user information
       const userProfiles: Record<string, { first_name?: string; last_name?: string }> = {};
       
       for (const member of teamMembersData) {
@@ -53,14 +52,12 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
         }
       }
       
-      // Get hour registrations for each member
       const members = await Promise.all(teamMembersData.map(async (member) => {
         const { data: hourRegistrations } = await supabase
           .from('hour_registrations')
           .select('id, hours, date')
           .eq('team_member_id', member.id);
         
-        // Generate name from profile or fallback to user_id
         let name = 'Onbekend';
         if (member.user_id && userProfiles[member.user_id]) {
           const profile = userProfiles[member.user_id];
@@ -87,26 +84,37 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
   }, [teamId]);
 
   const addTeamMember = useCallback(async (name: string) => {
-    if (!teamId) return;
+    if (!teamId) {
+      toast({
+        title: "Geen team",
+        description: "Je moet eerst een team aanmaken of lid worden van een team.",
+        variant: "destructive"
+      });
+      return false;
+    }
     
     try {
-      // Create a new team member record
-      const { data, error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Niet ingelogd",
+          description: "Je moet ingelogd zijn om teamleden toe te voegen.",
+          variant: "destructive"
+        });
+        return false;
+      }
+      
+      const { data: newMember, error } = await supabase
         .from('team_members')
         .insert({
           team_id: teamId,
-          name,
-          role: 'member',
-          hours: 0,
-          balance: 0,
+          user_id: user.id,
+          role: 'user',
           permissions: {
             add_tips: true,
             add_hours: true,
             view_team: true,
-            view_reports: false,
-            edit_tips: false,
-            close_periods: false,
-            manage_payouts: false
+            view_reports: true
           }
         })
         .select()
@@ -115,41 +123,53 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
       if (error) {
         console.error('Error adding team member:', error);
         toast({
-          title: "Fout bij toevoegen teamlid",
+          title: "Fout bij toevoegen",
           description: "Er is een fout opgetreden bij het toevoegen van het teamlid.",
           variant: "destructive"
         });
-        return;
+        return false;
       }
       
-      // Add the new member to local state
-      const newMember: TeamMember = {
-        id: data.id,
-        name,
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ first_name: name })
+        .eq('id', user.id);
+      
+      if (profileError) {
+        console.error('Error updating profile name:', profileError);
+      }
+      
+      const teamMember: TeamMember = {
+        id: newMember.id,
+        name: name,
         hours: 0,
         balance: 0,
-        team_id: teamId,
+        hourRegistrations: [],
+        user_id: user.id,
+        team_id: teamId
       };
       
-      setTeamMembers(prev => [...prev, newMember]);
+      setTeamMembers(prev => [...prev, teamMember]);
       
       toast({
         title: "Teamlid toegevoegd",
         description: `${name} is toegevoegd aan het team.`,
       });
+      
+      return true;
     } catch (error) {
       console.error('Error adding team member:', error);
       toast({
-        title: "Fout bij toevoegen teamlid",
+        title: "Fout bij toevoegen",
         description: "Er is een fout opgetreden bij het toevoegen van het teamlid.",
         variant: "destructive"
       });
+      return false;
     }
   }, [teamId, toast]);
 
   const removeTeamMember = useCallback(async (id: string) => {
     try {
-      // Delete team member from database
       const { error } = await supabase
         .from('team_members')
         .delete()
@@ -165,7 +185,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
         return;
       }
       
-      // Remove from local state
       setTeamMembers(prev => prev.filter(member => member.id !== id));
       
       toast({
@@ -184,7 +203,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
 
   const updateTeamMemberHours = useCallback(async (id: string, hours: number) => {
     try {
-      // First, insert the hour registration
       const { data: registration, error: regError } = await supabase
         .from('hour_registrations')
         .insert({
@@ -205,7 +223,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
         return;
       }
       
-      // Then, update the total hours for the team member
       const { data: memberData, error: memberError } = await supabase
         .from('team_members')
         .select('hours')
@@ -230,7 +247,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
         return;
       }
       
-      // Update local state
       setTeamMembers(prev => 
         prev.map(member => {
           if (member.id === id) {
@@ -271,7 +287,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
 
   const deleteHourRegistration = useCallback(async (memberId: string, registrationId: string) => {
     try {
-      // First get the hours from the registration
       const { data: registration, error: getError } = await supabase
         .from('hour_registrations')
         .select('hours')
@@ -285,7 +300,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
       
       const hoursToRemove = registration.hours;
       
-      // Delete the registration
       const { error: deleteError } = await supabase
         .from('hour_registrations')
         .delete()
@@ -296,7 +310,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
         return;
       }
       
-      // Update the team member's total hours
       const { data: memberData, error: memberError } = await supabase
         .from('team_members')
         .select('hours')
@@ -321,7 +334,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
         return;
       }
       
-      // Update local state
       setTeamMembers(prev => 
         prev.map(member => {
           if (member.id === memberId) {
@@ -355,7 +367,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
 
   const updateTeamMemberBalance = useCallback(async (memberId: string, balance: number) => {
     try {
-      // Update balance in database
       const { error } = await supabase
         .from('team_members')
         .update({ balance })
@@ -366,7 +377,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
         return;
       }
       
-      // Update local state
       setTeamMembers(prev => 
         prev.map(member => 
           member.id === memberId ? { ...member, balance } : member
@@ -379,7 +389,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
 
   const clearTeamMemberHours = useCallback(async (memberId: string) => {
     try {
-      // Update hours in database
       const { error: updateError } = await supabase
         .from('team_members')
         .update({ hours: 0 })
@@ -390,7 +399,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
         return;
       }
       
-      // Delete all hour registrations for this member
       const { error: deleteError } = await supabase
         .from('hour_registrations')
         .delete()
@@ -401,7 +409,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
         return;
       }
       
-      // Update local state
       setTeamMembers(prev => 
         prev.map(member => 
           member.id === memberId ? { ...member, hours: 0, hourRegistrations: [] } : member
@@ -424,11 +431,9 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
 
   const updateTeamMemberName = useCallback(async (memberId: string, newName: string): Promise<boolean> => {
     try {
-      // Check if this is a linked user
       const member = teamMembers.find(m => m.id === memberId);
       
       if (member?.user_id) {
-        // If linked to a user, update the profile
         const { error } = await supabase
           .from('profiles')
           .update({ first_name: newName })
@@ -444,9 +449,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
           return false;
         }
       } else {
-        // Otherwise, just update the team member name field in team_members
-        // (This should be a separate column if you want to support this
-        // but Supabase doesn't seem to have it yet)
         toast({
           title: "Naam wijzigen niet ondersteund",
           description: "Het wijzigen van namen voor niet-gebruikers wordt nog niet ondersteund.",
@@ -455,7 +457,6 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
         return false;
       }
       
-      // Update local state
       setTeamMembers(prev => 
         prev.map(member => 
           member.id === memberId ? { ...member, name: newName } : member

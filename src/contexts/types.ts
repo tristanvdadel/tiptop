@@ -83,7 +83,7 @@ export interface AppContextType {
   
   // Actions
   addTip: (amount: number, note?: string, customDate?: string) => Promise<void>;
-  addTeamMember: (name: string) => Promise<void>;
+  addTeamMember: (name: string) => Promise<boolean>;
   removeTeamMember: (id: string) => Promise<void>;
   updateTeamMemberHours: (id: string, hours: number) => Promise<void>;
   startNewPeriod: () => Promise<string>;

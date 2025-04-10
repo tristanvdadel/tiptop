@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth, set, getWeek, format, startOfMonth, nextMonday } from 'date-fns';
@@ -213,7 +214,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           user_id: member.user_id,
           role: member.role,
           permissions: member.permissions,
-          hasAccount: member.hasAccount || false
+          // We'll check if there's a hasAccount property, if not, check if there's a has_account
+          // property (database naming convention), and fall back to false if neither exists
+          hasAccount: member.hasAccount || member.has_account || false
         }));
         setTeamMembers(processedMembers);
         

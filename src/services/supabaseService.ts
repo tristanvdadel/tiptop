@@ -55,9 +55,13 @@ export const fetchTeamData = async (teamId: string) => {
         `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 
         'Onbekend lid';
       
+      // Set hasAccount to true if the member has a user_id
+      const hasAccount = !!member.user_id;
+      
       return {
         ...member,
         name,
+        hasAccount,
         hourRegistrations: hourRegistrations || []
       };
     }));

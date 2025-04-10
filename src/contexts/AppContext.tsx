@@ -213,7 +213,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           user_id: member.user_id,
           role: member.role,
           permissions: member.permissions,
-          // Simply use the hasAccount property that was set in supabaseService
           hasAccount: member.hasAccount || false
         }));
         setTeamMembers(processedMembers);
@@ -986,4 +985,284 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
     
-    if (totalHours === 0 || totalTips
+    if (totalHours === 0 || totalTips === 0) {
+      const tipPerMember = totalTips / teamMembers.length || 0;
+      
+      return teamMembers.map(member => ({
+        ...member,
+        tipAmount: tipPerMember
+      }));
+    }
+    
+    const tipPerHour = totalTips / totalHours;
+    
+    return teamMembers.map(member => {
+      const tipAmount = member.hours * tipPerHour;
+      
+      return {
+        ...member,
+        tipAmount
+      };
+    });
+  };
+  
+  const calculateAverageTipPerHour = (periodId?: string, calculationMode: 'period' | 'day' | 'week' | 'month' = 'period') => {
+    let periodsToCalculate: Period[] = [];
+    
+    if (periodId) {
+      const period = periods.find(p => p.id === periodId);
+      if (period) {
+        periodsToCalculate = [period];
+      }
+    } else if (currentPeriod) {
+      periodsToCalculate = [currentPeriod];
+    }
+    
+    if (periodsToCalculate.length === 0) {
+      return 0;
+    }
+    
+    const totalTips = periodsToCalculate.reduce((total, period) => 
+      total + period.tips.reduce((sum, tip) => sum + tip.amount, 0), 0);
+    
+    const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+    
+    if (totalHours === 0) {
+      return 0;
+    }
+    
+    return totalTips / totalHours;
+  };
+  
+  const markPeriodsAsPaid = (periodIds: string[], customDistribution?: PayoutData['distribution']) => {
+    setPeriods(prev => 
+      prev.map(period => 
+        periodIds.includes(period.id)
+          ? { ...period, isPaid: true, isActive: false }
+          : period
+      )
+    );
+    
+    const paidPeriods = periods.filter(period => periodIds.includes(period.id));
+    
+    const totalTips = paidPeriods.reduce((total, period) => 
+      total + period.tips.reduce((sum, tip) => sum + tip.amount, 0), 0);
+    
+    const distributionData = customDistribution || calculateTipDistribution(periodIds).map(member => ({
+      memberId: member.id,
+      amount: member.tipAmount || 0
+    }));
+    
+    const newPayout: PayoutData = {
+      id: generateId(),
+      periodIds,
+      date: new Date().toISOString(),
+      payerName: 'current-user',
+      payoutTime: new Date().toISOString(),
+      totalAmount: totalTips,
+      distribution: distributionData,
+    };
+    
+    setPayouts(prev => [...prev, newPayout]);
+    setMostRecentPayout(newPayout);
+    
+    toast({
+      title: "Uitbetaling afgerond",
+      description: `${periodIds.length} periode(s) zijn gemarkeerd als uitbetaald.`,
+    });
+  };
+  
+  const deletePaidPeriods = () => {
+    const unpaidPeriods = periods.filter(period => !period.isPaid);
+    setPeriods(unpaidPeriods);
+    
+    toast({
+      title: "Betaalde periodes verwijderd",
+      description: "Alle betaalde periodes zijn verwijderd.",
+    });
+  };
+  
+  const deletePeriod = (periodId: string) => {
+    const periodToDelete = periods.find(p => p.id === periodId);
+    
+    if (!periodToDelete) {
+      toast({
+        title: "Fout bij verwijderen",
+        description: "De periode kon niet worden gevonden.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (periodToDelete.isPaid) {
+      toast({
+        title: "Kan niet verwijderen",
+        description: "Een betaalde periode kan niet worden verwijderd.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setPeriods(prev => prev.filter(p => p.id !== periodId));
+    
+    if (currentPeriod && currentPeriod.id === periodId) {
+      setCurrentPeriod(null);
+    }
+    
+    toast({
+      title: "Periode verwijderd",
+      description: "De periode is succesvol verwijderd.",
+    });
+  };
+  
+  const deleteTip = (periodId: string, tipId: string) => {
+    const period = periods.find(p => p.id === periodId);
+    
+    if (!period) {
+      return;
+    }
+    
+    const updatedTips = period.tips.filter(tip => tip.id !== tipId);
+    
+    const updatedPeriod = {
+      ...period,
+      tips: updatedTips
+    };
+    
+    setPeriods(prev => 
+      prev.map(p => p.id === periodId ? updatedPeriod : p)
+    );
+    
+    if (currentPeriod && currentPeriod.id === periodId) {
+      setCurrentPeriod(updatedPeriod);
+    }
+  };
+  
+  const updateTip = (periodId: string, tipId: string, amount: number, note?: string, date?: string) => {
+    const period = periods.find(p => p.id === periodId);
+    
+    if (!period) {
+      return;
+    }
+    
+    const updatedTips = period.tips.map(tip => 
+      tip.id === tipId 
+        ? { 
+            ...tip, 
+            amount, 
+            note: note !== undefined ? note : tip.note,
+            date: date || tip.date
+          } 
+        : tip
+    );
+    
+    const updatedPeriod = {
+      ...period,
+      tips: updatedTips
+    };
+    
+    setPeriods(prev => 
+      prev.map(p => p.id === periodId ? updatedPeriod : p)
+    );
+    
+    if (currentPeriod && currentPeriod.id === periodId) {
+      setCurrentPeriod(updatedPeriod);
+    }
+    
+    toast({
+      title: "Fooi bijgewerkt",
+      description: "De fooi is succesvol bijgewerkt.",
+    });
+  };
+  
+  const updatePeriod = (periodId: string, updates: {name?: string, notes?: string}) => {
+    setPeriods(prev => 
+      prev.map(period => {
+        if (period.id === periodId) {
+          const updatedPeriod = { ...period };
+          
+          if (updates.name !== undefined) {
+            updatedPeriod.name = updates.name;
+          }
+          
+          if (updates.notes !== undefined) {
+            updatedPeriod.notes = updates.notes;
+          }
+          
+          if (currentPeriod && currentPeriod.id === periodId) {
+            setCurrentPeriod(updatedPeriod);
+          }
+          
+          return updatedPeriod;
+        }
+        return period;
+      })
+    );
+  };
+  
+  return (
+    <AppContext.Provider
+      value={{
+        // State
+        currentPeriod,
+        periods,
+        teamMembers,
+        payouts,
+        autoClosePeriods,
+        periodDuration,
+        alignWithCalendar,
+        setAlignWithCalendar,
+        closingTime,
+        setClosingTime,
+        isLoading,
+        teamId,
+        
+        // Actions
+        addTip,
+        addTeamMember,
+        removeTeamMember,
+        updateTeamMemberHours,
+        startNewPeriod,
+        endCurrentPeriod,
+        calculateTipDistribution,
+        calculateAverageTipPerHour,
+        markPeriodsAsPaid,
+        hasReachedLimit,
+        hasReachedPeriodLimit,
+        getUnpaidPeriodsCount,
+        deletePaidPeriods,
+        deletePeriod,
+        deleteTip,
+        updateTip,
+        updatePeriod,
+        deleteHourRegistration,
+        updateTeamMemberBalance,
+        clearTeamMemberHours,
+        updateTeamMemberName,
+        mostRecentPayout,
+        setMostRecentPayout,
+        setAutoClosePeriods,
+        setPeriodDuration,
+        scheduleAutoClose,
+        calculateAutoCloseDate,
+        getNextAutoCloseDate,
+        getFormattedClosingTime,
+        refreshTeamData,
+        updateTeamMemberPermissions,
+        updateTeamMemberRole,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (context === undefined) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
+};
+
+export default AppContext;

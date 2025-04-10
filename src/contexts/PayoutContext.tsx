@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useTeamMember } from './TeamMemberContext';
+import { usePeriod } from './PeriodContext';
 
 type PayoutContextType = {
   payouts: PayoutData[];
@@ -23,7 +24,8 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
   const { toast } = useToast();
   const teamMemberContext = useTeamMember();
   const teamMembers = teamMemberContext?.teamMembers || [];
-  const periods = teamMemberContext?.periods || [];
+  const periodContext = usePeriod();
+  const periods = periodContext?.periods || [];
 
   const fetchPayouts = useCallback(async () => {
     if (!teamId) return;

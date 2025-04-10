@@ -29,6 +29,7 @@ const TipInput = () => {
   const [showDateWarning, setShowDateWarning] = useState(false);
   const [userPermissions, setUserPermissions] = useState<any>(null);
   const [canAddTips, setCanAddTips] = useState(true);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   
   const placeholders = [
@@ -90,8 +91,9 @@ const TipInput = () => {
     checkPermissions();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     
     if (!canAddTips) {
       toast({
@@ -99,28 +101,54 @@ const TipInput = () => {
         description: "Je hebt geen toestemming om fooi toe te voegen.",
         variant: "destructive"
       });
+      setLoading(false);
       return;
     }
     
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      setLoading(false);
       return;
     }
     
-    // Check if there's an active period, if not, create one first
-    if (!currentPeriod) {
-      // Start a new period
-      const newPeriodId = startNewPeriod();
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Niet ingelogd",
+          description: "Je moet ingelogd zijn om fooi toe te voegen.",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
       
-      // Then wait a moment for the period to be created before adding the tip
-      setTimeout(() => {
-        addTip(parsedAmount, note.trim() || undefined, date.toISOString());
+      // Check if there's an active period, if not, create one first
+      if (!currentPeriod) {
+        // Start a new period
+        const newPeriodId = await startNewPeriod();
+        
+        // Then wait a moment for the period to be created before adding the tip
+        setTimeout(async () => {
+          await addTip(parsedAmount, note.trim() || undefined, date.toISOString());
+          resetForm();
+          setLoading(false);
+        }, 100);
+      } else {
+        // Normal flow when period exists
+        await addTip(parsedAmount, note.trim() || undefined, date.toISOString());
         resetForm();
-      }, 100);
-    } else {
-      // Normal flow when period exists
-      addTip(parsedAmount, note.trim() || undefined, date.toISOString());
-      resetForm();
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error submitting tip:', error);
+      toast({
+        title: "Fout bij toevoegen",
+        description: "Er is een fout opgetreden bij het toevoegen van de fooi.",
+        variant: "destructive"
+      });
+      setLoading(false);
     }
   };
 
@@ -260,10 +288,16 @@ const TipInput = () => {
             type="submit" 
             variant="goldGradient" 
             className="w-full animate-pulse-subtle group relative overflow-hidden" 
-            disabled={!amount || isNaN(parseFloat(amount))}
+            disabled={!amount || isNaN(parseFloat(amount)) || loading}
           >
-            <Sparkles size={16} className="mr-1 text-amber-700 animate-pulse" />
-            <span className="relative z-10">Top Tip</span>
+            {loading ? (
+              <span>Verwerken...</span>
+            ) : (
+              <>
+                <Sparkles size={16} className="mr-1 text-amber-700 animate-pulse" />
+                <span className="relative z-10">Top Tip</span>
+              </>
+            )}
           </Button>
         </form>
       </CardContent>

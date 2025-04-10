@@ -9,6 +9,38 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      hour_registrations: {
+        Row: {
+          created_at: string
+          date: string
+          hours: number
+          id: string
+          team_member_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          hours: number
+          id?: string
+          team_member_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          hours?: number
+          id?: string
+          team_member_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hour_registrations_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invites: {
         Row: {
           code: string
@@ -50,6 +82,172 @@ export type Database = {
           },
         ]
       }
+      payout_distributions: {
+        Row: {
+          actual_amount: number | null
+          amount: number
+          balance: number | null
+          created_at: string
+          id: string
+          payout_id: string
+          team_member_id: string
+        }
+        Insert: {
+          actual_amount?: number | null
+          amount: number
+          balance?: number | null
+          created_at?: string
+          id?: string
+          payout_id: string
+          team_member_id: string
+        }
+        Update: {
+          actual_amount?: number | null
+          amount?: number
+          balance?: number | null
+          created_at?: string
+          id?: string
+          payout_id?: string
+          team_member_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_distributions_payout_id_fkey"
+            columns: ["payout_id"]
+            isOneToOne: false
+            referencedRelation: "payouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_distributions_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payout_periods: {
+        Row: {
+          created_at: string
+          id: string
+          payout_id: string
+          period_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          payout_id: string
+          period_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          payout_id?: string
+          period_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_periods_payout_id_fkey"
+            columns: ["payout_id"]
+            isOneToOne: false
+            referencedRelation: "payouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_periods_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payouts: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          payer_name: string | null
+          payout_time: string
+          team_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          payer_name?: string | null
+          payout_time?: string
+          team_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          payer_name?: string | null
+          payout_time?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payouts_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      periods: {
+        Row: {
+          auto_close_date: string | null
+          average_tip_per_hour: number | null
+          created_at: string
+          end_date: string | null
+          id: string
+          is_active: boolean
+          is_paid: boolean
+          name: string | null
+          notes: string | null
+          start_date: string
+          team_id: string
+        }
+        Insert: {
+          auto_close_date?: string | null
+          average_tip_per_hour?: number | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          is_active?: boolean
+          is_paid?: boolean
+          name?: string | null
+          notes?: string | null
+          start_date?: string
+          team_id: string
+        }
+        Update: {
+          auto_close_date?: string | null
+          average_tip_per_hour?: number | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          is_active?: boolean
+          is_paid?: boolean
+          name?: string | null
+          notes?: string | null
+          start_date?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "periods_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -76,7 +274,9 @@ export type Database = {
       }
       team_members: {
         Row: {
+          balance: number | null
           created_at: string
+          hours: number | null
           id: string
           permissions: Json | null
           role: string
@@ -84,7 +284,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          balance?: number | null
           created_at?: string
+          hours?: number | null
           id?: string
           permissions?: Json | null
           role: string
@@ -92,7 +294,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          balance?: number | null
           created_at?: string
+          hours?: number | null
           id?: string
           permissions?: Json | null
           role?: string
@@ -104,6 +308,44 @@ export type Database = {
             foreignKeyName: "team_members_team_id_fkey"
             columns: ["team_id"]
             isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_settings: {
+        Row: {
+          align_with_calendar: boolean
+          auto_close_periods: boolean
+          closing_time: Json
+          id: string
+          period_duration: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          align_with_calendar?: boolean
+          auto_close_periods?: boolean
+          closing_time?: Json
+          id?: string
+          period_duration?: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          align_with_calendar?: boolean
+          auto_close_periods?: boolean
+          closing_time?: Json
+          id?: string
+          period_duration?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_settings_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: true
             referencedRelation: "teams"
             referencedColumns: ["id"]
           },
@@ -129,6 +371,44 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      tips: {
+        Row: {
+          added_by: string
+          amount: number
+          created_at: string
+          date: string
+          id: string
+          note: string | null
+          period_id: string
+        }
+        Insert: {
+          added_by: string
+          amount: number
+          created_at?: string
+          date?: string
+          id?: string
+          note?: string | null
+          period_id: string
+        }
+        Update: {
+          added_by?: string
+          amount?: number
+          created_at?: string
+          date?: string
+          id?: string
+          note?: string | null
+          period_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tips_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "periods"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

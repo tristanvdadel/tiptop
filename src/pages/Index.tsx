@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
 const Index = () => {
-  const { currentPeriod } = useApp();
+  const { currentPeriod, fetchPeriods } = useApp();
   const [hasTeam, setHasTeam] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -21,6 +21,7 @@ const Index = () => {
   useEffect(() => {
     const checkTeamMembership = async () => {
       try {
+        setLoading(true);
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
           setLoading(false);
@@ -38,6 +39,11 @@ const Index = () => {
         } else {
           setHasTeam(count ? count > 0 : false);
         }
+        
+        // Fetch periods if user has a team
+        if (count && count > 0) {
+          await fetchPeriods();
+        }
       } catch (err) {
         console.error('Error checking team membership:', err);
         setHasTeam(false);
@@ -47,14 +53,18 @@ const Index = () => {
     };
     
     checkTeamMembership();
-  }, []);
+  }, [fetchPeriods]);
   
   const formatPeriodDate = (date: string) => {
     return format(new Date(date), 'd MMMM yyyy', { locale: nl });
   };
   
   if (loading) {
-    return <div className="flex justify-center py-8">Laden...</div>;
+    return (
+      <div className="flex justify-center py-8">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
+      </div>
+    );
   }
   
   if (!hasTeam) {

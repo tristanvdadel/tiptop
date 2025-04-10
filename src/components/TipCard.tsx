@@ -30,6 +30,7 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [hasEditPermission, setHasEditPermission] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   
   const actualPeriodId = periodId || (currentPeriod ? currentPeriod.id : '');
@@ -69,21 +70,36 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
     checkPermissions();
   }, []);
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    
     if (!actualPeriodId) {
       toast({
         title: "Fout bij verwijderen",
         description: "Kan fooi niet verwijderen: geen periode gevonden.",
         variant: "destructive",
       });
+      setIsDeleting(false);
       return;
     }
-    deleteTip(actualPeriodId, tip.id);
-    setIsDeleteDialogOpen(false);
-    toast({
-      title: "Fooi verwijderd",
-      description: "De fooi is succesvol verwijderd.",
-    });
+    
+    try {
+      await deleteTip(actualPeriodId, tip.id);
+      setIsDeleteDialogOpen(false);
+      toast({
+        title: "Fooi verwijderd",
+        description: "De fooi is succesvol verwijderd.",
+      });
+    } catch (error) {
+      console.error('Error deleting tip:', error);
+      toast({
+        title: "Fout bij verwijderen",
+        description: "Er is een fout opgetreden bij het verwijderen van de fooi.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -133,9 +149,13 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuleren</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
-              Verwijderen
+            <AlertDialogCancel disabled={isDeleting}>Annuleren</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              className="bg-destructive text-destructive-foreground"
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Verwijderen..." : "Verwijderen"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

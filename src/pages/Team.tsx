@@ -11,6 +11,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import TeamMemberList from '@/components/team/TeamMemberList';
 import PeriodSelector from '@/components/team/PeriodSelector';
 import TipDistribution from '@/components/team/TipDistribution';
+import { supabase } from '@/integrations/supabase/client';
 
 const Team = () => {
   const {
@@ -24,15 +25,40 @@ const Team = () => {
     periods,
     payouts,
     updateTeamMemberName,
+    fetchTeamMembers,
+    fetchPeriods,
   } = useApp();
   
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
   const [distribution, setDistribution] = useState<TeamMember[]>([]);
   const [showPayoutSummary, setShowPayoutSummary] = useState(false);
   const [sortedTeamMembers, setSortedTeamMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Fetch data when component mounts
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        await fetchTeamMembers();
+        await fetchPeriods();
+      } catch (error) {
+        console.error("Error loading team data:", error);
+        toast({
+          title: "Fout bij laden",
+          description: "Er is een fout opgetreden bij het laden van de teamgegevens.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [fetchTeamMembers, fetchPeriods, toast]);
 
   // Sort team members alphabetically by name
   useEffect(() => {
@@ -76,7 +102,7 @@ const Team = () => {
     calculateDistributionForSelectedPeriods();
   }, [selectedPeriods, calculateDistributionForSelectedPeriods]);
 
-  const handlePayout = () => {
+  const handlePayout = async () => {
     if (selectedPeriods.length === 0) {
       toast({
         title: "Selecteer perioden",
@@ -86,18 +112,30 @@ const Team = () => {
       return;
     }
 
-    const customDistribution = distribution.map(member => ({
-      memberId: member.id,
-      amount: member.tipAmount || 0,
-      actualAmount: (member.tipAmount || 0) + (member.balance || 0),
-      balance: member.balance
-    }));
-    
-    markPeriodsAsPaid(selectedPeriods, customDistribution);
-    setShowPayoutSummary(true);
-    
-    // Update URL to include payoutSummary parameter
-    navigate('/team?payoutSummary=true');
+    try {
+      setLoading(true);
+      const customDistribution = distribution.map(member => ({
+        memberId: member.id,
+        amount: member.tipAmount || 0,
+        actualAmount: (member.tipAmount || 0) + (member.balance || 0),
+        balance: member.balance
+      }));
+      
+      await markPeriodsAsPaid(selectedPeriods, customDistribution);
+      setShowPayoutSummary(true);
+      
+      // Update URL to include payoutSummary parameter
+      navigate('/team?payoutSummary=true');
+    } catch (error) {
+      console.error("Error processing payout:", error);
+      toast({
+        title: "Fout bij uitbetaling",
+        description: "Er is een fout opgetreden bij het verwerken van de uitbetaling.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const calculateTotalTipsAndHours = useCallback(() => {
@@ -134,6 +172,17 @@ const Team = () => {
     });
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p>Gegevens laden...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (showPayoutSummary) {
     return (
       <div className="pb-16">
@@ -145,6 +194,24 @@ const Team = () => {
       </div>
     );
   }
+
+  const hasPermission = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+    
+    const { data } = await supabase
+      .from('team_members')
+      .select('permissions, role')
+      .eq('user_id', user.id)
+      .single();
+    
+    if (!data) return false;
+    
+    if (data.role === 'admin') return true;
+    
+    const permissions = data.permissions as unknown as Record<string, boolean>;
+    return permissions?.manage_payouts === true;
+  };
 
   return (
     <div className="pb-16">
@@ -182,9 +249,9 @@ const Team = () => {
             variant="default" 
             className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white"
             onClick={handlePayout} 
-            disabled={selectedPeriods.length === 0}
+            disabled={selectedPeriods.length === 0 || loading}
           >
-            Uitbetaling voltooien
+            {loading ? "Verwerken..." : "Uitbetaling voltooien"}
           </Button>
         </div>
       )}

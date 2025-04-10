@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -109,11 +110,13 @@ const TipInput = () => {
     // Check if there's an active period, if not, create one first
     if (!currentPeriod) {
       // Start a new period
-      startNewPeriod();
-      // Then immediately add the tip to the new period
-      // No need for setTimeout as startNewPeriod is synchronous
-      addTip(parsedAmount, note.trim() || undefined, date.toISOString());
-      resetForm();
+      const newPeriodId = startNewPeriod();
+      
+      // Then wait a moment for the period to be created before adding the tip
+      setTimeout(() => {
+        addTip(parsedAmount, note.trim() || undefined, date.toISOString());
+        resetForm();
+      }, 100);
     } else {
       // Normal flow when period exists
       addTip(parsedAmount, note.trim() || undefined, date.toISOString());

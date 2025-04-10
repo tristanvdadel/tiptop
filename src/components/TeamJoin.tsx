@@ -30,8 +30,11 @@ const TeamJoin = ({ inviteCode, onInviteCodeChange, onJoinTeam }: TeamJoinProps)
           description: "Je moet ingelogd zijn om lid te worden van een team.",
           variant: "destructive"
         });
+        setLoading(false);
         return;
       }
+      
+      console.log("Joining team with invite code:", inviteCode.trim());
       
       // Find the team invitation with this code
       const { data: invite, error: inviteError } = await supabase
@@ -41,27 +44,36 @@ const TeamJoin = ({ inviteCode, onInviteCodeChange, onJoinTeam }: TeamJoinProps)
         .single();
       
       if (inviteError) {
+        console.error("Error finding invite:", inviteError);
         if (inviteError.code === 'PGRST116') {
           throw new Error("Ongeldige uitnodigingscode");
         }
         throw inviteError;
       }
       
+      console.log("Found invite:", invite);
+      
       if (new Date(invite.expires_at) < new Date()) {
         throw new Error("Deze uitnodigingscode is verlopen");
       }
       
-      const { data: existingMember } = await supabase
+      // Check if already a member
+      const { data: existingMember, error: memberCheckError } = await supabase
         .from('team_members')
         .select('id')
         .eq('team_id', invite.team_id)
         .eq('user_id', user.id)
         .maybeSingle();
       
+      if (memberCheckError) {
+        console.error("Error checking membership:", memberCheckError);
+      }
+      
       if (existingMember) {
         throw new Error("Je bent al lid van dit team");
       }
       
+      // Add as team member
       const { error: memberError } = await supabase
         .from('team_members')
         .insert([
@@ -73,7 +85,10 @@ const TeamJoin = ({ inviteCode, onInviteCodeChange, onJoinTeam }: TeamJoinProps)
           }
         ]);
       
-      if (memberError) throw memberError;
+      if (memberError) {
+        console.error("Error inserting team member:", memberError);
+        throw memberError;
+      }
       
       toast({
         title: "Succesvol toegevoegd",

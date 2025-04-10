@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Shield, Info, UserRound, UserRoundPlus, UserRoundX } from 'lucide-react';
+import { Shield, Info, UserRound } from 'lucide-react';
 import { 
   Table, 
   TableBody, 
@@ -105,6 +105,8 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
       }
 
       try {
+        console.log("Fetching team members for team:", teamId);
+        
         const { data: members, error } = await supabase
           .from('team_members')
           .select(`
@@ -115,7 +117,12 @@ const TeamMemberPermissions = ({ teamId, isAdmin }: TeamMemberPermissionsProps) 
           `)
           .eq('team_id', teamId);
 
-        if (error) throw error;
+        if (error) {
+          console.error("Error fetching team members:", error);
+          throw error;
+        }
+
+        console.log("Fetched team members:", members);
 
         const membersWithProfiles = await Promise.all(
           (members || []).map(async (member) => {

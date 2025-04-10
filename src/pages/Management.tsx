@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,6 +67,7 @@ const Management = () => {
         setError(null);
         
         try {
+          // Fetch user's team memberships
           const { data: teamMembers, error: memberError } = await supabase
             .from('team_members')
             .select('id, team_id, role')
@@ -87,6 +89,7 @@ const Management = () => {
           setHasAnyTeam(teamMembers && teamMembers.length > 0);
           
           if (teamMembers && teamMembers.length > 0) {
+            // Get team details for each membership
             const teamIds = teamMembers.map(tm => tm.team_id);
             const { data: teams, error: teamsError } = await supabase
               .from('teams')
@@ -109,6 +112,7 @@ const Management = () => {
               }
             }
             
+            // Check if user has admin role in any team
             const adminMemberships = teamMembers?.filter(tm => tm.role === 'admin') || [];
             setIsAdmin(adminMemberships.length > 0);
           }
@@ -134,6 +138,7 @@ const Management = () => {
       
       setLoadingMembers(true);
       try {
+        // Fetch all team members for selected team
         const { data: members, error: membersError } = await supabase
           .from('team_members')
           .select('*')
@@ -144,25 +149,33 @@ const Management = () => {
           throw membersError;
         }
         
-        const userIds = members.map(member => member.user_id);
+        const userIds = members.map(member => member.user_id).filter(Boolean);
         
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, avatar_url')
-          .in('id', userIds);
+        // Fetch profiles for team members
+        let profiles = [];
+        if (userIds.length > 0) {
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, avatar_url')
+            .in('id', userIds);
+            
+          if (profilesError) {
+            console.error('Error fetching profiles:', profilesError);
+            throw profilesError;
+          }
           
-        if (profilesError) {
-          console.error('Error fetching profiles:', profilesError);
-          throw profilesError;
+          profiles = profilesData || [];
         }
 
+        // Set current user's membership
         const currentMembership = members.find(m => m.user_id === user.id);
         if (currentMembership) {
           setSelectedMembershipId(currentMembership.id);
         }
         
+        // Enrich member data with profiles and emails
         const enrichedMembers = await Promise.all(members.map(async (member) => {
-          const profile = profiles?.find(p => p.id === member.user_id) || {};
+          const profile = profiles.find(p => p.id === member.user_id) || {};
           const userEmail = await getUserEmail(member.user_id);
           
           return {
@@ -188,6 +201,355 @@ const Management = () => {
     fetchTeamMembers();
   }, [selectedTeamId, toast, user]);
 
+  const handleCreateTeam = async () => {
+    if (!newTeamName.trim() || !user) return;
+    
+    try {
+      console.log("Creating team:", newTeamName, "for user:", user.id);
+      
+      const { data: team, error: teamError } = await supabase
+        .from('teams')
+        .insert([
+          { name: newTeamName, created_by: user.id }
+        ])
+        .select()
+        .single();
+      
+      if (teamError) {
+        console.error("Team creation error:", teamError);
+        throw teamError;
+      }
+      
+      console.log("Team created:", team);
+      
+      const { error: memberError } = await supabase
+        .from('team_members')
+        .insert([
+          { 
+            team_id: team.id, 
+            user_id: user.id, 
+            role: 'admin',
+            permissions: {
+              add_tips: true,
+              edit_tips: true,
+              add_hours: true,
+              view_team: true,
+              view_reports: true,
+              close_periods: true,
+              manage_payouts: true
+            }
+          }
+        ]);
+      
+      if (memberError) {
+        console.error("Team member creation error:", memberError);
+        throw memberError;
+      }
+      
+      toast({
+        title: "Team aangemaakt",
+        description: `Team '${newTeamName}' is succesvol aangemaakt.`
+      });
+      
+      setNewTeamName('');
+      
+      window.location.reload();
+      
+    } catch (error) {
+      console.error('Error creating team:', error);
+      toast({
+        title: "Fout bij aanmaken team",
+        description: error.message || "Er is een fout opgetreden bij het aanmaken van het team.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleGenerateInvite = async (role, permissions) => {
+    if (!selectedTeamId || !user) return;
+    
+    try {
+      const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+      const expiresAt = addDays(new Date(), 7).toISOString();
+      
+      const fullPermissions = {
+        ...permissions,
+        edit_tips: role === 'admin' || permissions.edit_tips || false,
+        close_periods: role === 'admin' || permissions.close_periods || false,
+        manage_payouts: role === 'admin' || permissions.manage_payouts || false
+      };
+      
+      const { error } = await supabase
+        .from('invites')
+        .insert([
+          { 
+            team_id: selectedTeamId, 
+            code, 
+            created_by: user.id,
+            role,
+            permissions: fullPermissions,
+            expires_at: expiresAt
+          }
+        ]);
+      
+      if (error) throw error;
+      
+      setInviteCode(code);
+      toast({
+        title: "Uitnodigingscode aangemaakt",
+        description: "De code is 7 dagen geldig."
+      });
+      
+    } catch (error) {
+      console.error('Error generating invite:', error);
+      toast({
+        title: "Fout bij aanmaken uitnodiging",
+        description: error.message || "Er is een fout opgetreden bij het aanmaken van de uitnodiging.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleJoinTeam = async () => {
+    if (!inviteCode.trim() || !user) return;
+    
+    try {
+      const { data: invite, error: inviteError } = await supabase
+        .from('invites')
+        .select('*')
+        .eq('code', inviteCode.trim())
+        .single();
+      
+      if (inviteError) {
+        if (inviteError.code === 'PGRST116') {
+          throw new Error("Ongeldige uitnodigingscode");
+        }
+        throw inviteError;
+      }
+      
+      if (new Date(invite.expires_at) < new Date()) {
+        throw new Error("Deze uitnodigingscode is verlopen");
+      }
+      
+      const { data: existingMember } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('team_id', invite.team_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (existingMember) {
+        throw new Error("Je bent al lid van dit team");
+      }
+      
+      const { error: memberError } = await supabase
+        .from('team_members')
+        .insert([
+          { 
+            team_id: invite.team_id, 
+            user_id: user.id,
+            role: invite.role,
+            permissions: invite.permissions
+          }
+        ]);
+      
+      if (memberError) throw memberError;
+      
+      toast({
+        title: "Succesvol toegevoegd",
+        description: "Je bent toegevoegd aan het team."
+      });
+      
+      setInviteCode('');
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error joining team:', error);
+      toast({
+        title: "Fout bij deelnemen aan team",
+        description: error.message || "Er is een fout opgetreden bij het deelnemen aan het team.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleTeamChange = (teamId) => {
+    setSelectedTeamId(teamId);
+    
+    const membership = userTeamMemberships.find(tm => tm.team_id === teamId);
+    if (membership) {
+      setSelectedMembershipId(membership.id);
+    }
+  };
+  
+  const handleLeaveTeam = async () => {
+    if (!selectedTeamId || !selectedMembershipId || !user) return;
+    
+    try {
+      // Check if user is the last admin
+      const { data: teamAdmins, error: adminsError } = await supabase
+        .from('team_members')
+        .select('id, role')
+        .eq('team_id', selectedTeamId)
+        .eq('role', 'admin');
+        
+      if (adminsError) throw adminsError;
+      
+      const isLastAdmin = teamAdmins && teamAdmins.length === 1 && 
+                          teamAdmins[0] && teamAdmins[0].id === selectedMembershipId;
+      
+      if (isLastAdmin) {
+        throw new Error("Je kunt het team niet verlaten omdat je de enige beheerder bent. Maak eerst een ander lid beheerder of verwijder het team.");
+      }
+      
+      // Delete membership
+      const { error: deleteError } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('id', selectedMembershipId);
+        
+      if (deleteError) throw deleteError;
+      
+      toast({
+        title: "Team verlaten",
+        description: "Je bent niet langer lid van dit team."
+      });
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error leaving team:', error);
+      toast({
+        title: "Fout bij verlaten team",
+        description: error.message || "Er is een fout opgetreden bij het verlaten van het team.",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  const handleDeleteTeam = async () => {
+    if (!selectedTeamId || !user) return;
+    
+    try {
+      // Check if user is an admin
+      const { data: adminMembership, error: adminError } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('team_id', selectedTeamId)
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+        
+      if (adminError) {
+        console.error("Error checking admin status:", adminError);
+        throw new Error("Er is een fout opgetreden bij het verifiëren van je rechten.");
+      }
+      
+      if (!adminMembership) {
+        throw new Error("Je hebt geen rechten om dit team te verwijderen.");
+      }
+      
+      // Delete invites, team members, and team
+      const { error: inviteDeleteError } = await supabase
+        .from('invites')
+        .delete()
+        .eq('team_id', selectedTeamId);
+        
+      if (inviteDeleteError) throw inviteDeleteError;
+      
+      const { error: memberDeleteError } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('team_id', selectedTeamId);
+        
+      if (memberDeleteError) throw memberDeleteError;
+      
+      const { error: teamDeleteError } = await supabase
+        .from('teams')
+        .delete()
+        .eq('id', selectedTeamId);
+        
+      if (teamDeleteError) throw teamDeleteError;
+      
+      toast({
+        title: "Team verwijderd",
+        description: "Het team is succesvol verwijderd."
+      });
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error deleting team:', error);
+      toast({
+        title: "Fout bij verwijderen team",
+        description: error.message || "Er is een fout opgetreden bij het verwijderen van het team.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRenameTeam = async (teamId, newName) => {
+    if (!teamId || !newName.trim() || !user) return;
+    
+    try {
+      // Check if user is an admin
+      const { data: adminMembership, error: adminError } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('team_id', teamId)
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+        
+      if (adminError) {
+        console.error("Error checking admin status:", adminError);
+        throw new Error("Er is een fout opgetreden bij het verifiëren van je rechten.");
+      }
+      
+      if (!adminMembership) {
+        throw new Error("Je hebt geen rechten om de teamnaam te wijzigen.");
+      }
+      
+      // Update team name
+      const { error: updateError } = await supabase
+        .from('teams')
+        .update({ name: newName.trim() })
+        .eq('id', teamId);
+        
+      if (updateError) throw updateError;
+      
+      // Update local state
+      setUserTeams(prev => 
+        prev.map(team => 
+          team.id === teamId 
+            ? { ...team, name: newName.trim() } 
+            : team
+        )
+      );
+      
+      toast({
+        title: "Teamnaam bijgewerkt",
+        description: "De naam van het team is succesvol bijgewerkt.",
+      });
+      
+    } catch (error) {
+      console.error('Error renaming team:', error);
+      toast({
+        title: "Fout bij hernoemen team",
+        description: error.message || "Er is een fout opgetreden bij het hernoemen van het team.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Functions that we didn't modify but need to be included
   const handleCreateTeam = async () => {
     if (!newTeamName.trim() || !user) return;
     

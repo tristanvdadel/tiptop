@@ -2,6 +2,8 @@ import { createContext, useContext, useState, ReactNode, useEffect } from 'react
 import { useToast } from '@/hooks/use-toast';
 import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth, set, getWeek, format, startOfMonth, nextMonday } from 'date-fns';
 import { nl } from 'date-fns/locale';
+import { supabase } from '@/integrations/supabase/client';
+import { fetchTeamData, savePeriod, saveTeamMember, savePayout, saveTeamSettings } from '@/services/supabaseService';
 
 // Define types
 export type TeamMember = {
@@ -12,12 +14,16 @@ export type TeamMember = {
   lastPayout?: string; // Date of last payout
   hourRegistrations?: HourRegistration[]; // Added hour registrations
   balance?: number; // Added balance field for carrying forward unpaid tips
+  user_id?: string; // Added for Supabase integration
+  role?: string; // Added for Supabase integration
+  permissions?: any; // Added for Supabase integration
 };
 
 export type HourRegistration = {
   id: string;
   hours: number;
   date: string;
+  processed?: boolean;
 };
 
 export type TipEntry = {
@@ -40,13 +46,16 @@ export type Period = {
   notes?: string; // Added notes field
   autoCloseDate?: string; // Added auto-close date
   averageTipPerHour?: number; // Added to store the average tip per hour
+  team_id?: string; // Added for Supabase integration
 };
 
 export type PayoutData = {
+  id: string;
   periodIds: string[];
   date: string;
   payerName?: string;     // Name of the person who made the payout
   payoutTime?: string;    // Time when the payout was made
+  totalAmount: number;    // Total amount of the payout
   distribution: {
     memberId: string;
     amount: number;
@@ -69,6 +78,8 @@ type AppContextType = {
   setAlignWithCalendar: (value: boolean) => void;
   closingTime: { hour: number; minute: number };
   setClosingTime: (time: { hour: number; minute: number }) => void;
+  isLoading: boolean;
+  teamId: string | null;
   
   // Actions
   addTip: (amount: number, note?: string, customDate?: string) => void;
@@ -100,6 +111,9 @@ type AppContextType = {
   calculateAutoCloseDate: (startDate: string, duration: PeriodDuration) => string;
   getNextAutoCloseDate: () => string | null;
   getFormattedClosingTime: () => string;
+  refreshTeamData: () => Promise<void>;
+  updateTeamMemberPermissions: (memberId: string, permissions: any) => Promise<void>;
+  updateTeamMemberRole: (memberId: string, role: string) => Promise<void>;
 };
 
 // Define app limits
@@ -121,9 +135,153 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [periodDuration, setPeriodDuration] = useState<PeriodDuration>('week');
   const [alignWithCalendar, setAlignWithCalendar] = useState<boolean>(false);
   const [closingTime, setClosingTime] = useState<{ hour: number; minute: number }>({ hour: 0, minute: 0 });
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [teamId, setTeamId] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Check if user is authenticated and get their team ID
   useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          setIsLoading(false);
+          return;
+        }
+        
+        // Get user's team ID
+        const { data: teamMember } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (teamMember && teamMember.team_id) {
+          setTeamId(teamMember.team_id);
+          await refreshTeamData(teamMember.team_id);
+        } else {
+          loadLocalData();
+        }
+        
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Error checking auth:", error);
+        loadLocalData();
+        setIsLoading(false);
+      }
+    };
+    
+    checkAuth();
+    
+    // Listen for auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        // Get user's team ID
+        const { data: teamMember } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        
+        if (teamMember && teamMember.team_id) {
+          setTeamId(teamMember.team_id);
+          await refreshTeamData(teamMember.team_id);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setTeamId(null);
+        loadLocalData();
+      }
+    });
+    
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+  
+  // Refresh team data from Supabase
+  const refreshTeamData = async (tid?: string) => {
+    const targetTeamId = tid || teamId;
+    if (!targetTeamId) return;
+    
+    setIsLoading(true);
+    try {
+      const data = await fetchTeamData(targetTeamId);
+      
+      if (data) {
+        // Process and set team members
+        const processedMembers = data.teamMembers.map(member => ({
+          id: member.id,
+          name: member.name,
+          hours: member.hours || 0,
+          balance: member.balance || 0,
+          hourRegistrations: member.hourRegistrations || [],
+          user_id: member.user_id,
+          role: member.role,
+          permissions: member.permissions
+        }));
+        setTeamMembers(processedMembers);
+        
+        // Process and set periods
+        const processedPeriods = data.periods.map(period => ({
+          id: period.id,
+          name: period.name,
+          startDate: period.start_date,
+          endDate: period.end_date,
+          isActive: period.is_active,
+          isPaid: period.is_paid,
+          notes: period.notes,
+          autoCloseDate: period.auto_close_date,
+          averageTipPerHour: period.average_tip_per_hour,
+          tips: period.tips.map((tip: any) => ({
+            id: tip.id,
+            amount: tip.amount,
+            date: tip.date,
+            note: tip.note,
+            addedBy: tip.added_by
+          })),
+          team_id: period.team_id
+        }));
+        setPeriods(processedPeriods);
+        
+        // Set current period if any
+        const activePeriod = processedPeriods.find(p => p.isActive);
+        setCurrentPeriod(activePeriod || null);
+        
+        // Process and set payouts
+        if (data.payouts && data.payouts.length > 0) {
+          setPayouts(data.payouts);
+          setMostRecentPayout(data.payouts[data.payouts.length - 1]);
+        }
+        
+        // Set settings
+        if (data.settings) {
+          setAutoClosePeriods(data.settings.auto_close_periods);
+          setPeriodDuration(data.settings.period_duration as PeriodDuration);
+          setAlignWithCalendar(data.settings.align_with_calendar);
+          setClosingTime(data.settings.closing_time);
+        }
+        
+        toast({
+          title: "Gegevens gesynchroniseerd",
+          description: "De teamgegevens zijn succesvol gesynchroniseerd.",
+        });
+      }
+    } catch (error) {
+      console.error("Error refreshing team data:", error);
+      toast({
+        title: "Synchronisatie mislukt",
+        description: "Er is een fout opgetreden bij het synchroniseren van de teamgegevens.",
+        variant: "destructive"
+      });
+      loadLocalData();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Load data from localStorage as fallback
+  const loadLocalData = () => {
     const storedPeriods = localStorage.getItem('periods');
     const storedTeamMembers = localStorage.getItem('teamMembers');
     const storedPayouts = localStorage.getItem('payouts');
@@ -156,7 +314,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     if (storedPayouts) {
       try {
-        setPayouts(JSON.parse(storedPayouts));
+        const parsedPayouts = JSON.parse(storedPayouts);
+        setPayouts(parsedPayouts);
+        if (parsedPayouts.length > 0) {
+          setMostRecentPayout(parsedPayouts[parsedPayouts.length - 1]);
+        }
       } catch (error) {
         console.error("Error parsing payouts from localStorage:", error);
       }
@@ -204,35 +366,104 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         console.error("Error parsing closingTime from localStorage:", error);
       }
     }
-  }, []);
+  };
 
+  // Save data to localStorage and Supabase
   useEffect(() => {
     localStorage.setItem('periods', JSON.stringify(periods));
-  }, [periods]);
+    
+    // If authenticated, sync to Supabase
+    if (teamId && periods.length > 0) {
+      const syncPeriods = async () => {
+        try {
+          for (const period of periods) {
+            await savePeriod(teamId, period);
+          }
+        } catch (error) {
+          console.error("Error syncing periods to Supabase:", error);
+        }
+      };
+      
+      syncPeriods();
+    }
+  }, [periods, teamId]);
 
   useEffect(() => {
     localStorage.setItem('teamMembers', JSON.stringify(teamMembers));
-  }, [teamMembers]);
+    
+    // If authenticated, sync to Supabase
+    if (teamId && teamMembers.length > 0) {
+      const syncTeamMembers = async () => {
+        try {
+          for (const member of teamMembers) {
+            await saveTeamMember(teamId, member);
+          }
+        } catch (error) {
+          console.error("Error syncing team members to Supabase:", error);
+        }
+      };
+      
+      syncTeamMembers();
+    }
+  }, [teamMembers, teamId]);
   
   useEffect(() => {
     localStorage.setItem('payouts', JSON.stringify(payouts));
-  }, [payouts]);
+    
+    // If authenticated, sync to Supabase
+    if (teamId && payouts.length > 0) {
+      const syncPayouts = async () => {
+        try {
+          for (const payout of payouts) {
+            await savePayout(teamId, payout);
+          }
+        } catch (error) {
+          console.error("Error syncing payouts to Supabase:", error);
+        }
+      };
+      
+      syncPayouts();
+    }
+  }, [payouts, teamId]);
   
   useEffect(() => {
     localStorage.setItem('autoClosePeriods', JSON.stringify(autoClosePeriods));
+    syncSettings();
   }, [autoClosePeriods]);
   
   useEffect(() => {
     localStorage.setItem('periodDuration', JSON.stringify(periodDuration));
+    syncSettings();
   }, [periodDuration]);
   
   useEffect(() => {
     localStorage.setItem('alignWithCalendar', JSON.stringify(alignWithCalendar));
+    syncSettings();
   }, [alignWithCalendar]);
   
   useEffect(() => {
     localStorage.setItem('closingTime', JSON.stringify(closingTime));
+    syncSettings();
   }, [closingTime]);
+  
+  const syncSettings = () => {
+    if (teamId) {
+      const saveSettings = async () => {
+        try {
+          await saveTeamSettings(teamId, {
+            autoClosePeriods,
+            periodDuration,
+            alignWithCalendar,
+            closingTime
+          });
+        } catch (error) {
+          console.error("Error syncing settings to Supabase:", error);
+        }
+      };
+      
+      saveSettings();
+    }
+  };
   
   useEffect(() => {
     if (!autoClosePeriods || !currentPeriod) return;
@@ -259,6 +490,90 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     return () => clearInterval(interval);
   }, [currentPeriod, autoClosePeriods]);
+
+  // Update team member permissions in database
+  const updateTeamMemberPermissions = async (memberId: string, permissions: any) => {
+    if (!teamId) {
+      toast({
+        title: "Fout bij bijwerken bevoegdheden",
+        description: "Je moet ingelogd zijn om bevoegdheden te kunnen bijwerken.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .update({ permissions })
+        .eq('id', memberId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setTeamMembers(prev => 
+        prev.map(member => 
+          member.id === memberId ? { ...member, permissions } : member
+        )
+      );
+      
+      toast({
+        title: "Bevoegdheden bijgewerkt",
+        description: "De bevoegdheden zijn succesvol bijgewerkt.",
+      });
+      
+      await refreshTeamData();
+    } catch (error) {
+      console.error("Error updating permissions:", error);
+      toast({
+        title: "Fout bij bijwerken bevoegdheden",
+        description: "Er is een fout opgetreden bij het bijwerken van de bevoegdheden.",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  // Update team member role in database
+  const updateTeamMemberRole = async (memberId: string, role: string) => {
+    if (!teamId) {
+      toast({
+        title: "Fout bij bijwerken rol",
+        description: "Je moet ingelogd zijn om rollen te kunnen bijwerken.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .update({ role })
+        .eq('id', memberId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setTeamMembers(prev => 
+        prev.map(member => 
+          member.id === memberId ? { ...member, role } : member
+        )
+      );
+      
+      toast({
+        title: "Rol bijgewerkt",
+        description: "De rol is succesvol bijgewerkt.",
+      });
+      
+      await refreshTeamData();
+    } catch (error) {
+      console.error("Error updating role:", error);
+      toast({
+        title: "Fout bij bijwerken rol",
+        description: "Er is een fout opgetreden bij het bijwerken van de rol.",
+        variant: "destructive"
+      });
+    }
+  };
 
   const generateId = () => {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -403,6 +718,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         isPaid: false,
         ...(periodName && { name: periodName }),
         ...(autoCloseDate && { autoCloseDate }),
+        ...(teamId && { team_id: teamId })
       };
       
       const newTip: TipEntry = {
@@ -631,6 +947,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       isPaid: false,
       ...(periodName && { name: periodName }),
       ...(autoCloseDate && { autoCloseDate }),
+      ...(teamId && { team_id: teamId })
     };
     
     setCurrentPeriod(newPeriod);
@@ -663,370 +980,4 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const calculateTipDistribution = (periodIds?: string[], calculationMode: 'period' | 'day' | 'week' | 'month' = 'period') => {
     let periodsToCalculate: Period[] = [];
     
-    if (periodIds && periodIds.length > 0) {
-      periodsToCalculate = periods.filter(p => periodIds.includes(p.id));
-    } else if (currentPeriod) {
-      periodsToCalculate = [currentPeriod];
-    } else {
-      return [];
-    }
-    
-    if (!periodsToCalculate.length || !teamMembers.length) {
-      return [];
-    }
-    
-    const totalTip = periodsToCalculate.reduce(
-      (sum, period) => sum + period.tips.reduce((s, tip) => s + tip.amount, 0), 
-      0
-    );
-    
-    const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
-    
-    if (totalHours === 0) {
-      // If no hours logged, distribute equally among members with balances or hours
-      const membersWithBalances = teamMembers.filter(member => 
-        (member.balance !== undefined && member.balance !== 0) || member.hours > 0
-      );
-      
-      if (membersWithBalances.length === 0) {
-        return [];
-      }
-      
-      // Equal distribution - no balances included in the calculation
-      const evenShare = totalTip > 0 ? totalTip / membersWithBalances.length : 0;
-      
-      return teamMembers.map(member => {
-        const tipShare = membersWithBalances.includes(member) ? evenShare : 0;
-        
-        return {
-          ...member,
-          tipAmount: parseFloat(tipShare.toFixed(2)),
-        };
-      });
-    }
-    
-    let adjustmentFactor = 1;
-    
-    switch (calculationMode) {
-      case 'day':
-        adjustmentFactor = 1.05;
-        break;
-      case 'week':
-        adjustmentFactor = 1.1;
-        break; 
-      case 'month':
-        adjustmentFactor = 1.15;
-        break;
-    }
-    
-    // Calculate distribution based on hours only, without adding balances
-    const tipToDistribute = totalTip;
-    
-    const initialDistribution = teamMembers.map(member => {
-      const hourShare = totalHours > 0 
-        ? (member.hours / totalHours) * tipToDistribute 
-        : 0;
-      
-      let adjustedShare = hourShare;
-      if (member.hours > 10) {
-        adjustedShare = hourShare * adjustmentFactor;
-      }
-      
-      return {
-        ...member,
-        hourShare: adjustedShare,
-        tipAmount: parseFloat(adjustedShare.toFixed(2)),
-      };
-    });
-    
-    const totalAfterAdjustment = initialDistribution.reduce(
-      (sum, member) => sum + (member.hourShare || 0), 
-      0
-    );
-    
-    const scalingFactor = totalTip / totalAfterAdjustment;
-    
-    return initialDistribution.map(member => {
-      const scaledHourShare = member.hourShare * scalingFactor;
-      
-      return {
-        ...member,
-        tipAmount: parseFloat(scaledHourShare.toFixed(2)),
-      };
-    });
-  };
-
-  const calculateAverageTipPerHour = (periodId?: string, calculationMode: 'period' | 'day' | 'week' | 'month' = 'period') => {
-    let periodsToCalculate: Period[] = [];
-    
-    if (periodId) {
-      const period = periods.find(p => p.id === periodId);
-      if (period) {
-        periodsToCalculate = [period];
-      }
-    } else {
-      periodsToCalculate = periods.filter(p => p.tips.length > 0);
-    }
-    
-    if (!periodsToCalculate.length) {
-      return 0;
-    }
-    
-    const validPeriods = periodsToCalculate.map(period => {
-      if (period.isPaid && period.averageTipPerHour !== undefined) {
-        return {
-          average: period.averageTipPerHour
-        };
-      }
-      
-      const periodTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
-      const periodHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
-      
-      if (periodHours === 0) {
-        return null;
-      }
-      
-      return {
-        tips: periodTips,
-        hours: periodHours,
-        average: periodTips / periodHours
-      };
-    }).filter(p => p !== null) as Array<{tips?: number, hours?: number, average: number}>;
-    
-    if (validPeriods.length === 0) {
-      return 0;
-    }
-    
-    const totalAverage = validPeriods.reduce((sum, period) => sum + period.average, 0) / validPeriods.length;
-    
-    let adjustmentFactor = 1;
-    
-    switch (calculationMode) {
-      case 'day':
-        adjustmentFactor = 1.05;
-        break;
-      case 'week':
-        adjustmentFactor = 1.1;
-        break;
-      case 'month':
-        adjustmentFactor = 1.15;
-        break;
-    }
-    
-    return totalAverage * adjustmentFactor;
-  };
-
-  const markPeriodsAsPaid = (periodIds: string[], customDistribution?: PayoutData['distribution']) => {
-    if (!periodIds.length) return;
-    
-    let distribution;
-    
-    if (customDistribution) {
-      distribution = customDistribution;
-    } else {
-      distribution = calculateTipDistribution(periodIds).map(member => ({
-        memberId: member.id,
-        amount: member.tipAmount || 0,
-      }));
-    }
-    
-    // Get the current user name from localStorage
-    const payerName = localStorage.getItem('userName') || 'Onbekend';
-    
-    const newPayout: PayoutData = {
-      periodIds,
-      date: new Date().toISOString(),
-      payerName: payerName,
-      payoutTime: new Date().toISOString(),
-      distribution,
-    };
-    
-    setPayouts(prev => [...prev, newPayout]);
-    setMostRecentPayout(newPayout);
-    
-    setPeriods(prev => 
-      prev.map(period => {
-        if (periodIds.includes(period.id)) {
-          // Calculate and store the average tip per hour for this period
-          const periodAverage = calculateAverageTipPerHour(period.id);
-          
-          return { 
-            ...period, 
-            isPaid: true,
-            averageTipPerHour: periodAverage
-          };
-        }
-        return period;
-      })
-    );
-    
-    setTeamMembers(prev => 
-      prev.map(member => ({
-        ...member,
-        lastPayout: newPayout.date,
-      }))
-    );
-  };
-
-  const deletePaidPeriods = () => {
-    const filteredPeriods = periods.filter(period => !period.isPaid);
-    setPeriods(filteredPeriods);
-  };
-  
-  const deletePeriod = (periodId: string) => {
-    const periodToDelete = periods.find(p => p.id === periodId);
-    
-    if (!periodToDelete) return;
-    
-    if (periodToDelete.isActive) {
-      endCurrentPeriod();
-    }
-    
-    setPeriods(prev => prev.filter(p => p.id !== periodId));
-    
-    setPayouts(prev => 
-      prev.map(payout => ({
-        ...payout,
-        periodIds: payout.periodIds.filter(id => id !== periodId)
-      }))
-    );
-  };
-
-  const deleteTip = (periodId: string, tipId: string) => {
-    const periodToUpdate = periods.find(p => p.id === periodId);
-    
-    if (!periodToUpdate) return;
-    
-    const updatedPeriod = {
-      ...periodToUpdate,
-      tips: periodToUpdate.tips.filter(tip => tip.id !== tipId),
-    };
-    
-    setPeriods(prev => 
-      prev.map(p => p.id === periodId ? updatedPeriod : p)
-    );
-    
-    if (currentPeriod && currentPeriod.id === periodId) {
-      setCurrentPeriod(updatedPeriod);
-    }
-    
-    toast({
-      title: "Fooi verwijderd",
-      description: "De fooi is succesvol verwijderd.",
-    });
-  };
-  
-  const updateTip = (periodId: string, tipId: string, amount: number, note?: string, date?: string) => {
-    const periodToUpdate = periods.find(p => p.id === periodId);
-    
-    if (!periodToUpdate) return;
-    
-    const updatedPeriod = {
-      ...periodToUpdate,
-      tips: periodToUpdate.tips.map(tip => 
-        tip.id === tipId 
-          ? { 
-              ...tip, 
-              amount, 
-              note: note !== undefined ? note : tip.note,
-              date: date || tip.date,
-            } 
-          : tip
-      ),
-    };
-    
-    setPeriods(prev => 
-      prev.map(p => p.id === periodId ? updatedPeriod : p)
-    );
-    
-    if (currentPeriod && currentPeriod.id === periodId) {
-      setCurrentPeriod(updatedPeriod);
-    }
-    
-    toast({
-      title: "Fooi bijgewerkt",
-      description: "De fooi is succesvol bijgewerkt.",
-    });
-  };
-
-  const updatePeriod = (periodId: string, updates: {name?: string, notes?: string}) => {
-    const periodToUpdate = periods.find(p => p.id === periodId);
-    
-    if (!periodToUpdate) return;
-    
-    const updatedPeriod = {
-      ...periodToUpdate,
-      ...(updates.name !== undefined && { name: updates.name }),
-      ...(updates.notes !== undefined && { notes: updates.notes }),
-    };
-    
-    setPeriods(prev => 
-      prev.map(p => p.id === periodId ? updatedPeriod : p)
-    );
-    
-    if (currentPeriod && currentPeriod.id === periodId) {
-      setCurrentPeriod(updatedPeriod);
-    }
-    
-    toast({
-      title: "Periode bijgewerkt",
-      description: "De periode is succesvol bijgewerkt.",
-    });
-  };
-
-  return (
-    <AppContext.Provider
-      value={{
-        currentPeriod,
-        periods,
-        teamMembers,
-        payouts,
-        mostRecentPayout,
-        setMostRecentPayout,
-        addTip,
-        addTeamMember,
-        removeTeamMember,
-        updateTeamMemberHours,
-        startNewPeriod,
-        endCurrentPeriod,
-        calculateTipDistribution,
-        calculateAverageTipPerHour,
-        markPeriodsAsPaid,
-        hasReachedLimit,
-        hasReachedPeriodLimit,
-        getUnpaidPeriodsCount,
-        deletePaidPeriods,
-        deletePeriod,
-        deleteTip,
-        updateTip,
-        updatePeriod,
-        deleteHourRegistration,
-        updateTeamMemberBalance,
-        clearTeamMemberHours,
-        updateTeamMemberName,
-        autoClosePeriods,
-        setAutoClosePeriods,
-        periodDuration,
-        setPeriodDuration,
-        scheduleAutoClose,
-        calculateAutoCloseDate,
-        getNextAutoCloseDate,
-        alignWithCalendar,
-        setAlignWithCalendar,
-        closingTime,
-        setClosingTime,
-        getFormattedClosingTime,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
-  );
-};
-
-export const useApp = () => {
-  const context = useContext(AppContext);
-  if (context === undefined) {
-    throw new Error('useApp must be used within an AppProvider');
-  }
-  return context;
-};
+    if (periodIds && period

@@ -12,7 +12,7 @@ interface PayoutDetailItem {
   balance?: number;
 }
 
-interface PayoutData {
+export interface PayoutData {
   id: string;
   date: string;
   totalAmount: number;

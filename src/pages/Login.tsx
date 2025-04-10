@@ -13,6 +13,9 @@ import { Loader2, Coins } from 'lucide-react';
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
   const { toast } = useToast();
@@ -64,14 +67,27 @@ const Login = () => {
         email,
         password,
         options: {
-          emailRedirectTo: window.location.origin
+          emailRedirectTo: window.location.origin,
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          }
         }
       });
       if (error) throw error;
-      toast({
-        title: "Account aangemaakt",
-        description: "Controleer je e-mail om je account te bevestigen."
-      });
+      
+      // If an invite code was provided, try to join the team
+      if (inviteCode.trim()) {
+        toast({
+          title: "Account aangemaakt",
+          description: "Na bevestiging van je e-mail word je lid van het team met de uitnodigingscode."
+        });
+      } else {
+        toast({
+          title: "Account aangemaakt",
+          description: "Controleer je e-mail om je account te bevestigen."
+        });
+      }
     } catch (error: any) {
       toast({
         title: "Fout bij registreren",
@@ -141,6 +157,16 @@ const Login = () => {
               </CardHeader>
               <form onSubmit={handleSignUp}>
                 <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName">Voornaam</Label>
+                      <Input id="firstName" type="text" placeholder="Voornaam" required value={firstName} onChange={e => setFirstName(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName">Achternaam</Label>
+                      <Input id="lastName" type="text" placeholder="Achternaam" required value={lastName} onChange={e => setLastName(e.target.value)} />
+                    </div>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="registerEmail">E-mail</Label>
                     <Input id="registerEmail" type="email" placeholder="naam@voorbeeld.nl" required value={email} onChange={e => setEmail(e.target.value)} />
@@ -150,6 +176,13 @@ const Login = () => {
                     <Input id="registerPassword" type="password" required value={password} onChange={e => setPassword(e.target.value)} />
                     <p className="text-xs text-muted-foreground">
                       Wachtwoord moet minimaal 6 tekens bevatten
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="inviteCode">Uitnodigingscode (optioneel)</Label>
+                    <Input id="inviteCode" type="text" placeholder="Voer code in" value={inviteCode} onChange={e => setInviteCode(e.target.value)} />
+                    <p className="text-xs text-muted-foreground">
+                      Heb je een uitnodigingscode? Voer deze in om direct lid te worden van een team
                     </p>
                   </div>
                 </CardContent>

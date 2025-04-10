@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Euro, Calendar as CalendarIcon, Sparkles } from 'lucide-react';
+import { Euro, Calendar as CalendarIcon, Sparkles, QrCode } from 'lucide-react';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Calendar } from '@/components/ui/calendar';
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { QRCodeDialog } from './QRCodeDialog';
 
 const presets = [5, 10, 20, 50, 100];
 
@@ -26,6 +27,7 @@ const TipInput = () => {
   const [showNote, setShowNote] = useState<boolean>(false);
   const [date, setDate] = useState<Date>(new Date());
   const [showDateWarning, setShowDateWarning] = useState(false);
+  const [showQRDialog, setShowQRDialog] = useState(false);
   const { toast } = useToast();
   
   const placeholders = [
@@ -98,7 +100,17 @@ const TipInput = () => {
   return (
     <Card>
       <CardContent className="p-4">
-        <h2 className="text-lg font-medium mb-4">Fooi toevoegen</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-medium">Fooi toevoegen</h2>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 border-amber-200 hover:bg-amber-50"
+            onClick={() => setShowQRDialog(true)}
+          >
+            <QrCode size={16} className="text-amber-500" />
+          </Button>
+        </div>
         
         <form onSubmit={handleSubmit}>
           <div className="flex items-center mb-4">
@@ -191,6 +203,14 @@ const TipInput = () => {
           </Button>
         </form>
       </CardContent>
+      
+      {/* QR Code Dialog */}
+      <QRCodeDialog 
+        open={showQRDialog} 
+        onOpenChange={setShowQRDialog} 
+        amount={parseFloat(amount) || 0} 
+        note={note} 
+      />
     </Card>
   );
 };

@@ -1,9 +1,10 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Check, Calendar as CalendarIcon, Zap, Settings } from 'lucide-react';
+import { ArrowLeft, Check, Calendar as CalendarIcon, Zap, Settings, QrCode } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -26,6 +27,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { QRCodeDialog } from '@/components/QRCodeDialog';
 
 const FastTip = () => {
   const { addTip, currentPeriod } = useApp();
@@ -37,6 +39,7 @@ const FastTip = () => {
   const [keepOpen, setKeepOpen] = useState<boolean>(false);
   const [quickAmounts, setQuickAmounts] = useState<number[]>([1, 2, 5, 10]);
   const [newQuickAmounts, setNewQuickAmounts] = useState<string>('');
+  const [showQRDialog, setShowQRDialog] = useState<boolean>(false);
   const { toast } = useToast();
   
   const placeholders = [
@@ -159,39 +162,49 @@ const FastTip = () => {
             FastTip
           </h1>
         </div>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="text-black hover:bg-yellow-600"
-            >
-              <Settings size={20} />
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] backdrop-blur-2xl bg-yellow-500/80 border-yellow-500/50 shadow-2xl">
-            <DialogHeader>
-              <DialogTitle>Snelknoppen instellen</DialogTitle>
-              <DialogDescription>
-                Stel de bedragen in voor de snelknoppen. Voer de gewenste bedragen in gescheiden door komma's.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-              <Input
-                placeholder="1, 2, 5, 10"
-                value={newQuickAmounts}
-                onChange={(e) => setNewQuickAmounts(e.target.value)}
-                className="mb-2"
-              />
-              <p className="text-xs text-muted-foreground">
-                Huidige waarden: {quickAmounts.join(', ')}
-              </p>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleSaveQuickAmounts} variant="goldGradient">Opslaan</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="bg-white/50 border-yellow-300 text-yellow-900 hover:bg-yellow-400 hover:text-white"
+            onClick={() => setShowQRDialog(true)}
+          >
+            <QrCode size={20} />
+          </Button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="text-black hover:bg-yellow-600"
+              >
+                <Settings size={20} />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px] backdrop-blur-2xl bg-yellow-500/80 border-yellow-500/50 shadow-2xl">
+              <DialogHeader>
+                <DialogTitle>Snelknoppen instellen</DialogTitle>
+                <DialogDescription>
+                  Stel de bedragen in voor de snelknoppen. Voer de gewenste bedragen in gescheiden door komma's.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <Input
+                  placeholder="1, 2, 5, 10"
+                  value={newQuickAmounts}
+                  onChange={(e) => setNewQuickAmounts(e.target.value)}
+                  className="mb-2"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Huidige waarden: {quickAmounts.join(', ')}
+                </p>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleSaveQuickAmounts} variant="goldGradient">Opslaan</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </header>
       
       <div className="flex-grow flex flex-col items-center justify-center p-4 relative z-10">
@@ -294,6 +307,14 @@ const FastTip = () => {
           </div>
         </div>
       </div>
+      
+      {/* QR Code Dialog */}
+      <QRCodeDialog 
+        open={showQRDialog} 
+        onOpenChange={setShowQRDialog} 
+        amount={amount} 
+        note={note} 
+      />
     </div>
   );
 };

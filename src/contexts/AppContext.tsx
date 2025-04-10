@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth, set, getWeek, format } from 'date-fns';
@@ -310,11 +309,41 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     
-    // Apply custom closing time, adjusting the date correctly
+    // Apply custom closing time to the target date
     const { hour, minute } = closingTime;
     
-    // Set the target date's time to the specified closing time
+    // Set the hours and minutes based on the closing time
     targetDate.setHours(hour, minute, 0, 0);
+    
+    // Handle AM/PM logic (times between 00:00-11:59 go to the next day/week/month)
+    if (hour < 12) { // AM time (00:00-11:59) - move to the next period
+      if (duration === 'week' && alignWithCalendar) {
+        // For weekly periods, AM times should be on Monday of the following week
+        const nextMonday = addDays(endOfWeek(targetDate, { weekStartsOn: 1 }), 1);
+        targetDate = new Date(nextMonday);
+        targetDate.setHours(hour, minute, 0, 0);
+      } else if (duration === 'month' && alignWithCalendar) {
+        // For monthly periods, AM times should be on the first day of the next month
+        const nextMonth = addDays(endOfMonth(targetDate), 1);
+        targetDate = new Date(nextMonth);
+        targetDate.setHours(hour, minute, 0, 0);
+      } else if (duration === 'day' || !alignWithCalendar) {
+        // For daily periods or when not aligned with calendar, just add one day
+        targetDate = addDays(targetDate, 1);
+      }
+    } else {
+      // PM time (12:00-23:59) - stay on the same end day
+      if (duration === 'week' && alignWithCalendar) {
+        // For weekly periods, PM times should be on Sunday
+        targetDate = endOfWeek(new Date(date), { weekStartsOn: 1 });
+        targetDate.setHours(hour, minute, 0, 0);
+      } else if (duration === 'month' && alignWithCalendar) {
+        // For monthly periods, PM times should be on the last day of the month
+        targetDate = endOfMonth(new Date(date));
+        targetDate.setHours(hour, minute, 0, 0);
+      }
+      // For daily periods or non-aligned periods, we already set the time correctly
+    }
     
     // If the resulting datetime is earlier than now (for same-day periods),
     // then we need to ensure we're not setting it in the past
@@ -322,7 +351,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (duration === 'day' && targetDate < now) {
       // If we're creating a period and the closing time has already passed today,
       // then set the close time to tomorrow at the specified time
-      targetDate.setDate(targetDate.getDate() + 1);
+      targetDate = addDays(targetDate, 1);
     }
     
     return targetDate.toISOString();

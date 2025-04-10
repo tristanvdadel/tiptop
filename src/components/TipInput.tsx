@@ -72,8 +72,13 @@ const TipInput = () => {
           return;
         }
         
-        // Check add_tips permission
-        setCanAddTips(teamMember?.permissions?.add_tips ?? false);
+        // Check add_tips permission - Fix the type checking here
+        if (teamMember?.permissions && typeof teamMember.permissions === 'object') {
+          setCanAddTips(teamMember.permissions.add_tips === true);
+        } else {
+          setCanAddTips(false);
+        }
+        
         setUserPermissions(teamMember?.permissions);
       } catch (error) {
         console.error('Error checking permissions:', error);

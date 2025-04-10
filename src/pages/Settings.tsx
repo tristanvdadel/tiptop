@@ -465,9 +465,19 @@ const Settings = () => {
                 Tijd waarop periodes automatisch worden afgesloten
               </p>
               <p className="text-xs text-muted-foreground ml-6">
-                Tijden tussen 00:00-11:59 (AM) worden beschouwd als na het einde van de dag.
-                Tijden tussen 12:00-23:59 (PM) worden beschouwd als binnen dezelfde dag.
+                Tijden tussen 00:00-11:59 (AM) worden toegepast op de dag na het einde van de periode:
               </p>
+              <ul className="text-xs text-muted-foreground ml-10 mt-1">
+                <li>Bij wekelijkse periodes: de maandag van de volgende week</li>
+                <li>Bij maandelijkse periodes: de 1e dag van de volgende maand</li>
+              </ul>
+              <p className="text-xs text-muted-foreground ml-6 mt-1">
+                Tijden tussen 12:00-23:59 (PM) worden toegepast op de laatste dag van de periode:
+              </p>
+              <ul className="text-xs text-muted-foreground ml-10 mt-1">
+                <li>Bij wekelijkse periodes: de zondag van deze week</li>
+                <li>Bij maandelijkse periodes: de laatste dag van deze maand</li>
+              </ul>
             </div>
             <Input
               id="closingTime"

@@ -259,7 +259,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           setAutoClosePeriods(data.settings.auto_close_periods);
           setPeriodDuration(data.settings.period_duration as PeriodDuration);
           setAlignWithCalendar(data.settings.align_with_calendar);
-          setClosingTime(data.settings.closing_time);
+          
+          // Make sure closing_time is properly formatted
+          if (data.settings.closing_time && 
+              typeof data.settings.closing_time === 'object' &&
+              'hour' in data.settings.closing_time &&
+              'minute' in data.settings.closing_time) {
+            setClosingTime({
+              hour: Number(data.settings.closing_time.hour),
+              minute: Number(data.settings.closing_time.minute)
+            });
+          }
         }
         
         toast({
@@ -359,11 +369,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (storedClosingTime) {
       try {
         const parsedClosingTime = JSON.parse(storedClosingTime);
-        if (parsedClosingTime.hour !== undefined && parsedClosingTime.minute !== undefined) {
-          setClosingTime(parsedClosingTime);
+        // Check if the parsed value is an object with hour and minute properties
+        if (
+          typeof parsedClosingTime === 'object' && 
+          parsedClosingTime !== null &&
+          'hour' in parsedClosingTime && 
+          'minute' in parsedClosingTime &&
+          typeof parsedClosingTime.hour === 'number' && 
+          typeof parsedClosingTime.minute === 'number'
+        ) {
+          setClosingTime({
+            hour: parsedClosingTime.hour,
+            minute: parsedClosingTime.minute
+          });
+        } else {
+          // Default to midnight if invalid format
+          console.error("Invalid closing time format in localStorage, using default");
+          setClosingTime({ hour: 0, minute: 0 });
         }
       } catch (error) {
         console.error("Error parsing closingTime from localStorage:", error);
+        // Default to midnight if parsing fails
+        setClosingTime({ hour: 0, minute: 0 });
       }
     }
   };

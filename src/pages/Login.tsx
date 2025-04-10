@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,7 @@ const Login = () => {
     setLoading(true);
     try {
       const {
+        data: { user },
         error
       } = await supabase.auth.signUp({
         email,
@@ -76,11 +78,57 @@ const Login = () => {
       });
       if (error) throw error;
       
-      if (inviteCode.trim()) {
-        toast({
-          title: "Account aangemaakt",
-          description: "Na bevestiging van je e-mail word je lid van het team met de uitnodigingscode."
-        });
+      if (inviteCode.trim() && user) {
+        // Find the team invitation with this code
+        const { data: invite, error: inviteError } = await supabase
+          .from('invites')
+          .select('*')
+          .eq('code', inviteCode.trim())
+          .single();
+        
+        if (inviteError) {
+          if (inviteError.code === 'PGRST116') {
+            toast({
+              title: "Account aangemaakt",
+              description: "Controleer je e-mail om je account te bevestigen. Ongeldige uitnodigingscode werd genegeerd."
+            });
+          } else {
+            throw inviteError;
+          }
+        } else {
+          // Check if code is expired
+          if (new Date(invite.expires_at) < new Date()) {
+            toast({
+              title: "Account aangemaakt",
+              description: "Controleer je e-mail om je account te bevestigen. De uitnodigingscode was verlopen."
+            });
+          } else {
+            // Add user to the team
+            const { error: memberError } = await supabase
+              .from('team_members')
+              .insert([
+                { 
+                  team_id: invite.team_id, 
+                  user_id: user.id,
+                  role: invite.role,
+                  permissions: invite.permissions
+                }
+              ]);
+            
+            if (memberError) {
+              console.error("Error adding user to team:", memberError);
+              toast({
+                title: "Account aangemaakt",
+                description: "Controleer je e-mail om je account te bevestigen. Er was een probleem bij het toevoegen aan het team."
+              });
+            } else {
+              toast({
+                title: "Account aangemaakt",
+                description: "Na bevestiging van je e-mail ben je lid van het team."
+              });
+            }
+          }
+        }
       } else {
         toast({
           title: "Account aangemaakt",

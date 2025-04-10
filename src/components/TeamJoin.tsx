@@ -1,9 +1,12 @@
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogIn } from "lucide-react";
+import { LogIn, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface TeamJoinProps {
   inviteCode: string;
@@ -12,6 +15,89 @@ interface TeamJoinProps {
 }
 
 const TeamJoin = ({ inviteCode, onInviteCodeChange, onJoinTeam }: TeamJoinProps) => {
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+  
+  const handleJoinTeam = async () => {
+    if (!inviteCode.trim()) return;
+    
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Niet ingelogd",
+          description: "Je moet ingelogd zijn om lid te worden van een team.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Find the team invitation with this code
+      const { data: invite, error: inviteError } = await supabase
+        .from('invites')
+        .select('*')
+        .eq('code', inviteCode.trim())
+        .single();
+      
+      if (inviteError) {
+        if (inviteError.code === 'PGRST116') {
+          throw new Error("Ongeldige uitnodigingscode");
+        }
+        throw inviteError;
+      }
+      
+      if (new Date(invite.expires_at) < new Date()) {
+        throw new Error("Deze uitnodigingscode is verlopen");
+      }
+      
+      const { data: existingMember } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('team_id', invite.team_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (existingMember) {
+        throw new Error("Je bent al lid van dit team");
+      }
+      
+      const { error: memberError } = await supabase
+        .from('team_members')
+        .insert([
+          { 
+            team_id: invite.team_id, 
+            user_id: user.id,
+            role: invite.role,
+            permissions: invite.permissions
+          }
+        ]);
+      
+      if (memberError) throw memberError;
+      
+      toast({
+        title: "Succesvol toegevoegd",
+        description: "Je bent toegevoegd aan het team."
+      });
+      
+      onInviteCodeChange('');
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+      
+    } catch (error: any) {
+      console.error('Error joining team:', error);
+      toast({
+        title: "Fout bij deelnemen aan team",
+        description: error.message || "Er is een fout opgetreden bij het deelnemen aan het team.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   return (
     <Card>
       <CardHeader>
@@ -28,9 +114,21 @@ const TeamJoin = ({ inviteCode, onInviteCodeChange, onJoinTeam }: TeamJoinProps)
               onChange={(e) => onInviteCodeChange(e.target.value)}
             />
           </div>
-          <Button onClick={onJoinTeam} disabled={!inviteCode.trim()}>
-            <LogIn className="mr-2 h-4 w-4" />
-            Team toetreden
+          <Button 
+            onClick={handleJoinTeam} 
+            disabled={!inviteCode.trim() || loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Bezig met toetreden...
+              </>
+            ) : (
+              <>
+                <LogIn className="mr-2 h-4 w-4" />
+                Team toetreden
+              </>
+            )}
           </Button>
         </div>
       </CardContent>

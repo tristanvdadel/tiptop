@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Check, Clock, Calendar, PlusCircle, MinusCircle, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { Plus, Trash2, Check, Clock, Calendar, PlusCircle, MinusCircle, ChevronDown, ChevronUp, Pencil, UserCheck, User } from 'lucide-react';
 import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -13,6 +13,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 
 interface TeamMemberListProps {
   teamMembers: TeamMember[];
@@ -177,7 +179,6 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {/* Dynamische hoogte voor ScrollArea op basis van aantal teamleden */}
             <ScrollArea className={`w-full`} style={{ height: getScrollAreaHeight() }}>
               <Table>
                 <TableHeader>
@@ -194,7 +195,31 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
                       <TableCell className="py-2">
                         <Collapsible>
                           <CollapsibleTrigger className="font-medium hover:underline cursor-pointer flex items-center" onClick={() => toggleMemberDetails(member.id)}>
-                            {member.name}
+                            <div className="flex items-center gap-2">
+                              {member.name}
+                              
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    {member.hasAccount ? (
+                                      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 flex items-center gap-1">
+                                        <UserCheck className="h-3 w-3" />
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-200 flex items-center gap-1">
+                                        <User className="h-3 w-3" />
+                                      </Badge>
+                                    )}
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {member.hasAccount 
+                                      ? "Dit teamlid heeft een account" 
+                                      : "Dit teamlid heeft geen account"}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                            
                             {openMemberDetails[member.id] ? <ChevronUp size={16} className="ml-1" /> : <ChevronDown size={16} className="ml-1" />}
                           </CollapsibleTrigger>
                           <CollapsibleContent>
@@ -351,4 +376,3 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
 };
 
 export default TeamMemberList;
-

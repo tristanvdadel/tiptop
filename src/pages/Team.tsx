@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { TeamMember } from '@/contexts/AppContext';
@@ -11,6 +12,7 @@ import TeamMemberList from '@/components/team/TeamMemberList';
 import PeriodSelector from '@/components/team/PeriodSelector';
 import TipDistribution from '@/components/team/TipDistribution';
 import ImportHoursDialog from '@/components/team/ImportHoursDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 const Team = () => {
   const {
@@ -36,11 +38,37 @@ const Team = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Check which team members have accounts
   useEffect(() => {
-    const sorted = [...teamMembers].sort((a, b) => 
-      a.name.toLowerCase().localeCompare(b.name.toLowerCase())
-    );
-    setSortedTeamMembers(sorted);
+    const checkTeamMembersWithAccounts = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        
+        // Get all registered users from profiles
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id');
+        
+        const userIds = new Set(profiles?.map(profile => profile.id) || []);
+        
+        // Update team members with account status
+        const updatedTeamMembers = teamMembers.map(member => ({
+          ...member,
+          hasAccount: userIds.has(member.id)
+        }));
+        
+        const sorted = [...updatedTeamMembers].sort((a, b) => 
+          a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+        );
+        
+        setSortedTeamMembers(sorted);
+      } catch (error) {
+        console.error("Error checking team members with accounts:", error);
+      }
+    };
+    
+    checkTeamMembersWithAccounts();
   }, [teamMembers]);
 
   useEffect(() => {

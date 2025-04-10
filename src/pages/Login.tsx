@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Loader2, Coins } from 'lucide-react';
+import { Loader2, Coins, CheckCircle, Mail } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -19,6 +18,7 @@ const Login = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
+  const [emailVerificationStatus, setEmailVerificationStatus] = useState<'pending' | 'verified' | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -28,6 +28,20 @@ const Login = () => {
     const tabParam = params.get('tab');
     if (tabParam === 'register') {
       setActiveTab('register');
+    }
+  }, [location]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const emailVerified = params.get('emailVerified');
+    
+    if (emailVerified === 'true') {
+      setEmailVerificationStatus('verified');
+      toast({
+        title: "E-mail geverifieerd",
+        description: "Je e-mail is succesvol geactiveerd. Je kunt nu inloggen.",
+        variant: "default"
+      });
     }
   }, [location]);
 
@@ -79,7 +93,6 @@ const Login = () => {
       if (error) throw error;
       
       if (inviteCode.trim() && user) {
-        // Find the team invitation with this code
         const { data: invite, error: inviteError } = await supabase
           .from('invites')
           .select('*')
@@ -96,14 +109,12 @@ const Login = () => {
             throw inviteError;
           }
         } else {
-          // Check if code is expired
           if (new Date(invite.expires_at) < new Date()) {
             toast({
               title: "Account aangemaakt",
               description: "Controleer je e-mail om je account te bevestigen. De uitnodigingscode was verlopen."
             });
           } else {
-            // Add user to the team
             const { error: memberError } = await supabase
               .from('team_members')
               .insert([
@@ -145,6 +156,33 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  if (emailVerificationStatus === 'verified') {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-amber-100/30 via-amber-50/40 to-amber-100/30 p-4 relative">
+        <Card className="w-full max-w-md bg-white/30 backdrop-blur-lg border-border/20 shadow-lg">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <CheckCircle className="h-12 w-12 text-green-500" />
+            </div>
+            <CardTitle>E-mail geverifieerd</CardTitle>
+            <CardDescription>
+              Je e-mail is succesvol geactiveerd. Je kunt nu inloggen.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <Button 
+              onClick={() => setEmailVerificationStatus(null)} 
+              variant="goldGradient"
+              className="w-full"
+            >
+              Terug naar inloggen
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-amber-100/30 via-amber-50/40 to-amber-100/30 p-4 relative">

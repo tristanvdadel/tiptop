@@ -1,4 +1,4 @@
-// Fix PayoutContext markPeriodsAsPaid and related functions
+
 import { createContext, useContext, useState, useCallback } from 'react';
 import { PayoutData, TeamMember, Period } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -79,12 +79,15 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
   }, [teamId]);
 
   const calculateTipDistribution = useCallback((periodIds: string[] = [], calculationMode: 'period' | 'day' | 'week' | 'month' = 'period'): TeamMember[] => {
-    // Fetch periods and team members from context
-    const { teamMembers } = useContext(PayoutContext) as any; // Fix type error here
-    const { periods } = useContext(PayoutContext) as any; // Fix type error here
+    // Get access to the current app context
+    const appContext = useContext(PayoutContext)?.payouts ? useContext(PayoutContext) : { teamMembers: [], periods: [] };
+    const teamMembers = appContext?.teamMembers || [];
+    const periods = appContext?.periods || [];
     
     // Filter periods based on periodIds
-    const filteredPeriods = periods.filter(period => periodIds.includes(period.id));
+    const filteredPeriods = periods.filter(period => 
+      periodIds.length > 0 ? periodIds.includes(period.id) : true
+    );
     
     // Calculate total tips for the selected periods
     const totalTips = filteredPeriods.reduce((sum, period) => {
@@ -107,27 +110,28 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
   }, []);
 
   const calculateAverageTipPerHour = useCallback((periodId: string = '', calculationMode: 'period' | 'day' | 'week' | 'month' = 'period'): number => {
-    // Fetch periods and team members from context
-    const { teamMembers } = useContext(PayoutContext) as any; // Fix type error here
-    const { periods } = useContext(PayoutContext) as any; // Fix type error here
+    // Get access to the current app context
+    const appContext = useContext(PayoutContext)?.payouts ? useContext(PayoutContext) : { teamMembers: [], periods: [] };
+    const teamMembers = appContext?.teamMembers || [];
+    const periods = appContext?.periods || [];
     
-    // Find the period based on periodId
-    const period = periods.find(period => period.id === periodId);
-    
-    if (!period) {
-      return 0;
+    // If a specific period was requested, find that period
+    let selectedPeriods = periods;
+    if (periodId) {
+      const period = periods.find(p => p.id === periodId);
+      selectedPeriods = period ? [period] : [];
     }
     
-    // Calculate total tips for the period
-    const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
+    // Calculate total tips across all selected periods
+    const totalTips = selectedPeriods.reduce((sum, period) => {
+      return sum + (period.tips || []).reduce((periodSum, tip) => periodSum + tip.amount, 0);
+    }, 0);
     
     // Calculate total hours for all team members
     const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
     
     // Calculate tip per hour
-    const tipPerHour = totalHours > 0 ? totalTips / totalHours : 0;
-    
-    return tipPerHour;
+    return totalHours > 0 ? totalTips / totalHours : 0;
   }, []);
 
   // Fix the markPeriodsAsPaid function to handle the return type properly
@@ -226,14 +230,10 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
       setPayouts(prev => [newPayout, ...prev]);
       setMostRecentPayout(newPayout);
       
-      // Also update the periods in local state
-      const updatedPeriods = [...(PayoutContext as any).periods].map(p => 
-        periodIds.includes(p.id) ? { ...p, isPaid: true } : p
-      ) as Period[];
-      
-      // Here we use setPeriods to update the periods in the PeriodContext
-      // This will be passed in via props from AppContext
-      setPeriods(updatedPeriods);
+      // Also update the periods in local state using the function passed from AppContext
+      setPeriods(prevPeriods => 
+        prevPeriods.map(p => periodIds.includes(p.id) ? { ...p, isPaid: true } : p)
+      );
       
       toast({
         title: "Uitbetaling voltooid",

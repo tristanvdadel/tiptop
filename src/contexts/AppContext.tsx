@@ -176,15 +176,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <PeriodProvider teamId={teamId}>
-      <TeamMemberProvider teamId={teamId}>
-        <TipProvider teamId={teamId}>
-          <PayoutProvider teamId={teamId}>
-            <AppProviderInner teamId={teamId}>
-              {children}
-            </AppProviderInner>
-          </PayoutProvider>
-        </TipProvider>
-      </TeamMemberProvider>
+      {(periodContext) => (
+        <TeamMemberProvider teamId={teamId}>
+          {(teamMemberContext) => (
+            <TipProvider teamId={teamId}>
+              {(tipContext) => (
+                <PayoutProvider teamId={teamId} setPeriods={periodContext.setPeriods}>
+                  <AppProviderInner teamId={teamId}>
+                    {children}
+                  </AppProviderInner>
+                </PayoutProvider>
+              )}
+            </TipProvider>
+          )}
+        </TeamMemberProvider>
+      )}
     </PeriodProvider>
   );
 };

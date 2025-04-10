@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { Period, TipEntry, PeriodDuration } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -8,7 +7,7 @@ import { calculateAutoCloseDate, generateAutomaticPeriodName } from './utils';
 type PeriodContextType = {
   periods: Period[];
   currentPeriod: Period | null;
-  setPeriods: (periods: Period[]) => void;
+  setPeriods: (periods: Period[] | ((prev: Period[]) => Period[])) => void;
   setCurrentPeriod: (period: Period | null) => void;
   fetchPeriods: () => Promise<void>;
   startNewPeriod: () => Promise<string>;
@@ -34,7 +33,7 @@ type PeriodContextType = {
 const PeriodContext = createContext<PeriodContextType | undefined>(undefined);
 
 interface PeriodProviderProps {
-  children: ReactNode;
+  children: (periodContext: PeriodContextType) => React.ReactNode;
   teamId: string | null;
 }
 
@@ -399,32 +398,34 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
     return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
   }, [closingTime]);
 
+  const contextValue: PeriodContextType = {
+    periods,
+    currentPeriod,
+    setPeriods,
+    setCurrentPeriod,
+    fetchPeriods,
+    startNewPeriod,
+    endCurrentPeriod,
+    deletePeriod,
+    updatePeriod,
+    getUnpaidPeriodsCount,
+    deletePaidPeriods,
+    scheduleAutoClose,
+    getNextAutoCloseDate,
+    autoClosePeriods,
+    periodDuration,
+    alignWithCalendar,
+    closingTime,
+    setAutoClosePeriods,
+    setPeriodDuration,
+    setAlignWithCalendar,
+    setClosingTime,
+    getFormattedClosingTime,
+  };
+
   return (
-    <PeriodContext.Provider value={{
-      periods,
-      currentPeriod,
-      setPeriods,
-      setCurrentPeriod,
-      fetchPeriods,
-      startNewPeriod,
-      endCurrentPeriod,
-      deletePeriod,
-      updatePeriod,
-      getUnpaidPeriodsCount,
-      deletePaidPeriods,
-      scheduleAutoClose,
-      getNextAutoCloseDate,
-      autoClosePeriods,
-      periodDuration,
-      alignWithCalendar,
-      closingTime,
-      setAutoClosePeriods,
-      setPeriodDuration,
-      setAlignWithCalendar,
-      setClosingTime,
-      getFormattedClosingTime,
-    }}>
-      {children}
+    <PeriodContext.Provider value={contextValue}>
+      {children(contextValue)}
     </PeriodContext.Provider>
   );
 };

@@ -44,6 +44,31 @@ const Team = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Define a wrapper function to match the expected type
+  const handleUpdateTeamMemberName = (id: string, name: string): boolean => {
+    updateTeamMemberName(id, name)
+      .then(success => {
+        if (!success) {
+          toast({
+            title: "Wijzigen mislukt",
+            description: "Er is een fout opgetreden bij het wijzigen van de naam.",
+            variant: "destructive"
+          });
+        }
+      })
+      .catch(err => {
+        console.error("Error updating team member name:", err);
+        toast({
+          title: "Wijzigen mislukt",
+          description: "Er is een fout opgetreden bij het wijzigen van de naam.",
+          variant: "destructive"
+        });
+      });
+    
+    // Always return true for the immediate UI update
+    return true;
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -227,7 +252,7 @@ const Team = () => {
         removeTeamMember={removeTeamMember}
         updateTeamMemberHours={updateTeamMemberHours}
         deleteHourRegistration={deleteHourRegistration}
-        updateTeamMemberName={updateTeamMemberName}
+        updateTeamMemberName={handleUpdateTeamMemberName}
       />
       
       <PeriodSelector 

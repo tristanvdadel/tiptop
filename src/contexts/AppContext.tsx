@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth, set, getWeek, format } from 'date-fns';
@@ -380,13 +379,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       
+      const startDate = new Date();
+      const startDateISO = startDate.toISOString();
+      let autoCloseDate = null;
+      
+      if (autoClosePeriods) {
+        autoCloseDate = calculateAutoCloseDate(startDateISO, periodDuration);
+      }
+      
+      let periodName = "";
+      if (autoClosePeriods) {
+        periodName = generateAutomaticPeriodName(startDate, periodDuration);
+      }
+      
       const newPeriodId = generateId();
       const newPeriod: Period = {
         id: newPeriodId,
-        startDate: new Date().toISOString(),
+        startDate: startDateISO,
         isActive: true,
         tips: [],
         isPaid: false,
+        ...(periodName && { name: periodName }),
+        ...(autoCloseDate && { autoCloseDate }),
       };
       
       const newTip: TipEntry = {
@@ -401,6 +415,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       
       setPeriods(prev => [...prev, newPeriod]);
       setCurrentPeriod(newPeriod);
+      
+      if (autoCloseDate) {
+        toast({
+          title: "Nieuwe periode gestart",
+          description: `Deze periode wordt automatisch afgesloten op ${new Date(autoCloseDate).toLocaleDateString('nl-NL')}.`,
+        });
+      }
+      
       return;
     }
     

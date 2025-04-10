@@ -1,29 +1,116 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Clock } from 'lucide-react';
+import { BarChart, Clock, UserRound } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useState, useEffect } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { supabase } from '@/integrations/supabase/client';
 
 const MyOverview = () => {
   const {
     teamMembers,
     periods,
-    calculateTipDistribution
+    calculateTipDistribution,
+    isLoading,
+    refreshTeamData
   } = useApp();
+  
+  const [loading, setLoading] = useState(true);
+  const [userData, setUserData] = useState<any>(null);
 
-  // For simplicity, we'll assume the first team member is the current user
-  const currentUser = teamMembers[0];
+  // Fetch current user data
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          setUserData(user);
+        }
+        
+        // Ensure team data is refreshed
+        if (!isLoading) {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Error fetching user:", error);
+      }
+    };
+    
+    getCurrentUser();
+  }, [isLoading]);
+  
+  // Effect to set loading state based on app loading
+  useEffect(() => {
+    if (!isLoading) {
+      // Short timeout to ensure UI updates
+      const timer = setTimeout(() => {
+        setLoading(false);
+      }, 300);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
+
+  // Find the current user in team members
+  const getCurrentTeamMember = () => {
+    if (!userData || !teamMembers.length) return null;
+    
+    // Try to find the team member by user_id
+    return teamMembers.find(member => member.user_id === userData.id) || teamMembers[0];
+  };
+  
+  const currentUser = getCurrentTeamMember();
+
+  // Show loading skeleton while data is loading
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Mijn Overzicht</h1>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-40" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // If no team members, show message
   if (!currentUser) {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Mijn Overzicht</h1>
         <Card>
           <CardContent className="p-6 text-center">
-            <p>Voeg eerst teamleden toe</p>
+            <UserRound className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <p>Voeg eerst teamleden toe of wacht tot je wordt toegevoegd aan een team</p>
+            <Button className="mt-4" onClick={() => refreshTeamData()}>
+              Gegevens verversen
+            </Button>
           </CardContent>
         </Card>
       </div>

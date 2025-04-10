@@ -1,9 +1,10 @@
-
 import { createContext, useContext, useState, useCallback } from 'react';
 import { PayoutData, TeamMember, Period } from './types';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { useApp } from './AppContext';
+import { useTeamMember } from './TeamMemberContext';
 
 type PayoutContextType = {
   payouts: PayoutData[];
@@ -17,10 +18,12 @@ type PayoutContextType = {
 
 const PayoutContext = createContext<PayoutContextType | undefined>(undefined);
 
-export const PayoutProvider = ({ children, teamId, setPeriods }: { children: React.ReactNode, teamId: string | null, setPeriods: (periods: Period[]) => void }) => {
+export const PayoutProvider = ({ children, teamId, setPeriods }: { children: React.ReactNode, teamId: string | null, setPeriods: React.Dispatch<React.SetStateAction<Period[]>> }) => {
   const [payouts, setPayouts] = useState<PayoutData[]>([]);
   const [mostRecentPayout, setMostRecentPayout] = useState<PayoutData | null>(null);
   const { toast } = useToast();
+  const { teamMembers } = useTeamMember();
+  const { periods } = useApp() || { periods: [] };
 
   const fetchPayouts = useCallback(async () => {
     if (!teamId) return;
@@ -79,74 +82,53 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
   }, [teamId]);
 
   const calculateTipDistribution = useCallback((periodIds: string[] = [], calculationMode: 'period' | 'day' | 'week' | 'month' = 'period'): TeamMember[] => {
-    // Get access to the current app context
-    const appContext = useContext(PayoutContext)?.payouts ? useContext(PayoutContext) : { teamMembers: [], periods: [] };
-    const teamMembers = appContext?.teamMembers || [];
-    const periods = appContext?.periods || [];
-    
-    // Filter periods based on periodIds
     const filteredPeriods = periods.filter(period => 
       periodIds.length > 0 ? periodIds.includes(period.id) : true
     );
     
-    // Calculate total tips for the selected periods
     const totalTips = filteredPeriods.reduce((sum, period) => {
       return sum + period.tips.reduce((periodSum, tip) => periodSum + tip.amount, 0);
     }, 0);
     
-    // Calculate total hours for all team members
     const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
     
-    // Calculate tip per hour
     const tipPerHour = totalHours > 0 ? totalTips / totalHours : 0;
     
-    // Distribute tips to each team member
     const distribution = teamMembers.map(member => ({
       ...member,
       tipAmount: member.hours * tipPerHour
     }));
     
     return distribution;
-  }, []);
+  }, [teamMembers, periods]);
 
   const calculateAverageTipPerHour = useCallback((periodId: string = '', calculationMode: 'period' | 'day' | 'week' | 'month' = 'period'): number => {
-    // Get access to the current app context
-    const appContext = useContext(PayoutContext)?.payouts ? useContext(PayoutContext) : { teamMembers: [], periods: [] };
-    const teamMembers = appContext?.teamMembers || [];
-    const periods = appContext?.periods || [];
-    
-    // If a specific period was requested, find that period
     let selectedPeriods = periods;
     if (periodId) {
       const period = periods.find(p => p.id === periodId);
       selectedPeriods = period ? [period] : [];
     }
     
-    // Calculate total tips across all selected periods
     const totalTips = selectedPeriods.reduce((sum, period) => {
       return sum + (period.tips || []).reduce((periodSum, tip) => periodSum + tip.amount, 0);
     }, 0);
     
-    // Calculate total hours for all team members
     const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
     
-    // Calculate tip per hour
     return totalHours > 0 ? totalTips / totalHours : 0;
-  }, []);
+  }, [teamMembers, periods]);
 
-  // Fix the markPeriodsAsPaid function to handle the return type properly
   const markPeriodsAsPaid = useCallback(async (periodIds: string[], customDistribution?: PayoutData['distribution']): Promise<void> => {
     if (!teamId || periodIds.length === 0) return;
     
     try {
-      // Create a new payout record
       const { data: payoutData, error: payoutError } = await supabase
         .from('payouts')
         .insert({
           team_id: teamId,
           date: new Date().toISOString(),
           payout_time: new Date().toISOString(),
-          payer_name: 'System' // This could be customized in the future
+          payer_name: 'System'
         })
         .select()
         .single();
@@ -156,7 +138,6 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
         return;
       }
       
-      // Link the payout to the periods
       const payoutPeriods = periodIds.map(periodId => ({
         payout_id: payoutData.id,
         period_id: periodId
@@ -171,7 +152,6 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
         return;
       }
       
-      // Mark the periods as paid
       const { error: updateError } = await supabase
         .from('periods')
         .update({ is_paid: true })
@@ -182,7 +162,6 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
         return;
       }
       
-      // Store the distribution
       if (customDistribution) {
         const payoutDistributions = customDistribution.map(item => ({
           payout_id: payoutData.id,
@@ -200,7 +179,6 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
           console.error('Error storing payout distributions:', distError);
         }
         
-        // Update team member balances if needed
         for (const item of customDistribution) {
           if (item.balance !== undefined) {
             const { error: balanceError } = await supabase
@@ -215,7 +193,6 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
         }
       }
       
-      // Create a payout object for local state
       const newPayout: PayoutData = {
         id: payoutData.id,
         periodIds,
@@ -226,12 +203,10 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
         team_id: teamId
       };
       
-      // Update local state
       setPayouts(prev => [newPayout, ...prev]);
       setMostRecentPayout(newPayout);
       
-      // Also update the periods in local state using the function passed from AppContext
-      setPeriods(prevPeriods => 
+      setPeriods((prevPeriods: Period[]) => 
         prevPeriods.map(p => periodIds.includes(p.id) ? { ...p, isPaid: true } : p)
       );
       

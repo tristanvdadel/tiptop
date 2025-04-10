@@ -44,19 +44,7 @@ const Settings = () => {
           return;
         }
         
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('api_key')
-          .eq('id', user.id)
-          .single();
-        
-        if (profileError) {
-          console.error('Error fetching API key:', profileError);
-          setError('Kon API sleutel niet ophalen.');
-          return;
-        }
-        
-        setApiKey(profile?.api_key || '');
+        setApiKey(user.user_metadata?.api_key || '');
       } catch (err) {
         console.error('Error fetching API key:', err);
         setError('Er is een fout opgetreden bij het ophalen van de API sleutel.');
@@ -77,14 +65,11 @@ const Settings = () => {
         return;
       }
       
-      // Generate a new API key
       const newApiKey = generateApiKey();
       
-      // Update the user's profile with the new API key
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ api_key: newApiKey })
-        .eq('id', user.id);
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { api_key: newApiKey }
+      });
       
       if (updateError) {
         console.error('Error updating API key:', updateError);
@@ -92,7 +77,6 @@ const Settings = () => {
         return;
       }
       
-      // Update the local state with the new API key
       setApiKey(newApiKey);
       toast({
         title: "API sleutel vernieuwd",

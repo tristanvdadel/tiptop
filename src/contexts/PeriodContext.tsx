@@ -33,7 +33,7 @@ type PeriodContextType = {
 const PeriodContext = createContext<PeriodContextType | undefined>(undefined);
 
 interface PeriodProviderProps {
-  children: (periodContext: PeriodContextType) => React.ReactNode;
+  children: ReactNode;
   teamId: string | null;
 }
 
@@ -50,7 +50,6 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
     if (!teamId) return;
     
     try {
-      // Fetch all periods for the team
       const { data: periodsData, error: periodsError } = await supabase
         .from('periods')
         .select('*')
@@ -62,7 +61,6 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
         return;
       }
       
-      // Fetch tips for each period
       const periodsWithTips = await Promise.all(periodsData.map(async (period) => {
         const { data: tipsData } = await supabase
           .from('tips')
@@ -95,7 +93,6 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
       
       setPeriods(periodsWithTips);
       
-      // Set current period
       const activePeriod = periodsWithTips.find(p => p.isActive);
       if (activePeriod) {
         setCurrentPeriod(activePeriod);
@@ -107,12 +104,10 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
     }
   }, [teamId]);
 
-  // Declare endCurrentPeriod here so it can be referenced by startNewPeriod
   const endCurrentPeriod = useCallback(async () => {
     if (!currentPeriod || !teamId) return;
     
     try {
-      // Update the period to mark it as inactive
       const { error } = await supabase
         .from('periods')
         .update({
@@ -131,7 +126,6 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
         return;
       }
       
-      // Refresh periods to get the latest data
       await fetchPeriods();
       
       toast({
@@ -159,12 +153,10 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
     }
     
     try {
-      // First end the current period if it exists
       if (currentPeriod) {
         await endCurrentPeriod();
       }
       
-      // Create a new period
       const startDate = new Date();
       const startDateISO = startDate.toISOString();
       let autoCloseDate = null;
@@ -178,7 +170,6 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
         periodName = generateAutomaticPeriodName(startDate, periodDuration);
       }
       
-      // Insert new period in database
       const { data: newPeriod, error } = await supabase
         .from('periods')
         .insert({
@@ -202,7 +193,6 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
         return "";
       }
       
-      // Refresh periods to get the latest data
       await fetchPeriods();
       
       toast({
@@ -222,12 +212,10 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
     }
   }, [currentPeriod, teamId, autoClosePeriods, periodDuration, alignWithCalendar, closingTime, toast, fetchPeriods, endCurrentPeriod]);
 
-  // Delete a period by ID
   const deletePeriod = useCallback(async (periodId: string) => {
     if (!teamId) return;
     
     try {
-      // Delete period from database
       const { error } = await supabase
         .from('periods')
         .delete()
@@ -243,7 +231,6 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
         return;
       }
       
-      // Update local state
       setPeriods(prev => prev.filter(p => p.id !== periodId));
       
       if (currentPeriod && currentPeriod.id === periodId) {
@@ -268,7 +255,6 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
     if (!teamId) return;
     
     try {
-      // Update period in database
       const { error } = await supabase
         .from('periods')
         .update(updates)
@@ -284,7 +270,6 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
         return;
       }
       
-      // Update local state
       setPeriods(prev => prev.map(p => 
         p.id === periodId ? { ...p, ...updates } : p
       ));
@@ -321,7 +306,6 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
       
       if (paidPeriodIds.length === 0) return;
       
-      // Delete periods from database
       const { error } = await supabase
         .from('periods')
         .delete()
@@ -337,7 +321,6 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
         return;
       }
       
-      // Update local state
       setPeriods(prev => prev.filter(p => !p.isPaid));
       
       toast({
@@ -425,7 +408,7 @@ export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
 
   return (
     <PeriodContext.Provider value={contextValue}>
-      {children(contextValue)}
+      {children}
     </PeriodContext.Provider>
   );
 };

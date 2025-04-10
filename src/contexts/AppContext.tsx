@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -176,21 +175,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <PeriodProvider teamId={teamId}>
-      {(periodContext) => (
-        <TeamMemberProvider teamId={teamId}>
-          {(teamMemberContext) => (
-            <TipProvider teamId={teamId}>
-              {(tipContext) => (
-                <PayoutProvider teamId={teamId} setPeriods={periodContext.setPeriods}>
-                  <AppProviderInner teamId={teamId}>
-                    {children}
-                  </AppProviderInner>
-                </PayoutProvider>
-              )}
-            </TipProvider>
-          )}
-        </TeamMemberProvider>
-      )}
+      <TeamMemberProvider teamId={teamId}>
+        <TipProvider teamId={teamId}>
+          <PayoutProvider 
+            teamId={teamId} 
+            setPeriods={(periods) => {}}
+          >
+            <AppProviderInner teamId={teamId}>
+              {children}
+            </AppProviderInner>
+          </PayoutProvider>
+        </TipProvider>
+      </TeamMemberProvider>
     </PeriodProvider>
   );
 };

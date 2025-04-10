@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { TeamMember } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Users } from 'lucide-react';
+import { Users, Upload } from 'lucide-react';
 import { PayoutSummary } from '@/components/PayoutSummary';
 import { useNavigate, useLocation } from 'react-router-dom';
 import TeamMemberList from '@/components/team/TeamMemberList';
@@ -30,11 +29,11 @@ const Team = () => {
   const [distribution, setDistribution] = useState<TeamMember[]>([]);
   const [showPayoutSummary, setShowPayoutSummary] = useState(false);
   const [sortedTeamMembers, setSortedTeamMembers] = useState<TeamMember[]>([]);
+  const [importUrl, setImportUrl] = useState<string>('');
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Sort team members alphabetically by name
   useEffect(() => {
     const sorted = [...teamMembers].sort((a, b) => 
       a.name.toLowerCase().localeCompare(b.name.toLowerCase())
@@ -43,7 +42,6 @@ const Team = () => {
   }, [teamMembers]);
 
   useEffect(() => {
-    // Check if the URL has payoutSummary=true and set state accordingly
     const urlParams = new URLSearchParams(location.search);
     const showSummary = urlParams.get('payoutSummary') === 'true';
     setShowPayoutSummary(showSummary);
@@ -96,7 +94,6 @@ const Team = () => {
     markPeriodsAsPaid(selectedPeriods, customDistribution);
     setShowPayoutSummary(true);
     
-    // Update URL to include payoutSummary parameter
     navigate('/team?payoutSummary=true');
   };
 
@@ -134,12 +131,19 @@ const Team = () => {
     });
   };
 
+  const handleImportHours = () => {
+    toast({
+      title: "Nog niet geïmplementeerd",
+      description: "De uren import functionaliteit is nog in ontwikkeling.",
+    });
+    // Later zal dit een n8n workflow aanroepen
+  };
+
   if (showPayoutSummary) {
     return (
       <div className="pb-16">
         <PayoutSummary onClose={() => {
           setShowPayoutSummary(false);
-          // Remove the payoutSummary parameter from URL when closing
           navigate('/team');
         }} />
       </div>
@@ -161,6 +165,17 @@ const Team = () => {
         deleteHourRegistration={deleteHourRegistration}
         updateTeamMemberName={updateTeamMemberName}
       />
+      
+      <div className="flex justify-end my-4">
+        <Button 
+          variant="outline" 
+          className="flex items-center gap-2"
+          onClick={handleImportHours}
+        >
+          <Upload size={16} />
+          Uren importeren
+        </Button>
+      </div>
       
       <PeriodSelector 
         periods={periods}

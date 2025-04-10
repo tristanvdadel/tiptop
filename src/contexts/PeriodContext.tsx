@@ -1,5 +1,5 @@
 
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { Period, TipEntry, PeriodDuration } from './types';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,7 +33,12 @@ type PeriodContextType = {
 
 const PeriodContext = createContext<PeriodContextType | undefined>(undefined);
 
-export const PeriodProvider = ({ children, teamId }: { children: React.ReactNode, teamId: string | null }) => {
+interface PeriodProviderProps {
+  children: ReactNode;
+  teamId: string | null;
+}
+
+export const PeriodProvider = ({ children, teamId }: PeriodProviderProps) => {
   const [periods, setPeriods] = useState<Period[]>([]);
   const [currentPeriod, setCurrentPeriod] = useState<Period | null>(null);
   const [autoClosePeriods, setAutoClosePeriods] = useState<boolean>(true);
@@ -41,47 +46,6 @@ export const PeriodProvider = ({ children, teamId }: { children: React.ReactNode
   const [alignWithCalendar, setAlignWithCalendar] = useState<boolean>(false);
   const [closingTime, setClosingTime] = useState<{ hour: number; minute: number }>({ hour: 0, minute: 0 });
   const { toast } = useToast();
-
-  // Declare endCurrentPeriod here so it can be referenced by startNewPeriod
-  const endCurrentPeriod = useCallback(async () => {
-    if (!currentPeriod || !teamId) return;
-    
-    try {
-      // Update the period to mark it as inactive
-      const { error } = await supabase
-        .from('periods')
-        .update({
-          is_active: false,
-          end_date: new Date().toISOString()
-        })
-        .eq('id', currentPeriod.id);
-      
-      if (error) {
-        console.error('Error ending current period:', error);
-        toast({
-          title: "Fout bij afsluiten periode",
-          description: "Er is een fout opgetreden bij het afsluiten van de huidige periode.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Refresh periods to get the latest data
-      await fetchPeriods();
-      
-      toast({
-        title: "Periode afgesloten",
-        description: "De huidige periode is succesvol afgesloten.",
-      });
-    } catch (error) {
-      console.error('Error ending current period:', error);
-      toast({
-        title: "Fout bij afsluiten periode",
-        description: "Er is een fout opgetreden bij het afsluiten van de huidige periode.",
-        variant: "destructive"
-      });
-    }
-  }, [currentPeriod, teamId, toast, fetchPeriods]);
 
   const fetchPeriods = useCallback(async () => {
     if (!teamId) return;
@@ -143,6 +107,47 @@ export const PeriodProvider = ({ children, teamId }: { children: React.ReactNode
       console.error('Error fetching periods:', error);
     }
   }, [teamId]);
+
+  // Declare endCurrentPeriod here so it can be referenced by startNewPeriod
+  const endCurrentPeriod = useCallback(async () => {
+    if (!currentPeriod || !teamId) return;
+    
+    try {
+      // Update the period to mark it as inactive
+      const { error } = await supabase
+        .from('periods')
+        .update({
+          is_active: false,
+          end_date: new Date().toISOString()
+        })
+        .eq('id', currentPeriod.id);
+      
+      if (error) {
+        console.error('Error ending current period:', error);
+        toast({
+          title: "Fout bij afsluiten periode",
+          description: "Er is een fout opgetreden bij het afsluiten van de huidige periode.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Refresh periods to get the latest data
+      await fetchPeriods();
+      
+      toast({
+        title: "Periode afgesloten",
+        description: "De huidige periode is succesvol afgesloten.",
+      });
+    } catch (error) {
+      console.error('Error ending current period:', error);
+      toast({
+        title: "Fout bij afsluiten periode",
+        description: "Er is een fout opgetreden bij het afsluiten van de huidige periode.",
+        variant: "destructive"
+      });
+    }
+  }, [currentPeriod, teamId, toast, fetchPeriods]);
 
   const startNewPeriod = useCallback(async () => {
     if (!teamId) {

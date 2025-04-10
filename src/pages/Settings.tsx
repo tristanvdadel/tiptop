@@ -1,581 +1,282 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import React, { useState, useEffect } from 'react';
+import { useApp } from '@/contexts/AppContext';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Calendar, Bell, Moon, User, CreditCard, Globe, Lock, LogOut, Clock } from "lucide-react";
-import { useTheme } from "@/contexts/ThemeContext";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useToast } from "@/hooks/use-toast";
-import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
-import { supabase, getUser } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { useApp, PeriodDuration } from "@/contexts/AppContext";
-import { format } from "date-fns";
-import { nl } from "date-fns/locale";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Settings as SettingsIcon, Calendar, Clock, Unlock, AlertCircle } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { format, addDays, startOfWeek, startOfMonth, setHours, setMinutes } from 'date-fns';
+import { nl } from 'date-fns/locale';
+import { PeriodDuration } from '@/contexts/types';
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Settings = () => {
   const {
-    theme,
-    toggleTheme
-  } = useTheme();
-  const {
-    toast
-  } = useToast();
-  const [language, setLanguage] = useState("nl");
-  const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [userName, setUserName] = useState("Gebruiker");
-  const [userEmail, setUserEmail] = useState("");
-  const navigate = useNavigate();
-  
-  const { 
-    periodDuration, 
-    setPeriodDuration, 
-    autoClosePeriods, 
+    autoClosePeriods,
     setAutoClosePeriods,
-    currentPeriod,
-    calculateAutoCloseDate,
-    scheduleAutoClose,
-    getNextAutoCloseDate,
+    periodDuration,
+    setPeriodDuration,
     alignWithCalendar,
     setAlignWithCalendar,
     closingTime,
     setClosingTime,
-    getFormattedClosingTime
+    getFormattedClosingTime,
   } = useApp();
-
-  const [nextAutoCloseDate, setNextAutoCloseDate] = useState<string | null>(null);
-
+  const { toast } = useToast();
+  const [apiKey, setApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
   useEffect(() => {
-    const autoCloseDate = getNextAutoCloseDate();
-    if (autoCloseDate) {
-      setNextAutoCloseDate(format(new Date(autoCloseDate), 'd MMMM yyyy HH:mm', { locale: nl }));
-    } else {
-      setNextAutoCloseDate(null);
-    }
-  }, [getNextAutoCloseDate, currentPeriod]);
-
-  useEffect(() => {
-    const fetchUserData = async () => {
+    const fetchUserApiKey = async () => {
       try {
-        const user = await getUser();
-        if (user) {
-          setUserEmail(user.email || "");
-          
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('first_name, last_name, avatar_url')
-            .eq('id', user.id)
-            .single();
-            
-          if (profile) {
-            if (profile.first_name || profile.last_name) {
-              const fullName = [profile.first_name, profile.last_name]
-                .filter(Boolean)
-                .join(' ');
-              
-              if (fullName) {
-                setUserName(fullName);
-                localStorage.setItem('userName', fullName);
-              }
-            }
-            
-            if (profile.avatar_url) {
-              setProfileImage(profile.avatar_url);
-            }
-          }
+        setLoading(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setError('Gebruiker niet gevonden.');
+          return;
         }
-      } catch (error) {
-        console.error('Error fetching user data:', error);
+        
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('api_key')
+          .eq('id', user.id)
+          .single();
+        
+        if (profileError) {
+          console.error('Error fetching API key:', profileError);
+          setError('Kon API sleutel niet ophalen.');
+          return;
+        }
+        
+        setApiKey(profile?.api_key || '');
+      } catch (err) {
+        console.error('Error fetching API key:', err);
+        setError('Er is een fout opgetreden bij het ophalen van de API sleutel.');
+      } finally {
+        setLoading(false);
       }
     };
     
-    fetchUserData();
-    
-    const storedName = localStorage.getItem('userName');
-    if (storedName) {
-      setUserName(storedName);
-    }
+    fetchUserApiKey();
   }, []);
-
-  const handlePeriodDurationChange = (value: string) => {
-    const newDuration = value as PeriodDuration;
-    setPeriodDuration(newDuration);
-    
-    if (autoClosePeriods && currentPeriod) {
-      const newAutoCloseDate = calculateAutoCloseDate(currentPeriod.startDate, newDuration);
-      scheduleAutoClose(newAutoCloseDate);
-    }
-  };
-
-  const handleAutoCloseToggle = (checked: boolean) => {
-    setAutoClosePeriods(checked);
-    
-    if (checked && currentPeriod) {
-      const newAutoCloseDate = calculateAutoCloseDate(currentPeriod.startDate, periodDuration);
-      scheduleAutoClose(newAutoCloseDate);
-    }
-  };
-
-  const handleAlignWithCalendarToggle = (checked: boolean) => {
-    setAlignWithCalendar(checked);
-    
-    if (autoClosePeriods && currentPeriod) {
-      const newAutoCloseDate = calculateAutoCloseDate(currentPeriod.startDate, periodDuration);
-      scheduleAutoClose(newAutoCloseDate);
+  
+  const handleRegenerateApiKey = async () => {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setError('Gebruiker niet gevonden.');
+        return;
+      }
       
+      // Generate a new API key
+      const newApiKey = generateApiKey();
+      
+      // Update the user's profile with the new API key
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ api_key: newApiKey })
+        .eq('id', user.id);
+      
+      if (updateError) {
+        console.error('Error updating API key:', updateError);
+        setError('Kon API sleutel niet bijwerken.');
+        return;
+      }
+      
+      // Update the local state with the new API key
+      setApiKey(newApiKey);
       toast({
-        title: checked ? "Kalenderuitlijning ingeschakeld" : "Kalenderuitlijning uitgeschakeld",
-        description: checked 
-          ? "Periodes worden nu uitgelijnd op de kalender (wekelijks tot zondag, maandelijks tot het einde van de maand)." 
-          : "Periodes worden niet meer uitgelijnd op de kalender.",
+        title: "API sleutel vernieuwd",
+        description: "Je API sleutel is succesvol vernieuwd.",
       });
+    } catch (err) {
+      console.error('Error regenerating API key:', err);
+      setError('Er is een fout opgetreden bij het vernieuwen van de API sleutel.');
+    } finally {
+      setLoading(false);
     }
   };
-
-  const handleClosingTimeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const [hours, minutes] = event.target.value.split(':').map(Number);
-    
-    const newClosingTime = {
-      hour: hours,
-      minute: minutes
-    };
-    
-    setClosingTime(newClosingTime);
-    
-    if (autoClosePeriods && currentPeriod) {
-      const newAutoCloseDate = calculateAutoCloseDate(currentPeriod.startDate, periodDuration);
-      scheduleAutoClose(newAutoCloseDate);
-      
-      const timeDescription = hours < 12 
-        ? `${hours}:${minutes.toString().padStart(2, '0')} (volgende dag)` 
-        : `${hours}:${minutes.toString().padStart(2, '0')}`;
-      
-      toast({
-        title: "Sluitingstijd bijgewerkt",
-        description: `Sluitingstijd is ingesteld op ${timeDescription}. Tijden vóór 12:00 worden op de volgende dag toegepast.`,
-      });
-    }
+  
+  const generateApiKey = () => {
+    const random = Math.random().toString(36).substring(2, 15);
+    const timestamp = Date.now().toString(36);
+    return `${random}-${timestamp}`;
   };
-
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        if (e.target?.result) {
-          setProfileImage(e.target.result as string);
-          
-          toast({
-            title: "Profielfoto bijgewerkt",
-            description: "Je nieuwe profielfoto is succesvol opgeslagen."
-          });
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleProfileSave = async (data: {
-    name: string;
-  }) => {
-    setUserName(data.name);
-    localStorage.setItem('userName', data.name);
-    
+  
+  const handleAutoCloseChange = (value: boolean) => {
+    setAutoClosePeriods(value);
     toast({
-      title: "Profiel bijgewerkt",
-      description: "Je profielgegevens zijn succesvol opgeslagen."
+      title: "Instelling bijgewerkt",
+      description: `Automatisch afsluiten van periodes is nu ${value ? 'ingeschakeld' : 'uitgeschakeld'}.`,
     });
   };
-
-  const passwordForm = useForm({
-    defaultValues: {
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: ""
-    }
-  });
-
-  const profileForm = useForm({
-    defaultValues: {
-      name: userName
-    }
-  });
-
-  const onSubmitPassword = async (data: {
-    currentPassword: string;
-    newPassword: string;
-    confirmPassword: string;
-  }) => {
-    if (data.newPassword !== data.confirmPassword) {
-      toast({
-        title: "Fout",
-        description: "De wachtwoorden komen niet overeen",
-        variant: "destructive"
-      });
-      return;
-    }
+  
+  const handlePeriodDurationChange = (value: PeriodDuration) => {
+    setPeriodDuration(value);
+    toast({
+      title: "Instelling bijgewerkt",
+      description: `De periodelengte is nu ingesteld op ${value}.`,
+    });
+  };
+  
+  const handleAlignWithCalendarChange = (value: boolean) => {
+    setAlignWithCalendar(value);
+    toast({
+      title: "Instelling bijgewerkt",
+      description: `De periodes zijn nu ${value ? 'uitgelijnd' : 'niet uitgelijnd'} met de kalender.`,
+    });
+  };
+  
+  const handleClosingTimeChange = (hour: number, minute: number) => {
+    setClosingTime({ hour, minute });
+    toast({
+      title: "Instelling bijgewerkt",
+      description: `De sluitingstijd is nu ingesteld op ${hour}:${minute}.`,
+    });
+  };
+  
+  const generateTimeOptions = () => {
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    const minutes = [0, 15, 30, 45];
     
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: data.newPassword
+    return hours.map(hour => {
+      return minutes.map(minute => {
+        const time = setMinutes(setHours(new Date(), hour), minute);
+        return {
+          label: format(time, 'HH:mm'),
+          hour,
+          minute
+        };
       });
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Wachtwoord bijgewerkt",
-        description: "Je wachtwoord is succesvol gewijzigd."
-      });
-      
-      passwordForm.reset();
-    } catch (error: any) {
-      toast({
-        title: "Fout bij wijzigen wachtwoord",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
+    }).flat();
   };
-
-  const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast({
-        title: "Uitgelogd",
-        description: "Je bent succesvol uitgelogd."
-      });
-      navigate('/splash');
-    } catch (error) {
-      console.error('Error signing out:', error);
-      toast({
-        title: 'Fout bij uitloggen',
-        description: 'Er is een fout opgetreden bij het uitloggen.',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  return <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Instellingen</h1>
-        
-      </div>
+  
+  const timeOptions = generateTimeOptions();
+  
+  return (
+    <div className="container space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center"><SettingsIcon className="mr-2 h-4 w-4" /> Algemene instellingen</CardTitle>
+          <CardDescription>Beheer hier je algemene instellingen.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label htmlFor="autoClose">Automatisch periode afsluiten</Label>
+              <p className="text-sm text-muted-foreground">Sluit automatisch de huidige periode af op basis van de ingestelde periodelengte.</p>
+            </div>
+            <Switch id="autoClose" checked={autoClosePeriods} onCheckedChange={handleAutoCloseChange} />
+          </div>
+          
+          <Separator />
+          
+          <div>
+            <Label className="block mb-2">Periodelengte</Label>
+            <RadioGroup defaultValue={periodDuration} onValueChange={handlePeriodDurationChange} className="flex flex-col space-y-1">
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="day" id="day" />
+                <Label htmlFor="day">Dagelijks</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="week" id="week" />
+                <Label htmlFor="week">Wekelijks</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="month" id="month" />
+                <Label htmlFor="month">Maandelijks</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          
+          <Separator />
+          
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label htmlFor="alignCalendar">Periode uitlijnen met kalender</Label>
+              <p className="text-sm text-muted-foreground">Start de week/maand op de eerste dag van de week/maand.</p>
+            </div>
+            <Switch id="alignCalendar" checked={alignWithCalendar} onCheckedChange={handleAlignWithCalendarChange} disabled={periodDuration === 'day'} />
+          </div>
+          
+          <Separator />
+          
+          <div className="grid grid-cols-2 gap-4 items-center">
+            <div>
+              <Label htmlFor="closingTime">Sluitingstijd</Label>
+              <p className="text-sm text-muted-foreground">Selecteer de tijd waarop de periode automatisch moet worden afgesloten.</p>
+            </div>
+            <Select value={getFormattedClosingTime()} onValueChange={(value) => {
+              const selectedTime = timeOptions.find(time => time.label === value);
+              if (selectedTime) {
+                handleClosingTimeChange(selectedTime.hour, selectedTime.minute);
+              }
+            }}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecteer een tijd" />
+              </SelectTrigger>
+              <SelectContent>
+                {timeOptions.map((time) => (
+                  <SelectItem key={time.label} value={time.label}>
+                    {time.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
       
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle>Account</CardTitle>
-          
+        <CardHeader>
+          <CardTitle className="text-base flex items-center"><Unlock className="mr-2 h-4 w-4" /> API Instellingen</CardTitle>
+          <CardDescription>Beheer hier je API sleutel.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              {profileImage ? <Avatar className="h-14 w-14">
-                  <AvatarImage src={profileImage} alt="Profielfoto" />
-                  <AvatarFallback>U</AvatarFallback>
-                </Avatar> : <User className="h-14 w-14 p-2 rounded-full bg-muted text-muted-foreground" />}
-              <div>
-                <p className="font-medium">{userName}</p>
-                <p className="text-sm text-muted-foreground">{userEmail}</p>
-              </div>
-            </div>
-          </div>
+        <CardContent className="grid gap-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
           
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span>Profiel</span>
-            </div>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  Wijzigen
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Profiel wijzigen</DialogTitle>
-                  <DialogDescription>
-                    Pas je profielgegevens en foto aan.
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={profileForm.handleSubmit(handleProfileSave)}>
-                  <div className="grid gap-4 py-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Naam</Label>
-                      <Input id="name" defaultValue={userName} {...profileForm.register("name", {
-                      required: true
-                    })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="picture">Profielfoto</Label>
-                      <Input id="picture" type="file" accept="image/*" onChange={handleImageUpload} className="w-full" />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" type="button" onClick={() => document.querySelector('dialog')?.close()}>
-                      Annuleren
-                    </Button>
-                    <Button type="submit">Opslaan</Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Lock className="h-4 w-4 text-muted-foreground" />
-              <span>Wachtwoord</span>
-            </div>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  Wijzigen
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Wachtwoord wijzigen</DialogTitle>
-                  <DialogDescription>
-                    Voer je huidige wachtwoord in en kies een nieuw wachtwoord.
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={passwordForm.handleSubmit(onSubmitPassword)}>
-                  <div className="grid gap-4 py-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="currentPassword">Huidig wachtwoord</Label>
-                      <Input id="currentPassword" type="password" {...passwordForm.register("currentPassword", {
-                      required: true
-                    })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="newPassword">Nieuw wachtwoord</Label>
-                      <Input id="newPassword" type="password" {...passwordForm.register("newPassword", {
-                      required: true
-                    })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Bevestig nieuw wachtwoord</Label>
-                      <Input id="confirmPassword" type="password" {...passwordForm.register("confirmPassword", {
-                      required: true
-                    })} />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" type="button" onClick={() => document.querySelector('dialog')?.close()}>
-                      Annuleren
-                    </Button>
-                    <Button type="submit">Opslaan</Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
-          
-          <Separator />
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <span>Abonnement</span>
-            </div>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  Beheren
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Abonnement beheren</DialogTitle>
-                  <DialogDescription>
-                    Bekijk en wijzig je huidige abonnement.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Huidige abonnement</h4>
-                    <p className="text-sm text-muted-foreground">TipTop - €25/maand</p>
-                    <p className="text-xs text-muted-foreground">Eerste maand is gratis</p>
-                    <p className="text-xs text-muted-foreground">Volgende factuurdatum: 15 juni 2024</p>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline">Annuleren</Button>
-                  <Button>Abonnement wijzigen</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-          
-          <Separator />
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <LogOut className="h-4 w-4 text-muted-foreground" />
-              <span>Uitloggen</span>
-            </div>
-            <Button variant="destructive" size="sm" onClick={handleSignOut}>
-              Uitloggen
+          <div className="flex items-center space-x-2">
+            <Input
+              type={showApiKey ? "text" : "password"}
+              value={apiKey}
+              readOnly
+              className="flex-1"
+            />
+            <Button variant="outline" size="sm" onClick={() => setShowApiKey(!showApiKey)}>
+              {showApiKey ? "Verberg" : "Toon"}
             </Button>
           </div>
         </CardContent>
+        <CardFooter>
+          <Button onClick={handleRegenerateApiKey} disabled={loading}>
+            {loading ? (
+              <>
+                Vernieuwen...
+              </>
+            ) : (
+              <>
+                API sleutel vernieuwen
+              </>
+            )}
+          </Button>
+        </CardFooter>
       </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Periodes</CardTitle>
-          <CardDescription>Instellingen voor je fooi periodes</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4" />
-              <Label htmlFor="periodDuration">Periode duur</Label>
-            </div>
-            <Select 
-              value={periodDuration} 
-              onValueChange={handlePeriodDurationChange}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Selecteer duur" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="day">Dagelijks</SelectItem>
-                <SelectItem value="week">Wekelijks</SelectItem>
-                <SelectItem value="month">Maandelijks</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <Separator />
-          
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col">
-              <div className="flex items-center space-x-2">
-                <Clock className="h-4 w-4" />
-                <Label htmlFor="closingTime">Sluitingstijd</Label>
-              </div>
-              <p className="text-sm text-muted-foreground ml-6 mt-1">
-                Tijd waarop periodes automatisch worden afgesloten
-              </p>
-              <p className="text-xs text-muted-foreground ml-6">
-                Tijden tussen 00:00-11:59 (AM) worden toegepast op de dag na het einde van de periode:
-              </p>
-              <ul className="text-xs text-muted-foreground ml-10 mt-1">
-                <li>Bij wekelijkse periodes: de maandag van de volgende week</li>
-                <li>Bij maandelijkse periodes: de 1e dag van de volgende maand</li>
-              </ul>
-              <p className="text-xs text-muted-foreground ml-6 mt-1">
-                Tijden tussen 12:00-23:59 (PM) worden toegepast op de laatste dag van de periode:
-              </p>
-              <ul className="text-xs text-muted-foreground ml-10 mt-1">
-                <li>Bij wekelijkse periodes: de zondag van deze week</li>
-                <li>Bij maandelijkse periodes: de laatste dag van deze maand</li>
-              </ul>
-            </div>
-            <Input
-              id="closingTime"
-              type="time"
-              value={getFormattedClosingTime()}
-              onChange={handleClosingTimeChange}
-              className="w-[180px]"
-            />
-          </div>
-          
-          <Separator />
-          
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col">
-              <div className="flex items-center space-x-2">
-                <Calendar className="h-4 w-4" />
-                <Label htmlFor="autoClosePeriods">Automatisch periodes afsluiten</Label>
-              </div>
-              {autoClosePeriods && nextAutoCloseDate && (
-                <p className="text-sm text-muted-foreground ml-6 mt-1">
-                  Huidige periode sluit op: {nextAutoCloseDate}
-                </p>
-              )}
-            </div>
-            <Switch 
-              id="autoClosePeriods" 
-              checked={autoClosePeriods} 
-              onCheckedChange={handleAutoCloseToggle} 
-            />
-          </div>
-          
-          <Separator />
-          
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col">
-              <div className="flex items-center space-x-2">
-                <Calendar className="h-4 w-4" />
-                <Label htmlFor="alignWithCalendar">Uitlijnen op kalender</Label>
-              </div>
-              <p className="text-sm text-muted-foreground ml-6 mt-1">
-                Wekelijks tot zondag, maandelijks tot einde van de maand
-              </p>
-            </div>
-            <Switch 
-              id="alignWithCalendar" 
-              checked={alignWithCalendar} 
-              onCheckedChange={handleAlignWithCalendarToggle} 
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>App instellingen</CardTitle>
-          <CardDescription>Pas je app-ervaring aan</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Bell className="h-4 w-4" />
-              <Label htmlFor="notifications">Notificaties</Label>
-            </div>
-            <Switch id="notifications" defaultChecked />
-          </div>
-          
-          <Separator />
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Moon className="h-4 w-4" />
-              <Label htmlFor="darkMode">Donkere modus</Label>
-            </div>
-            <Switch id="darkMode" checked={theme === "dark"} onCheckedChange={toggleTheme} />
-          </div>
-          
-          <Separator />
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Globe className="h-4 w-4" />
-              <Label htmlFor="language">Taal</Label>
-            </div>
-            <Select defaultValue={language} onValueChange={setLanguage}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Selecteer taal" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="nl">Nederlands</SelectItem>
-                <SelectItem value="en">Engels</SelectItem>
-                <SelectItem value="de">Duits</SelectItem>
-                <SelectItem value="fr">Frans</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-    </div>;
+    </div>
+  );
 };
 
 export default Settings;

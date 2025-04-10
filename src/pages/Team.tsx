@@ -1,17 +1,20 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
-import { useApp } from '@/contexts/AppContext';
-import { TeamMember } from '@/contexts/AppContext';
-import { Button } from '@/components/ui/button';
-import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/hooks/use-toast";
-import { Users } from 'lucide-react';
-import { PayoutSummary } from '@/components/PayoutSummary';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TeamMember, HourRegistration } from '@/contexts/types';
 import TeamMemberList from '@/components/team/TeamMemberList';
 import PeriodSelector from '@/components/team/PeriodSelector';
 import TipDistribution from '@/components/team/TipDistribution';
+import { useApp } from '@/contexts/AppContext';
+import { formatDistance } from 'date-fns';
+import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Users, Timer, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import TeamCreate from '@/components/TeamCreate';
+import TeamJoin from '@/components/TeamJoin';
 
 const Team = () => {
   const {
@@ -38,7 +41,6 @@ const Team = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Fetch data when component mounts
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -60,7 +62,6 @@ const Team = () => {
     loadData();
   }, [fetchTeamMembers, fetchPeriods, toast]);
 
-  // Sort team members alphabetically by name
   useEffect(() => {
     const sorted = [...teamMembers].sort((a, b) => 
       a.name.toLowerCase().localeCompare(b.name.toLowerCase())
@@ -69,7 +70,6 @@ const Team = () => {
   }, [teamMembers]);
 
   useEffect(() => {
-    // Check if the URL has payoutSummary=true and set state accordingly
     const urlParams = new URLSearchParams(location.search);
     const showSummary = urlParams.get('payoutSummary') === 'true';
     setShowPayoutSummary(showSummary);
@@ -124,7 +124,6 @@ const Team = () => {
       await markPeriodsAsPaid(selectedPeriods, customDistribution);
       setShowPayoutSummary(true);
       
-      // Update URL to include payoutSummary parameter
       navigate('/team?payoutSummary=true');
     } catch (error) {
       console.error("Error processing payout:", error);
@@ -188,7 +187,6 @@ const Team = () => {
       <div className="pb-16">
         <PayoutSummary onClose={() => {
           setShowPayoutSummary(false);
-          // Remove the payoutSummary parameter from URL when closing
           navigate('/team');
         }} />
       </div>

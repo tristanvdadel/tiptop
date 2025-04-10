@@ -11,7 +11,12 @@ import { calculateAutoCloseDate, hasReachedLimit } from './utils';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const AppProviderInner = ({ children, teamId }: { children: ReactNode, teamId: string | null }) => {
+interface AppProviderInnerProps {
+  children: ReactNode;
+  teamId: string | null;
+}
+
+const AppProviderInner = ({ children, teamId }: AppProviderInnerProps) => {
   // Access all the separate contexts
   const period = usePeriod();
   const tip = useTip();

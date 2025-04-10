@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +15,7 @@ const Login = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
   const { toast } = useToast();
@@ -23,7 +23,6 @@ const Login = () => {
   const location = useLocation();
 
   useEffect(() => {
-    // Check if there's a tab parameter in the URL
     const params = new URLSearchParams(location.search);
     const tabParam = params.get('tab');
     if (tabParam === 'register') {
@@ -71,12 +70,12 @@ const Login = () => {
           data: {
             first_name: firstName,
             last_name: lastName,
+            phone_number: phoneNumber || null
           }
         }
       });
       if (error) throw error;
       
-      // If an invite code was provided, try to join the team
       if (inviteCode.trim()) {
         toast({
           title: "Account aangemaakt",
@@ -183,6 +182,19 @@ const Login = () => {
                     <Input id="inviteCode" type="text" placeholder="Voer code in" value={inviteCode} onChange={e => setInviteCode(e.target.value)} />
                     <p className="text-xs text-muted-foreground">
                       Heb je een uitnodigingscode? Voer deze in om direct lid te worden van een team
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumber">Telefoonnummer (optioneel)</Label>
+                    <Input 
+                      id="phoneNumber" 
+                      type="tel" 
+                      placeholder="06 12345678" 
+                      value={phoneNumber} 
+                      onChange={e => setPhoneNumber(e.target.value)} 
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Optioneel: voer je telefoonnummer in voor toekomstige meldingen
                     </p>
                   </div>
                 </CardContent>

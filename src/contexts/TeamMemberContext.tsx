@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback } from 'react';
-import { TeamMember, HourRegistration } from './types';
+import { TeamMember, HourRegistration } from '@/types/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { generateId } from './utils';
@@ -293,7 +293,7 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
       
       toast({
         title: "Uren toegevoegd",
-        description: `${hours} uren zijn toegevoegd.`,
+        description: `${hours} uren zijn toegevoegd.",
       });
     } catch (error) {
       console.error('Error updating team member hours:', error);

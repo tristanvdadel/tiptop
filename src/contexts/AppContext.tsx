@@ -213,7 +213,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           user_id: member.user_id,
           role: member.role,
           permissions: member.permissions,
-          hasAccount: member.has_account
+          hasAccount: member.hasAccount || false
         }));
         setTeamMembers(processedMembers);
         

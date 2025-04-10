@@ -1,3 +1,4 @@
+
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
@@ -36,9 +37,9 @@ const PeriodSummary = () => {
   const averageTipPerHour = useMemo(() => {
     if (!currentPeriod) return 0;
     if (currentPeriod.averageTipPerHour !== undefined) {
-      return currentPeriod.averageTipPerHour;
+      return currentPeriod.averageTipPerHour || 0; // Return 0 if null or undefined
     }
-    return calculateAverageTipPerHour(currentPeriod.id);
+    return calculateAverageTipPerHour(currentPeriod.id) || 0; // Return 0 if null or undefined
   }, [currentPeriod, calculateAverageTipPerHour]);
 
   const handleEditClick = () => {

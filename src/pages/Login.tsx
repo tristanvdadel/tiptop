@@ -45,21 +45,41 @@ const Login = () => {
     }
   }, [location]);
 
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          navigate('/');
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+      }
+    };
+    
+    checkSession();
+  }, [navigate]);
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       const {
+        data,
         error
       } = await supabase.auth.signInWithPassword({
         email,
         password
       });
+      
       if (error) throw error;
-      toast({
-        title: "Succesvol ingelogd"
-      });
-      navigate('/');
+      
+      if (data.session) {
+        toast({
+          title: "Succesvol ingelogd"
+        });
+        navigate('/');
+      }
     } catch (error: any) {
       toast({
         title: "Fout bij inloggen",

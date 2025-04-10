@@ -148,7 +148,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           
           toast({
             title: "Periode automatisch afgesloten",
-            description: `Een periode is automatisch afgesloten op basis van de instellingen.`,
+            description: `Een periode is automatisch afgesloten op basis van de instellingen. De eindtijd was ${new Date(now).toLocaleTimeString('nl-NL', {hour: '2-digit', minute: '2-digit'})}.`,
           });
           
           // Create a new period

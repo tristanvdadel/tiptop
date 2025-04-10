@@ -104,12 +104,32 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
         return false;
       }
       
+      const { data: existingMembers, error: checkError } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('team_id', teamId)
+        .eq('user_id', user.id);
+        
+      if (checkError) {
+        console.error('Error checking existing team members:', checkError);
+        throw checkError;
+      }
+      
+      if (existingMembers && existingMembers.length > 0) {
+        toast({
+          title: "Al lid van team",
+          description: "Je bent al lid van dit team.",
+          variant: "destructive"
+        });
+        return false;
+      }
+      
       const { data: newMember, error } = await supabase
         .from('team_members')
         .insert({
           team_id: teamId,
           user_id: user.id,
-          role: 'user',
+          role: 'member',
           permissions: {
             add_tips: true,
             add_hours: true,
@@ -166,7 +186,7 @@ export const TeamMemberProvider = ({ children, teamId }: { children: React.React
       });
       return false;
     }
-  }, [teamId, toast]);
+  }, [teamId, toast, setTeamMembers]);
 
   const removeTeamMember = useCallback(async (id: string) => {
     try {

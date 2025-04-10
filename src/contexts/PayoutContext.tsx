@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useCallback } from 'react';
 import { PayoutData, TeamMember, Period } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -93,7 +94,7 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
     );
     
     const totalTips = filteredPeriods.reduce((sum, period) => {
-      return sum + period.tips.reduce((periodSum, tip) => periodSum + tip.amount, 0);
+      return sum + (period.tips || []).reduce((periodSum, tip) => periodSum + tip.amount, 0);
     }, 0);
     
     const totalHours = teamMembers ? teamMembers.reduce((sum, member) => sum + member.hours, 0) : 0;

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth, set, getWeek, format } from 'date-fns';
+import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth, set, getWeek, format, startOfMonth, nextMonday } from 'date-fns';
 import { nl } from 'date-fns/locale';
 
 // Define types
@@ -299,10 +299,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           targetDate = new Date(date);
           break;
         case 'week':
-          targetDate = addWeeks(date, 1);
+          // For weekly periods, end on the next Monday
+          targetDate = nextMonday(date);
           break;
         case 'month':
-          targetDate = addMonths(date, 1);
+          // For monthly periods, end on the 1st of the next month
+          targetDate = startOfMonth(addMonths(date, 1));
           break;
         default:
           targetDate = addWeeks(date, 1);

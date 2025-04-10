@@ -1,9 +1,9 @@
+
 import { createContext, useContext, useState, useCallback } from 'react';
 import { PayoutData, TeamMember, Period } from './types';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
-import { useApp } from './AppContext';
 import { useTeamMember } from './TeamMemberContext';
 
 type PayoutContextType = {
@@ -23,7 +23,8 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
   const [mostRecentPayout, setMostRecentPayout] = useState<PayoutData | null>(null);
   const { toast } = useToast();
   const { teamMembers } = useTeamMember();
-  const { periods } = useApp() || { periods: [] };
+  // Access periods from TeamMember context
+  const { periods } = useTeamMember();
 
   const fetchPayouts = useCallback(async () => {
     if (!teamId) return;
@@ -82,6 +83,10 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
   }, [teamId]);
 
   const calculateTipDistribution = useCallback((periodIds: string[] = [], calculationMode: 'period' | 'day' | 'week' | 'month' = 'period'): TeamMember[] => {
+    if (!periods || periods.length === 0) {
+      return [];
+    }
+    
     const filteredPeriods = periods.filter(period => 
       periodIds.length > 0 ? periodIds.includes(period.id) : true
     );
@@ -90,19 +95,23 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
       return sum + period.tips.reduce((periodSum, tip) => periodSum + tip.amount, 0);
     }, 0);
     
-    const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+    const totalHours = teamMembers ? teamMembers.reduce((sum, member) => sum + member.hours, 0) : 0;
     
     const tipPerHour = totalHours > 0 ? totalTips / totalHours : 0;
     
-    const distribution = teamMembers.map(member => ({
+    const distribution = teamMembers ? teamMembers.map(member => ({
       ...member,
       tipAmount: member.hours * tipPerHour
-    }));
+    })) : [];
     
     return distribution;
   }, [teamMembers, periods]);
 
   const calculateAverageTipPerHour = useCallback((periodId: string = '', calculationMode: 'period' | 'day' | 'week' | 'month' = 'period'): number => {
+    if (!periods || periods.length === 0) {
+      return 0;
+    }
+    
     let selectedPeriods = periods;
     if (periodId) {
       const period = periods.find(p => p.id === periodId);
@@ -113,7 +122,7 @@ export const PayoutProvider = ({ children, teamId, setPeriods }: { children: Rea
       return sum + (period.tips || []).reduce((periodSum, tip) => periodSum + tip.amount, 0);
     }, 0);
     
-    const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+    const totalHours = teamMembers ? teamMembers.reduce((sum, member) => sum + member.hours, 0) : 0;
     
     return totalHours > 0 ? totalTips / totalHours : 0;
   }, [teamMembers, periods]);

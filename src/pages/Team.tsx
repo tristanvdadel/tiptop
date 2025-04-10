@@ -10,6 +10,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import TeamMemberList from '@/components/team/TeamMemberList';
 import PeriodSelector from '@/components/team/PeriodSelector';
 import TipDistribution from '@/components/team/TipDistribution';
+import ImportHoursDialog from '@/components/team/ImportHoursDialog';
 
 const Team = () => {
   const {
@@ -30,6 +31,7 @@ const Team = () => {
   const [showPayoutSummary, setShowPayoutSummary] = useState(false);
   const [sortedTeamMembers, setSortedTeamMembers] = useState<TeamMember[]>([]);
   const [importUrl, setImportUrl] = useState<string>('');
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -132,11 +134,15 @@ const Team = () => {
   };
 
   const handleImportHours = () => {
+    setShowImportDialog(true);
+  };
+
+  const handleFileImport = (file: File) => {
+    console.log("File imported:", file.name);
     toast({
-      title: "Nog niet geïmplementeerd",
-      description: "De uren import functionaliteit is nog in ontwikkeling.",
+      title: "Bestand geüpload",
+      description: "Het bestand is geüpload en wordt verwerkt. De functionaliteit voor het verwerken van de geïmporteerde uren is nog in ontwikkeling.",
     });
-    // Later zal dit een n8n workflow aanroepen
   };
 
   if (showPayoutSummary) {
@@ -203,6 +209,12 @@ const Team = () => {
           </Button>
         </div>
       )}
+
+      <ImportHoursDialog 
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        onImport={handleFileImport}
+      />
     </div>
   );
 };

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -87,12 +88,13 @@ const Login = () => {
       }
     };
     
+    // Reduce timeout from 1500ms to 1000ms for faster response
     timeoutId = window.setTimeout(() => {
       if (isMounted && !sessionChecked) {
         console.log("Session check timeout - forcing completion");
         setSessionChecked(true);
       }
-    }, 1500);
+    }, 1000);
     
     fastSessionCheck();
     
@@ -111,10 +113,10 @@ const Login = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setLoginProgress(10);
+    setLoginProgress(20); // Start at 20 instead of 10
     
     try {
-      setLoginProgress(30);
+      setLoginProgress(50); // Jump to 50 faster
       
       const {
         data,
@@ -124,20 +126,21 @@ const Login = () => {
         password
       });
       
-      setLoginProgress(70);
+      setLoginProgress(80); // Jump to 80 faster
       
       if (error) throw error;
       
-      setLoginProgress(90);
+      setLoginProgress(100);
       
       if (data.session) {
         toast({
           title: "Succesvol ingelogd"
         });
-        setLoginProgress(100);
+        
+        // Redirect faster
         setTimeout(() => {
           navigate('/', { replace: true });
-        }, 300);
+        }, 100); // Reduced from 300ms to 100ms
       }
     } catch (error: any) {
       toast({
@@ -347,7 +350,12 @@ const Login = () => {
                 <CardFooter className="flex flex-col gap-4">
                   {loginProgress > 0 && (
                     <div className="w-full">
-                      <Progress value={loginProgress} className="h-2" />
+                      <Progress value={loginProgress} className="h-2 bg-amber-100">
+                        <div 
+                          className="h-full bg-gradient-to-r from-amber-400 to-amber-300"
+                          style={{ width: `${loginProgress}%` }}
+                        />
+                      </Progress>
                     </div>
                   )}
                   <Button type="submit" className="w-full" variant="goldGradient" disabled={loading}>

@@ -32,6 +32,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     // THEN check for existing session, but only set state if we don't already have a session
     const getInitialSession = async () => {
       try {
+        console.log('Performing fast session check');
         const { data, error } = await supabase.auth.getSession();
         console.log('Initial session check:', data.session ? 'Session found' : 'No session found');
         
@@ -53,13 +54,13 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     // Start initial session check
     getInitialSession();
     
-    // Set a shorter timeout as a fallback
+    // Set a shorter timeout as a fallback - reduce from 800ms to 500ms
     const timeoutId = setTimeout(() => {
       if (mounted && isLoading) {
-        console.log('Forced loading state to end after timeout');
+        console.log('Session check timeout - forcing completion');
         setIsLoading(false);
       }
-    }, 800); // Reduced from 1000ms to 800ms for faster fallback
+    }, 500); // Reduced from 800ms to 500ms for faster fallback
 
     return () => {
       mounted = false;
@@ -83,7 +84,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     }
   }, [needsRedirect, navigate, location.pathname]);
 
-  // Only show loading state for a maximum of 800 milliseconds
+  // Only show loading state for a maximum of 500 milliseconds
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">

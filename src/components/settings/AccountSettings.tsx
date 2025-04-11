@@ -42,11 +42,16 @@ const AccountSettings = () => {
         if (user) {
           setUserEmail(user.email || "");
           
-          const { data: profile } = await supabase
+          const { data: profile, error } = await supabase
             .from('profiles')
             .select('first_name, last_name, avatar_url, phone')
             .eq('id', user.id)
             .single();
+          
+          if (error) {
+            console.error('Error fetching profile:', error);
+            return;
+          }
             
           if (profile) {
             setFirstName(profile.first_name || "");

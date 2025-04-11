@@ -83,25 +83,33 @@ const TeamCreate = ({
       if (memberError) {
         console.error("Teamlid toevoegen fout:", memberError);
         
-        // Als de RPC methode door RLS werkt, deze als fallback proberen
-        const { error: rpcError } = await supabase.rpc('add_team_member', { 
-          _team_id: team.id,
-          _user_id: user.id,
-          _role: 'admin',
-          _permissions: {
-            add_tips: true,
-            edit_tips: true,
-            add_hours: true,
-            view_team: true,
-            view_reports: true,
-            close_periods: true,
-            manage_payouts: true
+        // Als er een fout optreedt, probeer een directe insert zonder RPC
+        try {
+          // Tweede poging zonder RPC te gebruiken
+          const { error: secondAttemptError } = await supabase
+            .from('team_members')
+            .insert([{ 
+              team_id: team.id, 
+              user_id: user.id, 
+              role: 'admin',
+              permissions: {
+                add_tips: true,
+                edit_tips: true,
+                add_hours: true,
+                view_team: true,
+                view_reports: true,
+                close_periods: true,
+                manage_payouts: true
+              }
+            }]);
+            
+          if (secondAttemptError) {
+            console.error("Tweede poging teamlid toevoegen fout:", secondAttemptError);
+            throw secondAttemptError;
           }
-        });
-        
-        if (rpcError) {
-          console.error("RPC teamlid toevoegen fout:", rpcError);
-          throw rpcError;
+        } catch (fallbackError) {
+          console.error("Fallback poging mislukt:", fallbackError);
+          throw memberError;
         }
       }
       

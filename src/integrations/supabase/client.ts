@@ -59,28 +59,17 @@ export const getTeamMembers = async (teamId: string) => {
     if (error) {
       console.error('Error with direct query:', error);
       
-      // Fallback 1: Probeer de nieuwe safe function te gebruiken
+      // Fallback 1: Try to query through the RPC function if it exists in types
       const { data: safeData, error: safeError } = await supabase
-        .rpc('get_team_members_safe', { team_id_param: teamId });
+        .rpc('get_team_members', { team_id_param: teamId });
         
       if (safeError) {
-        console.error('Error with safe function:', safeError);
-        
-        // Fallback 2: Probeer de oude RPC methode
-        const { data: oldRpcData, error: oldRpcError } = await supabase
-          .rpc('get_team_members', { team_id_param: teamId });
-          
-        if (oldRpcError) {
-          console.error('Error with old RPC:', oldRpcError);
-          return { data: [], error: oldRpcError };
-        }
-        
-        console.log('Successfully fetched team members via old RPC:', oldRpcData?.length || 0);
-        return { data: oldRpcData, error: null };
+        console.error('Error with RPC function:', safeError);
+        return { data: [], error: safeError };
       }
       
-      console.log('Successfully fetched team members via safe function:', safeData?.length || 0);
-      return { data: safeData, error: null };
+      console.log('Successfully fetched team members via RPC function:', Array.isArray(safeData) ? safeData.length : 0);
+      return { data: Array.isArray(safeData) ? safeData : [], error: null };
     }
     
     console.log('Successfully fetched team members directly:', data?.length || 0);
@@ -103,12 +92,12 @@ export const getUserTeams = async (userId: string) => {
     if (error) {
       console.error('Error with direct teams query:', error);
       
-      // Aanpak 2: Query via de nieuwe safe functie
-      const { data: safeData, error: safeError } = await supabase
-        .rpc('get_user_teams_safe', { user_id_param: userId });
+      // Aanpak 2: Query via de RPC functie
+      const { data: rpcData, error: rpcError } = await supabase
+        .rpc('get_user_teams', { user_id_param: userId });
         
-      if (safeError) {
-        console.error('Error with safe function:', safeError);
+      if (rpcError) {
+        console.error('Error with RPC function:', rpcError);
         
         // Aanpak 3: Probeer via team_members en daarna teams
         const { data: memberships, error: membershipError } = await supabase
@@ -118,18 +107,7 @@ export const getUserTeams = async (userId: string) => {
           
         if (membershipError) {
           console.error('Error fetching memberships:', membershipError);
-          
-          // Aanpak 4: Als laatste de oude RPC methode proberen
-          const { data: oldRpcData, error: oldRpcError } = await supabase
-            .rpc('get_user_teams', { user_id_param: userId });
-            
-          if (oldRpcError) {
-            console.error('Error with old RPC:', oldRpcError);
-            return { data: [], error: oldRpcError };
-          }
-          
-          console.log('Successfully fetched teams via old RPC:', oldRpcData?.length || 0);
-          return { data: oldRpcData, error: null };
+          return { data: [], error: membershipError };
         }
         
         if (!memberships || memberships.length === 0) {
@@ -153,8 +131,8 @@ export const getUserTeams = async (userId: string) => {
         return { data: teamsData, error: null };
       }
       
-      console.log('Successfully fetched teams via safe function:', safeData?.length || 0);
-      return { data: safeData, error: null };
+      console.log('Successfully fetched teams via RPC function:', Array.isArray(rpcData) ? rpcData.length : 0);
+      return { data: Array.isArray(rpcData) ? rpcData : [], error: null };
     }
     
     console.log('Successfully fetched teams directly:', data?.length || 0);

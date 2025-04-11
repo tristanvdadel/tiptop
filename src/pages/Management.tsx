@@ -30,18 +30,18 @@ const Management = () => {
   const location = useLocation();
   const initialTabFromState = location.state?.initialTab;
   
-  const [userTeams, setUserTeams] = useState([]);
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [userTeamMemberships, setUserTeamMemberships] = useState([]);
+  const [userTeams, setUserTeams] = useState<any[]>([]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [userTeamMemberships, setUserTeamMemberships] = useState<any[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [loadingTeams, setLoadingTeams] = useState(true);
   const [loadingMembers, setLoadingMembers] = useState(false);
-  const [selectedTeamId, setSelectedTeamId] = useState(null);
-  const [selectedMembershipId, setSelectedMembershipId] = useState(null);
-  const [user, setUser] = useState(null);
-  const [error, setError] = useState(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   const [hasAnyTeam, setHasAnyTeam] = useState(false);
   const [activeTab, setActiveTab] = useState(initialTabFromState || "teams");
   const [loadAttempts, setLoadAttempts] = useState(0);
@@ -123,7 +123,7 @@ const Management = () => {
             }
               
             console.log("Received teams from getUserTeams:", userTeamsData?.length || 0);
-            if (userTeamsData && userTeamsData.length > 0) {
+            if (userTeamsData && Array.isArray(userTeamsData) && userTeamsData.length > 0) {
               setUserTeams(userTeamsData);
               setHasAnyTeam(true);
               setSelectedTeamId(userTeamsData[0].id);
@@ -150,13 +150,13 @@ const Management = () => {
               setHasAnyTeam(false);
             }
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error('Error in team fetch:', err);
           setError(err.message || "Er is een fout opgetreden bij het ophalen van je teams");
         }
         
         setLoadingTeams(false);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error checking user:', err);
         setError(err.message || "Er is een fout opgetreden bij het controleren van je gebruiker");
         setLoadingTeams(false);

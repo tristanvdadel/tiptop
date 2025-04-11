@@ -1,9 +1,11 @@
+
 import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
 import { TeamMember } from '@/contexts/AppContext';
 import { useApp } from '@/contexts/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { calculateTipDistributionTotals } from '@/services/teamDataService';
 import { debounce } from '@/services/payoutService';
+import { fetchTeamPeriods } from '@/services/periodService';
 
 interface TeamContextType {
   selectedPeriods: string[];
@@ -84,6 +86,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [debouncedTogglePeriod]);
 
+  // Effect to calculate distribution when selectedPeriods or teamMembers change
   React.useEffect(() => {
     if (selectedPeriods.length === 0 || teamMembers.length === 0) {
       setDistribution([]);
@@ -94,6 +97,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setDistribution(calculatedDistribution);
   }, [selectedPeriods, calculateTipDistribution, teamMembers.length]);
 
+  // Effect to sort team members by name
   React.useEffect(() => {
     if (teamMembers.length === 0) return;
     
@@ -198,7 +202,15 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       
       console.log("TeamContext: Data wordt opgehaald voor team:", teamId);
-      await refreshTeamData();
+      
+      // Eerst controleren of er al data is in de AppContext
+      if (periods.length === 0) {
+        console.log("TeamContext: No periods found in AppContext, refreshing data");
+        await refreshTeamData();
+      } else {
+        console.log(`TeamContext: Found ${periods.length} periods in AppContext, using existing data`);
+      }
+      
       console.log("TeamContext: Data succesvol opgehaald");
       setDataInitialized(true);
       return Promise.resolve();
@@ -208,7 +220,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setLoading(false);
     }
-  }, [refreshTeamData, teamId]);
+  }, [refreshTeamData, teamId, periods.length]);
 
   const value = {
     selectedPeriods,

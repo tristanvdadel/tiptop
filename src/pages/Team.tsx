@@ -46,6 +46,11 @@ const TeamContent: React.FC = () => {
         return;
       }
       
+      if (!teamId) {
+        console.error("Team.tsx: No team ID found, cannot load data");
+        return;
+      }
+      
       try {
         console.log("Team.tsx: Initial data loading for team:", teamId);
         await handleRefresh();
@@ -91,6 +96,7 @@ const TeamContent: React.FC = () => {
     updateTeamMembersWithAccounts();
   }, [teamMembers]);
 
+  // Show payout summary if payoutSummary URL param is present
   if (showPayoutSummary) {
     return (
       <div className="pb-16">
@@ -114,40 +120,28 @@ const TeamContent: React.FC = () => {
 
   return (
     <div className="pb-16">
-      {showPayoutSummary ? (
-        <PayoutSummary onClose={() => {
-          console.log("Team.tsx: Closing payout summary");
-          setShowPayoutSummary(false);
-          navigate('/team');
-        }} />
-      ) : loading && !dataInitialized ? (
-        <LoadingIndicator />
-      ) : (
-        <>
-          <TeamHeader />
-          
-          <TeamMemberList 
-            teamMembers={sortedTeamMembers}
-            addTeamMember={addTeamMember}
-            removeTeamMember={removeTeamMember}
-            updateTeamMemberHours={updateTeamMemberHours}
-            deleteHourRegistration={deleteHourRegistration}
-            updateTeamMemberName={updateTeamMemberName}
-          />
-          
-          <ImportActions />
-          
-          <PeriodSelector 
-            periods={periods}
-            selectedPeriods={selectedPeriods}
-            onTogglePeriodSelection={togglePeriodSelection}
-          />
-          
-          {periods.filter(period => !period.isPaid && !period.isActive).length > 0 && 
-            <TipDistributionSection />
-          }
-        </>
-      )}
+      <TeamHeader />
+      
+      <TeamMemberList 
+        teamMembers={sortedTeamMembers}
+        addTeamMember={addTeamMember}
+        removeTeamMember={removeTeamMember}
+        updateTeamMemberHours={updateTeamMemberHours}
+        deleteHourRegistration={deleteHourRegistration}
+        updateTeamMemberName={updateTeamMemberName}
+      />
+      
+      <ImportActions />
+      
+      <PeriodSelector 
+        periods={periods}
+        selectedPeriods={selectedPeriods}
+        onTogglePeriodSelection={togglePeriodSelection}
+      />
+      
+      {periods.filter(period => !period.isPaid && !period.isActive).length > 0 && 
+        <TipDistributionSection />
+      }
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { fetchTeamPeriods } from '@/services/periodService';
 
 const Periods = () => {
   const {
@@ -28,7 +29,9 @@ const Periods = () => {
     deletePaidPeriods,
     deletePeriod,
     updatePeriod,
-    autoClosePeriods
+    autoClosePeriods,
+    refreshTeamData,
+    teamId
   } = useApp();
   const navigate = useNavigate();
   const [showLimitDialog, setShowLimitDialog] = useState(false);
@@ -43,10 +46,38 @@ const Periods = () => {
   const [showDeleteAllPaidDialog, setShowDeleteAllPaidDialog] = useState(false);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [showCloseConfirmDialog, setShowCloseConfirmDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   const {
     toast
   } = useToast();
+  
+  useEffect(() => {
+    const loadData = async () => {
+      if (!teamId) {
+        console.log("Periods.tsx: No team ID found, cannot load data");
+        return;
+      }
+      
+      console.log("Periods.tsx: Loading data on initial mount for team:", teamId);
+      setIsLoading(true);
+      try {
+        await refreshTeamData();
+        console.log("Periods.tsx: Data loaded successfully");
+      } catch (error) {
+        console.error("Error loading team data on Periods page:", error);
+        toast({
+          title: "Fout bij laden",
+          description: "Er is een fout opgetreden bij het laden van de periodes.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [teamId, refreshTeamData, toast]);
   
   const sortedPeriods = [...periods].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   
@@ -156,19 +187,28 @@ const Periods = () => {
     }
   };
   
-  const confirmEditPeriod = () => {
+  const confirmEditPeriod = async () => {
     if (periodToEdit) {
-      updatePeriod(periodToEdit, {
-        name: editPeriodName.trim() || undefined,
-        notes: editPeriodNotes.trim() || undefined
-      });
-      setPeriodToEdit(null);
-      setShowEditPeriodDialog(false);
-      toast({
-        title: "Periode bijgewerkt",
-        description: "De periode is succesvol bijgewerkt.",
-        variant: "default"
-      });
+      try {
+        await updatePeriod(periodToEdit, {
+          name: editPeriodName.trim() || undefined,
+          notes: editPeriodNotes.trim() || undefined
+        });
+        setPeriodToEdit(null);
+        setShowEditPeriodDialog(false);
+        toast({
+          title: "Periode bijgewerkt",
+          description: "De periode is succesvol bijgewerkt.",
+          variant: "default"
+        });
+      } catch (error) {
+        console.error("Error updating period:", error);
+        toast({
+          title: "Fout bij bijwerken",
+          description: "Er is een fout opgetreden bij het bijwerken van de periode.",
+          variant: "destructive"
+        });
+      }
     }
   };
   
@@ -196,14 +236,31 @@ const Periods = () => {
     }
   };
 
-  const doClosePeriod = () => {
-    endCurrentPeriod();
-    setShowCloseConfirmDialog(false);
-    toast({
-      title: "Periode afgerond",
-      description: "De periode is succesvol afgerond.",
-    });
+  const doClosePeriod = async () => {
+    try {
+      await endCurrentPeriod();
+      setShowCloseConfirmDialog(false);
+      toast({
+        title: "Periode afgerond",
+        description: "De periode is succesvol afgerond.",
+      });
+    } catch (error) {
+      console.error("Error closing period:", error);
+      toast({
+        title: "Fout bij afronden",
+        description: "Er is een fout opgetreden bij het afronden van de periode.",
+        variant: "destructive"
+      });
+    }
   };
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#9b87f5]"></div>
+      </div>
+    );
+  }
   
   return <div className="space-y-6">
       <div className="flex justify-between items-center">

@@ -45,36 +45,45 @@ export const getUserEmail = async (userId: string) => {
   }
 };
 
-// Verbeterde team member query functies die de nieuwe security definer functies gebruiken
+// Verbeterde en veiligere team member queries
 export const getTeamMembers = async (teamId: string) => {
   try {
     console.log('Fetching team members for team:', teamId);
     
-    // We proberen direct de team_members tabel te bevragen, nu de RLS is opgelost
-    const { data, error } = await supabase
+    // Eerst directe benadering proberen (nieuwe RLS policies)
+    let { data, error } = await supabase
       .from('team_members')
       .select('*')
       .eq('team_id', teamId);
     
     if (error) {
-      console.error('Error fetching team members:', error);
+      console.error('Error with direct query:', error);
       
-      // Als de nieuwe approach niet werkt, proberen we een RPC als fallback
-      console.log('Trying fallback with RPC method...');
-      
-      const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_team_members', { team_id_param: teamId });
+      // Fallback 1: Probeer de nieuwe safe function te gebruiken
+      const { data: safeData, error: safeError } = await supabase
+        .rpc('get_team_members_safe', { team_id_param: teamId });
         
-      if (rpcError) {
-        console.error('RPC error fetching team members:', rpcError);
-        return { data: [], error: rpcError };
+      if (safeError) {
+        console.error('Error with safe function:', safeError);
+        
+        // Fallback 2: Probeer de oude RPC methode
+        const { data: oldRpcData, error: oldRpcError } = await supabase
+          .rpc('get_team_members', { team_id_param: teamId });
+          
+        if (oldRpcError) {
+          console.error('Error with old RPC:', oldRpcError);
+          return { data: [], error: oldRpcError };
+        }
+        
+        console.log('Successfully fetched team members via old RPC:', oldRpcData?.length || 0);
+        return { data: oldRpcData, error: null };
       }
       
-      console.log('RPC successful, fetched team members:', rpcData?.length || 0);
-      return { data: rpcData, error: null };
+      console.log('Successfully fetched team members via safe function:', safeData?.length || 0);
+      return { data: safeData, error: null };
     }
     
-    console.log('Successfully fetched team members:', data?.length || 0);
+    console.log('Successfully fetched team members directly:', data?.length || 0);
     return { data, error: null };
   } catch (error) {
     console.error('Unexpected error in getTeamMembers:', error);
@@ -86,58 +95,66 @@ export const getUserTeams = async (userId: string) => {
   try {
     console.log('Fetching teams for user:', userId);
     
-    // Eerst proberen we direct via de teams tabel, nu de RLS is opgelost
-    const { data, error } = await supabase
+    // Aanpak 1: Directe query naar teams (met nieuwe RLS policies)
+    let { data, error } = await supabase
       .from('teams')
       .select('*');
     
     if (error) {
-      console.error('Error fetching teams:', error);
+      console.error('Error with direct teams query:', error);
       
-      // Als de directe methode niet werkt, proberen we via de team_members tabel
-      console.log('Trying to fetch teams via memberships...');
-      
-      const { data: memberships, error: membershipError } = await supabase
-        .from('team_members')
-        .select('team_id')
-        .eq('user_id', userId);
+      // Aanpak 2: Query via de nieuwe safe functie
+      const { data: safeData, error: safeError } = await supabase
+        .rpc('get_user_teams_safe', { user_id_param: userId });
         
-      if (membershipError) {
-        console.error('Error fetching team memberships:', membershipError);
-        return { data: [], error: membershipError };
-      }
-      
-      if (!memberships || memberships.length === 0) {
-        console.log('No team memberships found for user');
-        return { data: [], error: null };
-      }
-      
-      const teamIds = memberships.map(m => m.team_id);
-      
-      const { data: teamsData, error: teamsError } = await supabase
-        .from('teams')
-        .select('*')
-        .in('id', teamIds);
+      if (safeError) {
+        console.error('Error with safe function:', safeError);
         
-      if (teamsError) {
-        console.error('Error fetching teams by IDs:', teamsError);
-        
-        // Laatste fallback proberen via RPC
-        console.log('Trying final fallback with RPC...');
-        const { data: rpcData, error: rpcError } = await supabase
-          .rpc('get_user_teams', { user_id_param: userId });
+        // Aanpak 3: Probeer via team_members en daarna teams
+        const { data: memberships, error: membershipError } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', userId);
           
-        if (rpcError) {
-          console.error('RPC error fetching user teams:', rpcError);
-          return { data: [], error: rpcError };
+        if (membershipError) {
+          console.error('Error fetching memberships:', membershipError);
+          
+          // Aanpak 4: Als laatste de oude RPC methode proberen
+          const { data: oldRpcData, error: oldRpcError } = await supabase
+            .rpc('get_user_teams', { user_id_param: userId });
+            
+          if (oldRpcError) {
+            console.error('Error with old RPC:', oldRpcError);
+            return { data: [], error: oldRpcError };
+          }
+          
+          console.log('Successfully fetched teams via old RPC:', oldRpcData?.length || 0);
+          return { data: oldRpcData, error: null };
         }
         
-        console.log('RPC successful, fetched teams:', rpcData?.length || 0);
-        return { data: rpcData, error: null };
+        if (!memberships || memberships.length === 0) {
+          console.log('No memberships found');
+          return { data: [], error: null };
+        }
+        
+        const teamIds = memberships.map(m => m.team_id);
+        
+        const { data: teamsData, error: teamsError } = await supabase
+          .from('teams')
+          .select('*')
+          .in('id', teamIds);
+          
+        if (teamsError) {
+          console.error('Error fetching teams by IDs:', teamsError);
+          return { data: [], error: teamsError };
+        }
+        
+        console.log('Successfully fetched teams via memberships:', teamsData?.length || 0);
+        return { data: teamsData, error: null };
       }
       
-      console.log('Successfully fetched teams via memberships:', teamsData?.length || 0);
-      return { data: teamsData, error: null };
+      console.log('Successfully fetched teams via safe function:', safeData?.length || 0);
+      return { data: safeData, error: null };
     }
     
     console.log('Successfully fetched teams directly:', data?.length || 0);

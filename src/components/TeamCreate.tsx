@@ -23,12 +23,19 @@ const TeamCreate = ({
   const { toast } = useToast();
 
   const handleCreateTeam = async () => {
-    if (!newTeamName.trim()) return;
+    if (!newTeamName.trim()) {
+      toast({
+        title: "Teamnaam vereist",
+        description: "Voer een geldige teamnaam in.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       setIsCreating(true);
       
-      // Check first if user is authenticated
+      // Controleren of gebruiker is ingelogd
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast({
@@ -39,13 +46,78 @@ const TeamCreate = ({
         return;
       }
       
-      // Proberen om direct het team aan te maken
+      console.log("Gebruiker ingelogd, wordt geprobeerd team aan te maken:", newTeamName);
+      
+      // Eerst het team aanmaken
+      const { data: team, error: teamError } = await supabase
+        .from('teams')
+        .insert([{ name: newTeamName, created_by: user.id }])
+        .select()
+        .single();
+      
+      if (teamError) {
+        console.error("Team aanmaken fout:", teamError);
+        throw teamError;
+      }
+      
+      console.log("Team aangemaakt:", team);
+      
+      // Direct daarna de gebruiker toevoegen als teamlid met admin rechten
+      const { error: memberError } = await supabase
+        .from('team_members')
+        .insert([{ 
+          team_id: team.id, 
+          user_id: user.id, 
+          role: 'admin',
+          permissions: {
+            add_tips: true,
+            edit_tips: true,
+            add_hours: true,
+            view_team: true,
+            view_reports: true,
+            close_periods: true,
+            manage_payouts: true
+          }
+        }]);
+      
+      if (memberError) {
+        console.error("Teamlid toevoegen fout:", memberError);
+        
+        // Als de RPC methode door RLS werkt, deze als fallback proberen
+        const { error: rpcError } = await supabase.rpc('add_team_member', { 
+          _team_id: team.id,
+          _user_id: user.id,
+          _role: 'admin',
+          _permissions: {
+            add_tips: true,
+            edit_tips: true,
+            add_hours: true,
+            view_team: true,
+            view_reports: true,
+            close_periods: true,
+            manage_payouts: true
+          }
+        });
+        
+        if (rpcError) {
+          console.error("RPC teamlid toevoegen fout:", rpcError);
+          throw rpcError;
+        }
+      }
+      
+      toast({
+        title: "Team aangemaakt",
+        description: `Team '${newTeamName}' is succesvol aangemaakt.`
+      });
+      
+      // Callback oproepen voor verdere verwerking
       onCreateTeam();
-    } catch (error) {
+      
+    } catch (error: any) {
       console.error('Error in handleCreateTeam:', error);
       toast({
         title: "Fout bij aanmaken team",
-        description: "Er is een fout opgetreden bij het aanmaken van het team. Probeer het opnieuw.",
+        description: error.message || "Er is een fout opgetreden bij het aanmaken van het team. Probeer het opnieuw.",
         variant: "destructive"
       });
     } finally {

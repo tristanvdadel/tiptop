@@ -5,6 +5,7 @@ export * from './periodService';
 export * from './teamMemberService';
 export * from './payoutService';
 export * from './excelService';
+export * from './teamDataService';
 
 // Export supabaseService functions with explicit naming
 export {

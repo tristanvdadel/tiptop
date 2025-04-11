@@ -9,25 +9,48 @@ const Splash = () => {
   const [authenticated, setAuthenticated] = useState(false);
   
   useEffect(() => {
+    let isMounted = true;
+    
     const checkAuth = async () => {
-      const loggedIn = await isLoggedIn();
-      setAuthenticated(loggedIn);
-      setLoading(false);
+      try {
+        // Fast check with local storage first to avoid unnecessary API calls
+        const { data } = await supabase.auth.getSession();
+        if (isMounted) {
+          setAuthenticated(!!data.session);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Error checking auth:", error);
+        if (isMounted) setLoading(false);
+      }
     };
     
     checkAuth();
     
+    // Set up auth listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setAuthenticated(!!session);
-        setLoading(false);
+        if (isMounted) {
+          setAuthenticated(!!session);
+          setLoading(false);
+        }
       }
     );
     
+    // Safety timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (isMounted && loading) {
+        console.log("Force ending loading state on Splash after timeout");
+        setLoading(false);
+      }
+    }, 1000);
+    
     return () => {
+      isMounted = false;
       authListener.subscription.unsubscribe();
+      clearTimeout(timeoutId);
     };
-  }, []);
+  }, [loading]);
   
   if (loading) {
     return (

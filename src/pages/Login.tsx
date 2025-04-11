@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import { Loader2, Coins, CheckCircle, Mail, KeyRound } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -52,18 +51,19 @@ const Login = () => {
   }, [location]);
 
   useEffect(() => {
-    const checkSession = async () => {
+    const fastSessionCheck = async () => {
       try {
         const { data } = await supabase.auth.getSession();
         if (data.session) {
-          navigate('/');
+          console.log("User already logged in, redirecting immediately");
+          navigate('/', { replace: true });
         }
       } catch (error) {
-        console.error('Error checking session:', error);
+        console.error('Error in fast session check:', error);
       }
     };
     
-    checkSession();
+    fastSessionCheck();
   }, [navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -84,7 +84,7 @@ const Login = () => {
         toast({
           title: "Succesvol ingelogd"
         });
-        navigate('/');
+        navigate('/', { replace: true });
       }
     } catch (error: any) {
       toast({
@@ -92,7 +92,6 @@ const Login = () => {
         description: error.message,
         variant: "destructive"
       });
-    } finally {
       setLoading(false);
     }
   };

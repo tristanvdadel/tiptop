@@ -20,12 +20,13 @@ import Splash from "./pages/Splash";
 import Management from "./pages/Management";
 import AuthGuard from "./components/AuthGuard";
 
-// Create the query client outside of the component
+// Create the query client with optimized settings
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      staleTime: 30000, // 30 seconds stale time to reduce refetches
     },
   },
 });

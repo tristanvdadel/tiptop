@@ -12,6 +12,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let mounted = true;
+    let initialCheckComplete = false;
 
     // Set up auth state listener FIRST to catch all auth events
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
@@ -20,6 +21,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       if (mounted) {
         setSession(newSession);
         setIsLoading(false);
+        initialCheckComplete = true; // Mark initial check as complete
       }
     });
 
@@ -29,8 +31,8 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
         const { data } = await supabase.auth.getSession();
         console.log('Initial session check:', data.session ? 'Session found' : 'No session found');
         
-        // Only update if mounted and we don't have a session yet (avoid unnecessary rerenders)
-        if (mounted && !session) {
+        // Only update if mounted and initial check from auth change event hasn't completed
+        if (mounted && !initialCheckComplete) {
           setSession(data.session);
           setIsLoading(false);
         }
@@ -40,15 +42,16 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
+    // Start initial session check
     getInitialSession();
-
-    // Set a shorter timeout as a fallback (2 seconds instead of 5)
+    
+    // Set a shorter timeout as a fallback (1 second instead of 2)
     const timeoutId = setTimeout(() => {
       if (mounted && isLoading) {
         console.log('Forced loading state to end after timeout');
         setIsLoading(false);
       }
-    }, 2000);
+    }, 1000);
 
     return () => {
       mounted = false;
@@ -57,7 +60,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  // Only show loading state for a maximum of 2 seconds
+  // Only show loading state for a maximum of 1 second
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -69,7 +72,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   // Use session check for protecting routes
   if (!session && location.pathname !== '/splash' && location.pathname !== '/login' && !location.pathname.startsWith('/fast-tip')) {
     console.log('No session, redirecting to login from:', location.pathname);
-    navigate('/login');
+    navigate('/login', { replace: true }); // Use replace to prevent history stacking
     return null;
   }
 

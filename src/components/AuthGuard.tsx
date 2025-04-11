@@ -20,16 +20,24 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       
       if (mounted) {
         setSession(newSession);
-        setIsLoading(false);
-        initialCheckComplete = true; // Mark initial check as complete
+        
+        // Only end loading here if we actually got a definitive answer
+        if (_event === 'SIGNED_IN' || _event === 'SIGNED_OUT' || _event === 'TOKEN_REFRESHED') {
+          setIsLoading(false);
+          initialCheckComplete = true;
+        }
       }
     });
 
     // THEN check for existing session, but only set state if we don't already have a session
     const getInitialSession = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
+        const { data, error } = await supabase.auth.getSession();
         console.log('Initial session check:', data.session ? 'Session found' : 'No session found');
+        
+        if (error) {
+          console.error('Error getting session:', error);
+        }
         
         // Only update if mounted and initial check from auth change event hasn't completed
         if (mounted && !initialCheckComplete) {
@@ -45,13 +53,13 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     // Start initial session check
     getInitialSession();
     
-    // Set a shorter timeout as a fallback (1 second instead of 2)
+    // Set a shorter timeout as a fallback
     const timeoutId = setTimeout(() => {
       if (mounted && isLoading) {
         console.log('Forced loading state to end after timeout');
         setIsLoading(false);
       }
-    }, 1000);
+    }, 800); // Reduced from 1000ms to 800ms for faster fallback
 
     return () => {
       mounted = false;
@@ -60,7 +68,22 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  // Only show loading state for a maximum of 1 second
+  // Avoid updating state during render - use local variables instead
+  const isPublicRoute = location.pathname === '/splash' || 
+                        location.pathname === '/login' || 
+                        location.pathname.startsWith('/fast-tip');
+                        
+  const needsRedirect = !isLoading && !session && !isPublicRoute;
+
+  // Handle redirect if needed
+  useEffect(() => {
+    if (needsRedirect) {
+      console.log('No session, redirecting to login from:', location.pathname);
+      navigate('/login', { replace: true });
+    }
+  }, [needsRedirect, navigate, location.pathname]);
+
+  // Only show loading state for a maximum of 800 milliseconds
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -69,10 +92,8 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  // Use session check for protecting routes
-  if (!session && location.pathname !== '/splash' && location.pathname !== '/login' && !location.pathname.startsWith('/fast-tip')) {
-    console.log('No session, redirecting to login from:', location.pathname);
-    navigate('/login', { replace: true }); // Use replace to prevent history stacking
+  // Don't return children until we've redirected if needed
+  if (needsRedirect) {
     return null;
   }
 

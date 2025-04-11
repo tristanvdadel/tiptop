@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import { Loader2, Coins, CheckCircle, Mail, KeyRound } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -18,12 +19,15 @@ const Login = () => {
   const [inviteCode, setInviteCode] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loginProgress, setLoginProgress] = useState(0);
   const [activeTab, setActiveTab] = useState("login");
   const [emailVerificationStatus, setEmailVerificationStatus] = useState<'pending' | 'verified' | null>(null);
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [resetPasswordSuccess, setResetPasswordSuccess] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -51,25 +55,67 @@ const Login = () => {
   }, [location]);
 
   useEffect(() => {
+    let isMounted = true;
+    let timeoutId: number;
+    
     const fastSessionCheck = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        if (data.session) {
+        console.log("Performing fast session check");
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error in session check:', error);
+          if (isMounted) {
+            setSessionChecked(true);
+          }
+          return;
+        }
+        
+        if (data.session && isMounted) {
           console.log("User already logged in, redirecting immediately");
-          navigate('/', { replace: true });
+          setAuthenticated(true);
+        }
+        
+        if (isMounted) {
+          setSessionChecked(true);
         }
       } catch (error) {
-        console.error('Error in fast session check:', error);
+        console.error('Unexpected error in fast session check:', error);
+        if (isMounted) {
+          setSessionChecked(true);
+        }
       }
     };
     
+    timeoutId = window.setTimeout(() => {
+      if (isMounted && !sessionChecked) {
+        console.log("Session check timeout - forcing completion");
+        setSessionChecked(true);
+      }
+    }, 1500);
+    
     fastSessionCheck();
-  }, [navigate]);
+    
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (authenticated) {
+      navigate('/', { replace: true });
+    }
+  }, [authenticated, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setLoginProgress(10);
+    
     try {
+      setLoginProgress(30);
+      
       const {
         data,
         error
@@ -78,13 +124,20 @@ const Login = () => {
         password
       });
       
+      setLoginProgress(70);
+      
       if (error) throw error;
+      
+      setLoginProgress(90);
       
       if (data.session) {
         toast({
           title: "Succesvol ingelogd"
         });
-        navigate('/', { replace: true });
+        setLoginProgress(100);
+        setTimeout(() => {
+          navigate('/', { replace: true });
+        }, 300);
       }
     } catch (error: any) {
       toast({
@@ -93,6 +146,7 @@ const Login = () => {
         variant: "destructive"
       });
       setLoading(false);
+      setLoginProgress(0);
     }
   };
 
@@ -214,6 +268,10 @@ const Login = () => {
     setResetPasswordSuccess(false);
   };
 
+  if (authenticated) {
+    return null;
+  }
+
   if (emailVerificationStatus === 'verified') {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-amber-100/30 via-amber-50/40 to-amber-100/30 p-4 relative">
@@ -286,7 +344,12 @@ const Login = () => {
                     Wachtwoord vergeten?
                   </Button>
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex flex-col gap-4">
+                  {loginProgress > 0 && (
+                    <div className="w-full">
+                      <Progress value={loginProgress} className="h-2" />
+                    </div>
+                  )}
                   <Button type="submit" className="w-full" variant="goldGradient" disabled={loading}>
                     {loading ? <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -364,7 +427,6 @@ const Login = () => {
         </Tabs>
       </div>
 
-      {/* Password Reset Dialog */}
       <Dialog open={resetPasswordOpen} onOpenChange={setResetPasswordOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

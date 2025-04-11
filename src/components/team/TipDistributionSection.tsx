@@ -39,7 +39,7 @@ const TipDistributionSection: React.FC = () => {
           onClick={handlePayoutClick} 
           disabled={selectedPeriods.length === 0}
         >
-          Complete payout
+          Uitbetaling voltooien
         </Button>
       </div>
     </>

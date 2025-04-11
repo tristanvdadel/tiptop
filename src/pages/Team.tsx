@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { TeamMember } from '@/contexts/AppContext';
@@ -43,18 +44,24 @@ const Team = () => {
   const [importUrl, setImportUrl] = useState<string>('');
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [dataInitialized, setDataInitialized] = useState(false);
   const [importedHours, setImportedHours] = useState<ImportedHour[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Laad teamgegevens slechts één keer bij initiële montage
   useEffect(() => {
-    const loadData = async () => {
+    const loadInitialData = async () => {
+      if (dataInitialized) return;
+      
       try {
+        console.log("Initiële gegevens laden...");
         setLoading(true);
         await refreshTeamData();
+        setDataInitialized(true);
       } catch (error) {
-        console.error("Error refreshing team data:", error);
+        console.error("Error bij laden van teamgegevens:", error);
         toast({
           title: "Fout bij laden",
           description: "Er is een fout opgetreden bij het laden van de teamgegevens.",
@@ -65,26 +72,32 @@ const Team = () => {
       }
     };
     
-    loadData();
-  }, [refreshTeamData, toast]);
+    loadInitialData();
+  }, [refreshTeamData, toast, dataInitialized]);
 
+  // Update gesorteerde teamleden wanneer teamleden veranderen
   useEffect(() => {
-    const checkTeamMembersWithAccounts = async () => {
+    const updateSortedMembers = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         
+        // Gebruik een enkele query om alle profielen op te halen
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id');
         
-        const userIds = new Set(profiles?.map(profile => profile.id) || []);
+        if (!profiles) return;
         
+        const userIds = new Set(profiles.map(profile => profile.id));
+        
+        // Lokale bewerking zonder extra queries
         const updatedTeamMembers = teamMembers.map(member => ({
           ...member,
           hasAccount: userIds.has(member.id)
         }));
         
+        // Sorteer alfabetisch
         const sorted = [...updatedTeamMembers].sort((a, b) => 
           a.name.toLowerCase().localeCompare(b.name.toLowerCase())
         );
@@ -95,9 +108,12 @@ const Team = () => {
       }
     };
     
-    checkTeamMembersWithAccounts();
+    if (teamMembers.length > 0) {
+      updateSortedMembers();
+    }
   }, [teamMembers]);
 
+  // Check URL parameters voor het tonen van de uitbetalingssamenvatting
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const showSummary = urlParams.get('payoutSummary') === 'true';
@@ -118,6 +134,7 @@ const Team = () => {
     });
   };
 
+  // Tip distribution berekenen met memoization
   const calculateDistributionForSelectedPeriods = useCallback(() => {
     if (selectedPeriods.length === 0 || teamMembers.length === 0) {
       setDistribution([]);
@@ -154,6 +171,7 @@ const Team = () => {
     navigate('/team?payoutSummary=true');
   };
 
+  // Bereken totalen met memoization
   const calculateTotalTipsAndHours = useCallback(() => {
     if (selectedPeriods.length === 0) {
       return {
@@ -194,6 +212,8 @@ const Team = () => {
 
   const handleFileImport = async (file: File) => {
     try {
+      setImportedHours([]); // Reset vorige uren
+      
       const extractedData = await extractHoursFromExcel(file);
       
       if (extractedData.length === 0) {
@@ -237,7 +257,10 @@ const Team = () => {
       if (teamMember) {
         updateTeamMemberHours(teamMember.id, hourData.hours);
       } else {
-        const newMemberId = addTeamMember(hourData.name);
+        // Voeg een nieuw teamlid toe
+        addTeamMember(hourData.name);
+        
+        // Zoek het nieuw toegevoegde lid op basis van naam
         const newMember = teamMembers.find(member => 
           member.name.toLowerCase() === hourData.name.toLowerCase()
         );
@@ -252,6 +275,29 @@ const Team = () => {
       title: "Uren verwerkt",
       description: `${confirmedHours.length} uren registraties succesvol verwerkt.`,
     });
+    
+    // Sluit dialoog na verwerking
+    setShowImportDialog(false);
+  };
+
+  const handleRefresh = async () => {
+    try {
+      setLoading(true);
+      await refreshTeamData();
+      toast({
+        title: "Gegevens vernieuwd",
+        description: "De teamgegevens zijn succesvol bijgewerkt.",
+      });
+    } catch (error) {
+      console.error("Error bij vernieuwen van teamgegevens:", error);
+      toast({
+        title: "Fout bij vernieuwen",
+        description: "Er is een fout opgetreden bij het vernieuwen van de teamgegevens.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (showPayoutSummary) {
@@ -261,6 +307,16 @@ const Team = () => {
           setShowPayoutSummary(false);
           navigate('/team');
         }} />
+      </div>
+    );
+  }
+
+  // Toon laadanimatie tijdens eerste laadproces
+  if (loading && !dataInitialized) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <RefreshCw size={32} className="animate-spin mb-4 text-primary" />
+        <p>Teamgegevens laden...</p>
       </div>
     );
   }
@@ -276,7 +332,7 @@ const Team = () => {
         <Button 
           variant="outline" 
           size="sm"
-          onClick={() => refreshTeamData()}
+          onClick={handleRefresh}
           disabled={loading}
         >
           <RefreshCw size={16} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />

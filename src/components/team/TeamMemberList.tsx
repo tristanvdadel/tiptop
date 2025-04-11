@@ -1,4 +1,3 @@
-
 import React, { useState, KeyboardEvent } from 'react';
 import { TeamMember, HourRegistration } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
@@ -139,12 +138,9 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
     return balance > 0 ? 'text-green-600' : 'text-red-600';
   };
 
-  // Bereken de dynamische hoogte op basis van het aantal teamleden
   const getScrollAreaHeight = (): string => {
     if (teamMembers.length <= 0) return 'auto';
-    // Basis hoogte per rij ongeveer 50px
-    // Minimum hoogte van 100px, maximum hoogte van 600px
-    const calculatedHeight = Math.min(Math.max(teamMembers.length * 50, 100), 600);
+    const calculatedHeight = Math.min(Math.max(teamMembers.length * 70, 250), 600);
     return `${calculatedHeight}px`;
   };
 

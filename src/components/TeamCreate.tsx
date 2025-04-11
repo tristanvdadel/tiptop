@@ -62,15 +62,14 @@ const TeamCreate = ({
       
       console.log("Team aangemaakt:", team);
 
-      // Probeer teamlid toe te voegen met directe insert
+      // Gebruik de nieuwe add_team_member functie om het oneindige recursie probleem te omzeilen
       try {
-        const { error: memberError } = await supabase
-          .from('team_members')
-          .insert([{ 
-            team_id: team.id, 
-            user_id: user.id, 
-            role: 'admin',
-            permissions: {
+        const { data: memberData, error: memberError } = await supabase
+          .rpc('add_team_member', {
+            team_id_param: team.id,
+            user_id_param: user.id,
+            role_param: 'admin',
+            permissions_param: {
               add_tips: true,
               edit_tips: true,
               add_hours: true,
@@ -79,18 +78,18 @@ const TeamCreate = ({
               close_periods: true,
               manage_payouts: true
             }
-          }]);
+          });
         
         if (memberError) {
-          console.error("Teamlid toevoegen fout:", memberError);
-          // We behandelen de fout hieronder verder
+          console.error("Fout bij RPC add_team_member:", memberError);
           throw memberError;
         }
-      } catch (memberInsertError: any) {
-        console.error("Fout bij teamlid toevoegen met direct insert:", memberInsertError);
         
-        // Als we hier komen, proberen we een alternatieve methode
-        // Het team is al aangemaakt, dus we tonen een succes bericht
+        console.log("Teamlid toegevoegd via RPC functie, ID:", memberData);
+      } catch (memberError: any) {
+        console.error("Fout bij toevoegen teamlid:", memberError);
+        
+        // Fallback: het team is al aangemaakt, dus we tonen een succes bericht
         // en informeren de gebruiker om te verversen
         toast({
           title: "Team mogelijk aangemaakt",

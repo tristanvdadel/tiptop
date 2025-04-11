@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -45,21 +44,19 @@ export const getUserEmail = async (userId: string) => {
   }
 };
 
-// Verbeterde en veiligere team member queries
+// Verbeterde team member queries met veilige functies
 export const getTeamMembers = async (teamId: string) => {
   try {
     console.log('Fetching team members for team:', teamId);
     
-    // Aanpak 1: Directe query naar team_members (voor als RLS is ingesteld)
-    let { data, error } = await supabase
-      .from('team_members')
-      .select('*')
-      .eq('team_id', teamId);
+    // Gebruik de nieuwe veilige functie om oneindige recursie te voorkomen
+    const { data, error } = await supabase
+      .rpc('get_team_members_safe', { team_id_param: teamId });
     
     if (error) {
-      console.error('Error with direct query:', error);
+      console.error('Error with RPC getTeamMembersSafe:', error);
       
-      // Aanpak 2: Probeer een gewone select zonder RPC
+      // Fallback: probeer gewone select als de RPC niet werkt
       try {
         const { data: directData, error: directError } = await supabase
           .from('team_members')
@@ -81,7 +78,7 @@ export const getTeamMembers = async (teamId: string) => {
       return { data: [], error };
     }
     
-    console.log('Successfully fetched team members directly:', Array.isArray(data) ? data.length : 0);
+    console.log('Successfully fetched team members via RPC:', Array.isArray(data) ? data.length : 0);
     return { data: Array.isArray(data) ? data : [], error: null };
   } catch (error) {
     console.error('Unexpected error in getTeamMembers:', error);
@@ -93,15 +90,14 @@ export const getUserTeams = async (userId: string) => {
   try {
     console.log('Fetching teams for user:', userId);
     
-    // Aanpak 1: Directe query naar teams (met nieuwe RLS policies)
-    let { data, error } = await supabase
-      .from('teams')
-      .select('*');
+    // Gebruik de nieuwe veilige functie om oneindige recursie te voorkomen
+    const { data, error } = await supabase
+      .rpc('get_user_teams_safe', { user_id_param: userId });
     
     if (error) {
-      console.error('Error with direct teams query:', error);
+      console.error('Error with RPC getUserTeamsSafe:', error);
       
-      // Aanpak 3: Probeer via team_members en daarna teams
+      // Fallback: probeer via team_members en daarna teams
       try {
         const { data: memberships, error: membershipError } = await supabase
           .from('team_members')
@@ -141,7 +137,7 @@ export const getUserTeams = async (userId: string) => {
       return { data: [], error };
     }
     
-    console.log('Successfully fetched teams directly:', Array.isArray(data) ? data.length : 0);
+    console.log('Successfully fetched teams via RPC:', Array.isArray(data) ? data.length : 0);
     return { data: Array.isArray(data) ? data : [], error: null };
   } catch (error) {
     console.error('Unexpected error in getUserTeams:', error);

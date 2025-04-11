@@ -418,6 +418,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_team_member: {
+        Args: {
+          team_id_param: string
+          user_id_param: string
+          role_param: string
+          permissions_param: Json
+        }
+        Returns: string
+      }
+      check_team_membership: {
+        Args: { user_id_param: string; team_id_param: string }
+        Returns: boolean
+      }
       get_team_members: {
         Args: { team_id_param: string }
         Returns: {
@@ -431,7 +444,29 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_team_members_safe: {
+        Args: { team_id_param: string }
+        Returns: {
+          balance: number | null
+          created_at: string
+          hours: number | null
+          id: string
+          permissions: Json | null
+          role: string
+          team_id: string
+          user_id: string
+        }[]
+      }
       get_user_teams: {
+        Args: { user_id_param: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+        }[]
+      }
+      get_user_teams_safe: {
         Args: { user_id_param: string }
         Returns: {
           created_at: string

@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -54,7 +55,7 @@ export const getTeamMembers = async (teamId: string) => {
       .rpc('get_team_members_safe', { team_id_param: teamId });
     
     if (error) {
-      console.error('Error with RPC getTeamMembersSafe:', error);
+      console.error('Error with RPC get_team_members_safe:', error);
       
       // Fallback: probeer gewone select als de RPC niet werkt
       try {
@@ -95,7 +96,7 @@ export const getUserTeams = async (userId: string) => {
       .rpc('get_user_teams_safe', { user_id_param: userId });
     
     if (error) {
-      console.error('Error with RPC getUserTeamsSafe:', error);
+      console.error('Error with RPC get_user_teams_safe:', error);
       
       // Fallback: probeer via team_members en daarna teams
       try {

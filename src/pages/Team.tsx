@@ -37,21 +37,18 @@ const Team = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Check which team members have accounts
   useEffect(() => {
     const checkTeamMembersWithAccounts = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         
-        // Get all registered users from profiles
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id');
         
         const userIds = new Set(profiles?.map(profile => profile.id) || []);
         
-        // Update team members with account status
         const updatedTeamMembers = teamMembers.map(member => ({
           ...member,
           hasAccount: userIds.has(member.id)

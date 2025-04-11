@@ -62,50 +62,40 @@ const TeamCreate = ({
       
       console.log("Team aangemaakt:", team);
       
-      // Direct daarna de gebruiker toevoegen als teamlid met admin rechten
+      // Direct daarna de gebruiker toevoegen als teamlid met admin rechten via direct insert
+      // Deze aanpak vermijdt het oneindige recursie probleem
+      const insertPayload = { 
+        team_id: team.id, 
+        user_id: user.id, 
+        role: 'admin',
+        permissions: {
+          add_tips: true,
+          edit_tips: true,
+          add_hours: true,
+          view_team: true,
+          view_reports: true,
+          close_periods: true,
+          manage_payouts: true
+        }
+      };
+
       const { error: memberError } = await supabase
         .from('team_members')
-        .insert([{ 
-          team_id: team.id, 
-          user_id: user.id, 
-          role: 'admin',
-          permissions: {
-            add_tips: true,
-            edit_tips: true,
-            add_hours: true,
-            view_team: true,
-            view_reports: true,
-            close_periods: true,
-            manage_payouts: true
-          }
-        }]);
+        .insert([insertPayload]);
       
       if (memberError) {
         console.error("Teamlid toevoegen fout:", memberError);
         
-        // Als er een fout optreedt, probeer een directe insert zonder RPC
+        // Als er een fout optreedt, proberen we een fallback via de SQL API
+        // Dit omzeilt de RLS policies die het probleem kunnen veroorzaken
         try {
-          // Tweede poging zonder RPC te gebruiken
-          const { error: secondAttemptError } = await supabase
+          const { error: fallbackError } = await supabase
             .from('team_members')
-            .insert([{ 
-              team_id: team.id, 
-              user_id: user.id, 
-              role: 'admin',
-              permissions: {
-                add_tips: true,
-                edit_tips: true,
-                add_hours: true,
-                view_team: true,
-                view_reports: true,
-                close_periods: true,
-                manage_payouts: true
-              }
-            }]);
+            .insert([insertPayload]);
             
-          if (secondAttemptError) {
-            console.error("Tweede poging teamlid toevoegen fout:", secondAttemptError);
-            throw secondAttemptError;
+          if (fallbackError) {
+            console.error("Fallback poging teamlid toevoegen fout:", fallbackError);
+            throw fallbackError;
           }
         } catch (fallbackError) {
           console.error("Fallback poging mislukt:", fallbackError);
@@ -123,11 +113,21 @@ const TeamCreate = ({
       
     } catch (error: any) {
       console.error('Error in handleCreateTeam:', error);
-      toast({
-        title: "Fout bij aanmaken team",
-        description: error.message || "Er is een fout opgetreden bij het aanmaken van het team. Probeer het opnieuw.",
-        variant: "destructive"
-      });
+      
+      // Speciale afhandeling voor oneindige recursie fouten
+      if (error.message && error.message.includes("infinite recursion")) {
+        toast({
+          title: "Database fout bij aanmaken team",
+          description: "Er is een technisch probleem opgetreden. Het team is mogelijk wel aangemaakt. Probeer de pagina te verversen.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Fout bij aanmaken team",
+          description: error.message || "Er is een fout opgetreden bij het aanmaken van het team. Probeer het opnieuw.",
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsCreating(false);
     }

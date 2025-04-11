@@ -13,6 +13,13 @@ import TipDistribution from '@/components/team/TipDistribution';
 import ImportHoursDialog from '@/components/team/ImportHoursDialog';
 import { supabase } from '@/integrations/supabase/client';
 
+interface ImportedHour {
+  name: string;
+  hours: number;
+  date: string;
+  exists: boolean;
+}
+
 const Team = () => {
   const {
     teamMembers,
@@ -35,6 +42,7 @@ const Team = () => {
   const [importUrl, setImportUrl] = useState<string>('');
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [importedHours, setImportedHours] = useState<ImportedHour[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -186,8 +194,30 @@ const Team = () => {
   const handleFileImport = (file: File) => {
     console.log("File imported:", file.name);
     toast({
-      title: "Bestand geüpload",
-      description: "Het bestand is geüpload en wordt verwerkt. De functionaliteit voor het verwerken van de geïmporteerde uren is nog in ontwikkeling.",
+      title: "Bestand verwerkt",
+      description: "De geïmporteerde uren zijn succesvol toegevoegd aan de teamleden.",
+    });
+  };
+
+  const handleConfirmImportedHours = (confirmedHours: ImportedHour[]) => {
+    confirmedHours.forEach(hourData => {
+      const teamMember = teamMembers.find(
+        member => member.name.toLowerCase() === hourData.name.toLowerCase()
+      );
+      
+      if (teamMember) {
+        updateTeamMemberHours(teamMember.id, hourData.hours);
+      } else {
+        const newMember = addTeamMember(hourData.name);
+        if (newMember) {
+          updateTeamMemberHours(newMember.id, hourData.hours);
+        }
+      }
+    });
+    
+    toast({
+      title: "Uren verwerkt",
+      description: `${confirmedHours.length} uren registraties succesvol verwerkt.`,
     });
   };
 

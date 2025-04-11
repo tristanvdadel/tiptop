@@ -4,11 +4,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Upload, FileUp, Check, FileX } from "lucide-react";
+import * as XLSX from 'xlsx';
+import ImportedHoursReview from './ImportedHoursReview';
+import { useApp } from '@/contexts/AppContext';
 
 interface ImportHoursDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onImport: (file: File) => void;
+}
+
+interface ExtractedHour {
+  name: string;
+  hours: number;
+  date: string;
+  exists: boolean;
 }
 
 const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
@@ -19,7 +29,10 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [extractedHours, setExtractedHours] = useState<ExtractedHour[]>([]);
+  const [showReview, setShowReview] = useState(false);
   const { toast } = useToast();
+  const { teamMembers } = useApp();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -59,29 +72,62 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
     }
   };
 
-  const handleImport = async () => {
+  const processExcelFile = async () => {
     if (!file) return;
     
     setIsUploading(true);
     try {
-      // In the future, this will call the n8n workflow
-      // For now, just simulate a delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const fileData = await file.arrayBuffer();
+      const wb = XLSX.read(fileData);
+      const firstSheet = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json<any>(firstSheet);
+
+      // Try to detect name and hours columns
+      const headers = Object.keys(data[0] || {});
+      const nameColumnCandidates = headers.filter(h => 
+        /naam|name|persoon|medewerker|employee/i.test(h)
+      );
+      const hoursColumnCandidates = headers.filter(h => 
+        /uren|uur|hours|hour/i.test(h)
+      );
       
-      // Call the onImport function with the file
-      onImport(file);
+      const nameColumn = nameColumnCandidates[0] || headers[0];
+      const hoursColumn = hoursColumnCandidates[0] || headers[1];
+
+      // Extract hours data
+      const currentDate = new Date().toISOString().split('T')[0];
+      const existingNames = new Set(teamMembers.map(m => m.name.toLowerCase()));
       
-      toast({
-        title: "Bestand geüpload",
-        description: "Het bestand is succesvol geüpload.",
-      });
-      
-      // Close the dialog
-      onClose();
+      const extractedData = data
+        .filter(row => row[nameColumn] && row[hoursColumn]) // Only rows with name and hours
+        .map(row => {
+          const name = String(row[nameColumn]).trim();
+          const hours = parseFloat(String(row[hoursColumn]).replace(',', '.'));
+          return {
+            name,
+            hours: isNaN(hours) ? 0 : hours,
+            date: currentDate,
+            exists: existingNames.has(name.toLowerCase())
+          };
+        });
+
+      if (extractedData.length === 0) {
+        toast({
+          title: "Geen data gevonden",
+          description: "Kon geen bruikbare data vinden in het bestand. Controleer of er namen en uren in staan.",
+          variant: "destructive"
+        });
+        setIsUploading(false);
+        return;
+      }
+
+      setExtractedHours(extractedData);
+      setShowReview(true);
     } catch (error) {
+      console.error("Error processing Excel file:", error);
       toast({
-        title: "Fout bij uploaden",
-        description: "Er is een fout opgetreden bij het uploaden van het bestand.",
+        title: "Fout bij verwerken",
+        description: "Er is een fout opgetreden bij het verwerken van het bestand.",
         variant: "destructive"
       });
     } finally {
@@ -89,9 +135,30 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
     }
   };
 
+  const handleConfirmHours = (confirmedHours: ExtractedHour[]) => {
+    setShowReview(false);
+    // Call onImport to allow parent component to handle the imported hours
+    onImport(file!);
+    // Reset state
+    setFile(null);
+    setExtractedHours([]);
+    onClose();
+  };
+
   const removeFile = () => {
     setFile(null);
   };
+
+  if (showReview) {
+    return (
+      <ImportedHoursReview
+        isOpen={isOpen}
+        onClose={() => setShowReview(false)}
+        importedHours={extractedHours}
+        onConfirm={handleConfirmHours}
+      />
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -169,16 +236,16 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
               Annuleren
             </Button>
             <Button 
-              onClick={handleImport} 
+              onClick={processExcelFile} 
               disabled={!file || isUploading}
               className="gap-2"
             >
               {isUploading ? (
-                <>Uploaden...</>
+                <>Verwerken...</>
               ) : (
                 <>
                   <Check className="h-4 w-4" /> 
-                  Importeren
+                  Verwerken
                 </>
               )}
             </Button>

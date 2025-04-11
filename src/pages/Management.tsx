@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +43,7 @@ const Management = () => {
   const [error, setError] = useState(null);
   const [hasAnyTeam, setHasAnyTeam] = useState(false);
   const [activeTab, setActiveTab] = useState(initialTabFromState || "teams");
+  const [loadAttempts, setLoadAttempts] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -52,6 +52,16 @@ const Management = () => {
       setActiveTab(initialTabFromState);
     }
   }, [initialTabFromState]);
+
+  const retryLoading = () => {
+    setLoadAttempts(prev => prev + 1);
+    setLoadingTeams(true);
+    setError(null);
+    toast({
+      title: "Opnieuw laden",
+      description: "Bezig met opnieuw ophalen van teams...",
+    });
+  };
 
   useEffect(() => {
     const checkUser = async () => {
@@ -66,71 +76,94 @@ const Management = () => {
         setLoadingTeams(true);
         setError(null);
         
+        console.log("Fetching teams for user:", user.id, "Attempt:", loadAttempts);
+        
         try {
-          // Fetch user's team memberships
-          const { data: teamMembers, error: memberError } = await supabase
-            .from('team_members')
-            .select('id, team_id, role')
-            .eq('user_id', user.id);
-            
-          if (memberError) {
-            console.error('Error fetching team memberships:', memberError);
-            setError(memberError.message);
-            toast({
-              title: "Fout bij ophalen teams",
-              description: memberError.message,
-              variant: "destructive"
-            });
-            setLoadingTeams(false);
-            return;
+          const { data: teams, error: teamsError } = await supabase
+            .from('teams')
+            .select('*');
+          
+          if (teamsError) {
+            console.error('Error fetching teams directly:', teamsError);
+            throw teamsError;
           }
           
-          setUserTeamMemberships(teamMembers || []);
-          setHasAnyTeam(teamMembers && teamMembers.length > 0);
-          
-          if (teamMembers && teamMembers.length > 0) {
-            // Get team details for each membership
-            const teamIds = teamMembers.map(tm => tm.team_id);
-            const { data: teams, error: teamsError } = await supabase
-              .from('teams')
-              .select('*')
-              .in('id', teamIds);
-              
-            if (teamsError) {
-              console.error('Error fetching teams:', teamsError);
-              setError(teamsError.message);
-            } else {
-              setUserTeams(teams || []);
-              
-              if (teams && teams.length > 0 && !selectedTeamId) {
-                setSelectedTeamId(teams[0].id);
-                
-                const membership = teamMembers.find(tm => tm.team_id === teams[0].id);
-                if (membership) {
-                  setSelectedMembershipId(membership.id);
-                }
-              }
-            }
+          console.log("Received teams:", teams?.length || 0);
+          if (teams && teams.length > 0) {
+            setUserTeams(teams);
+            setHasAnyTeam(true);
+            setSelectedTeamId(teams[0].id);
             
-            // Check if user has admin role in any team
-            const adminMemberships = teamMembers?.filter(tm => tm.role === 'admin') || [];
-            setIsAdmin(adminMemberships.length > 0);
+            const { data: memberships, error: membershipsError } = await supabase
+              .from('team_members')
+              .select('id, team_id, role')
+              .eq('user_id', user.id);
+            
+            if (membershipsError) {
+              console.error('Error fetching memberships:', membershipsError);
+            } else {
+              setUserTeamMemberships(memberships || []);
+              
+              const firstTeamMembership = memberships?.find(m => m.team_id === teams[0].id);
+              if (firstTeamMembership) {
+                setSelectedMembershipId(firstTeamMembership.id);
+              }
+              
+              const adminMemberships = memberships?.filter(tm => tm.role === 'admin') || [];
+              setIsAdmin(adminMemberships.length > 0);
+            }
+          } else {
+            console.log("No teams found directly, trying getUserTeams function");
+            const { data: userTeamsData, error: userTeamsError } = await getUserTeams(user.id);
+              
+            if (userTeamsError) {
+              console.error('Error in getUserTeams:', userTeamsError);
+              throw userTeamsError;
+            }
+              
+            console.log("Received teams from getUserTeams:", userTeamsData?.length || 0);
+            if (userTeamsData && userTeamsData.length > 0) {
+              setUserTeams(userTeamsData);
+              setHasAnyTeam(true);
+              setSelectedTeamId(userTeamsData[0].id);
+                
+              const { data: memberships, error: membershipsError } = await supabase
+                .from('team_members')
+                .select('id, team_id, role')
+                .eq('user_id', user.id);
+                
+              if (membershipsError) {
+                console.error('Error fetching memberships:', membershipsError);
+              } else {
+                setUserTeamMemberships(memberships || []);
+                  
+                const firstTeamMembership = memberships?.find(m => m.team_id === userTeamsData[0].id);
+                if (firstTeamMembership) {
+                  setSelectedMembershipId(firstTeamMembership.id);
+                }
+                  
+                const adminMemberships = memberships?.filter(tm => tm.role === 'admin') || [];
+                setIsAdmin(adminMemberships.length > 0);
+              }
+            } else {
+              setHasAnyTeam(false);
+            }
           }
         } catch (err) {
           console.error('Error in team fetch:', err);
-          setError(err.message);
+          setError(err.message || "Er is een fout opgetreden bij het ophalen van je teams");
         }
         
         setLoadingTeams(false);
       } catch (err) {
         console.error('Error checking user:', err);
-        setError(err.message);
+        setError(err.message || "Er is een fout opgetreden bij het controleren van je gebruiker");
         setLoadingTeams(false);
       }
     };
     
     checkUser();
-  }, [navigate, toast]);
+  }, [navigate, toast, loadAttempts]);
 
   useEffect(() => {
     const fetchTeamMembers = async () => {
@@ -138,7 +171,6 @@ const Management = () => {
       
       setLoadingMembers(true);
       try {
-        // Fetch all team members for selected team
         const { data: members, error: membersError } = await supabase
           .from('team_members')
           .select('*')
@@ -151,7 +183,6 @@ const Management = () => {
         
         const userIds = members.map(member => member.user_id).filter(Boolean);
         
-        // Fetch profiles for team members
         let profiles = [];
         if (userIds.length > 0) {
           const { data: profilesData, error: profilesError } = await supabase
@@ -167,13 +198,11 @@ const Management = () => {
           profiles = profilesData || [];
         }
 
-        // Set current user's membership
         const currentMembership = members.find(m => m.user_id === user.id);
         if (currentMembership) {
           setSelectedMembershipId(currentMembership.id);
         }
         
-        // Enrich member data with profiles and emails
         const enrichedMembers = await Promise.all(members.map(async (member) => {
           const profile = profiles.find(p => p.id === member.user_id) || {};
           const userEmail = await getUserEmail(member.user_id);
@@ -389,7 +418,6 @@ const Management = () => {
     if (!selectedTeamId || !selectedMembershipId || !user) return;
     
     try {
-      // Check if user is the last admin
       const { data: teamAdmins, error: adminsError } = await supabase
         .from('team_members')
         .select('id, role')
@@ -405,7 +433,6 @@ const Management = () => {
         throw new Error("Je kunt het team niet verlaten omdat je de enige beheerder bent. Maak eerst een ander lid beheerder of verwijder het team.");
       }
       
-      // Delete membership
       const { error: deleteError } = await supabase
         .from('team_members')
         .delete()
@@ -436,7 +463,6 @@ const Management = () => {
     if (!selectedTeamId || !user) return;
     
     try {
-      // Check if user is an admin
       const { data: adminMembership, error: adminError } = await supabase
         .from('team_members')
         .select('id')
@@ -454,7 +480,6 @@ const Management = () => {
         throw new Error("Je hebt geen rechten om dit team te verwijderen.");
       }
       
-      // Delete invites, team members, and team
       const { error: inviteDeleteError } = await supabase
         .from('invites')
         .delete()
@@ -499,7 +524,6 @@ const Management = () => {
     if (!teamId || !newName.trim() || !user) return;
     
     try {
-      // Check if user is an admin
       const { data: adminMembership, error: adminError } = await supabase
         .from('team_members')
         .select('id')
@@ -517,7 +541,6 @@ const Management = () => {
         throw new Error("Je hebt geen rechten om de teamnaam te wijzigen.");
       }
       
-      // Update team name
       const { error: updateError } = await supabase
         .from('teams')
         .update({ name: newName.trim() })
@@ -525,7 +548,6 @@ const Management = () => {
         
       if (updateError) throw updateError;
       
-      // Update local state
       setUserTeams(prev => 
         prev.map(team => 
           team.id === teamId 
@@ -557,8 +579,11 @@ const Management = () => {
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Fout bij laden van teams</AlertTitle>
-          <AlertDescription>
-            {error}
+          <AlertDescription className="space-y-3">
+            <p>{error}</p>
+            <Button variant="outline" onClick={retryLoading}>
+              Opnieuw proberen
+            </Button>
           </AlertDescription>
         </Alert>
       )}
@@ -578,7 +603,12 @@ const Management = () => {
         
         <TabsContent value="teams" className="space-y-4 mt-4">
           {loadingTeams ? (
-            <div className="flex justify-center py-8">Laden...</div>
+            <div className="flex justify-center py-8">
+              <div className="text-center space-y-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
+                <p>Laden van teams...</p>
+              </div>
+            </div>
           ) : userTeams.length > 0 ? (
             <div className="space-y-6">
               <Carousel

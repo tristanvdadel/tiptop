@@ -68,6 +68,9 @@ export const getTeamMembers = async (teamId: string) => {
     if (error) {
       console.error('Error fetching team members via RPC:', error);
       
+      // Verbeterde fallback met duidelijke logging
+      console.log('Trying fallback method for fetching team members...');
+      
       // Fallback to direct selection with less detailed attributes
       // This may work even with recursive policies by requesting fewer fields
       const { data: fallbackData, error: fallbackError } = await supabase
@@ -80,6 +83,7 @@ export const getTeamMembers = async (teamId: string) => {
         return { data: [], error: fallbackError };
       }
       
+      console.log('Fallback successful, fetched team members:', fallbackData?.length || 0);
       return { data: fallbackData, error: null };
     }
     
@@ -92,6 +96,24 @@ export const getTeamMembers = async (teamId: string) => {
 
 export const getUserTeams = async (userId: string) => {
   try {
+    console.log('Fetching teams for user:', userId);
+    
+    // First try direct table query - this is the most reliable way with our new RLS policies
+    const { data: directTeams, error: directError } = await supabase
+      .from('teams')
+      .select('*');
+    
+    if (!directError && directTeams && directTeams.length > 0) {
+      console.log('Successfully fetched teams directly:', directTeams.length);
+      return { data: directTeams, error: null };
+    }
+    
+    if (directError) {
+      console.log('Direct teams query error, trying RPC method:', directError.message);
+    } else {
+      console.log('No teams found with direct query, trying RPC method');
+    }
+    
     // Define the type for the return data
     type TeamResult = {
       id: string;
@@ -108,7 +130,8 @@ export const getUserTeams = async (userId: string) => {
     if (error) {
       console.error('Error fetching teams via RPC:', error);
       
-      // Fallback approach - get team IDs from memberships
+      // Fallback approach 1 - get team IDs from memberships
+      console.log('Trying fallback 1: fetching team memberships');
       const { data: memberships, error: membershipError } = await supabase
         .from('team_members')
         .select('team_id')
@@ -116,10 +139,10 @@ export const getUserTeams = async (userId: string) => {
         
       if (membershipError) {
         console.error('Error fetching team memberships:', membershipError);
+        console.log('Trying fallback 2: direct teams table query');
         
-        // Second fallback, try through raw SQL function
+        // Second fallback - try through teams table directly again
         try {
-          // Try to get teams through the team table directly
           const { data: teamsData, error: teamsError } = await supabase
             .from('teams')
             .select('*');
@@ -129,6 +152,7 @@ export const getUserTeams = async (userId: string) => {
             return { data: [], error: teamsError };
           }
           
+          console.log('Fallback 2 successful, fetched teams:', teamsData?.length || 0);
           return { data: teamsData, error: null };
         } catch (innerError) {
           console.error('Inner error in team fetching:', innerError);
@@ -137,8 +161,11 @@ export const getUserTeams = async (userId: string) => {
       }
       
       if (!memberships || memberships.length === 0) {
+        console.log('No team memberships found for user');
         return { data: [], error: null };
       }
+      
+      console.log('Found memberships, fetching team details:', memberships.length);
       
       // Get team details for the memberships we found
       const teamIds = memberships.map(m => m.team_id);
@@ -152,9 +179,11 @@ export const getUserTeams = async (userId: string) => {
         return { data: [], error: teamsError };
       }
       
+      console.log('Fallback 1 successful, fetched teams:', teamsData?.length || 0);
       return { data: teamsData, error: null };
     }
     
+    console.log('RPC method successful, fetched teams:', data?.length || 0);
     return { data, error: null };
   } catch (error) {
     console.error('Unexpected error in getUserTeams:', error);

@@ -7,6 +7,7 @@ import { PlusCircle } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { createTeam } from "@/services/teamService";
 
 interface TeamCreateProps {
   newTeamName: string;
@@ -48,57 +49,11 @@ const TeamCreate = ({
       
       console.log("Gebruiker ingelogd, wordt geprobeerd team aan te maken:", newTeamName);
       
-      // Eerst het team aanmaken
-      const { data: team, error: teamError } = await supabase
-        .from('teams')
-        .insert([{ name: newTeamName, created_by: user.id }])
-        .select()
-        .single();
+      // Create team using the service function that uses RPC
+      const team = await createTeam(newTeamName, user.id);
       
-      if (teamError) {
-        console.error("Team aanmaken fout:", teamError);
-        throw teamError;
-      }
-      
-      console.log("Team aangemaakt:", team);
-
-      // Gebruik de nieuwe add_team_member functie om het oneindige recursie probleem te omzeilen
-      try {
-        const { data: memberData, error: memberError } = await supabase
-          .rpc('add_team_member', {
-            team_id_param: team.id,
-            user_id_param: user.id,
-            role_param: 'admin',
-            permissions_param: {
-              add_tips: true,
-              edit_tips: true,
-              add_hours: true,
-              view_team: true,
-              view_reports: true,
-              close_periods: true,
-              manage_payouts: true
-            }
-          });
-        
-        if (memberError) {
-          console.error("Fout bij RPC add_team_member:", memberError);
-          throw memberError;
-        }
-        
-        console.log("Teamlid toegevoegd via RPC functie, ID:", memberData);
-      } catch (memberError: any) {
-        console.error("Fout bij toevoegen teamlid:", memberError);
-        
-        // Fallback: het team is al aangemaakt, dus we tonen een succes bericht
-        // en informeren de gebruiker om te verversen
-        toast({
-          title: "Team mogelijk aangemaakt",
-          description: "Er was een probleem met het toevoegen van jou als teamlid. Probeer de pagina te verversen om te zien of het team is aangemaakt.",
-          duration: 5000
-        });
-        
-        onCreateTeam();
-        return;
+      if (!team) {
+        throw new Error("Er is een onverwachte fout opgetreden bij het aanmaken van het team.");
       }
       
       toast({
@@ -113,7 +68,10 @@ const TeamCreate = ({
       console.error('Error in handleCreateTeam:', error);
       
       // Speciale afhandeling voor oneindige recursie fouten
-      if (error.message && error.message.includes("infinite recursion")) {
+      if (error.message && (
+          error.message.includes("infinite recursion") || 
+          error.code === "42P17"
+      )) {
         toast({
           title: "Database fout bij aanmaken team",
           description: "Er is een technisch probleem opgetreden. Probeer de pagina te verversen om te zien of het team is aangemaakt.",

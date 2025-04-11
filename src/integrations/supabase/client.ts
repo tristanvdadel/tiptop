@@ -45,42 +45,16 @@ export const getUserEmail = async (userId: string) => {
   }
 };
 
+// Import safe team functions from service layer
+import { getUserTeamsSafe, getTeamMembersSafe } from '@/services/teamService';
+
 // Verbeterde team member queries met veilige functies
 export const getTeamMembers = async (teamId: string) => {
   try {
     console.log('Fetching team members for team:', teamId);
     
-    // Gebruik de nieuwe veilige functie om oneindige recursie te voorkomen
-    const { data, error } = await supabase
-      .rpc('get_team_members_safe', { team_id_param: teamId });
-    
-    if (error) {
-      console.error('Error with RPC get_team_members_safe:', error);
-      
-      // Fallback: probeer gewone select als de RPC niet werkt
-      try {
-        const { data: directData, error: directError } = await supabase
-          .from('team_members')
-          .select('*')
-          .eq('team_id', teamId);
-          
-        if (!directError && Array.isArray(directData)) {
-          console.log('Successfully fetched team members via direct select:', directData.length);
-          return { data: directData, error: null };
-        }
-        
-        console.error('Direct select failed:', directError);
-      } catch (directErr) {
-        console.error('Direct select threw exception:', directErr);
-      }
-      
-      // Als laatste terugvallen op een lege array
-      console.log('All team member fetch methods failed, returning empty array');
-      return { data: [], error };
-    }
-    
-    console.log('Successfully fetched team members via RPC:', Array.isArray(data) ? data.length : 0);
-    return { data: Array.isArray(data) ? data : [], error: null };
+    const data = await getTeamMembersSafe(teamId);
+    return { data, error: null };
   } catch (error) {
     console.error('Unexpected error in getTeamMembers:', error);
     return { data: [], error };
@@ -91,55 +65,8 @@ export const getUserTeams = async (userId: string) => {
   try {
     console.log('Fetching teams for user:', userId);
     
-    // Gebruik de nieuwe veilige functie om oneindige recursie te voorkomen
-    const { data, error } = await supabase
-      .rpc('get_user_teams_safe', { user_id_param: userId });
-    
-    if (error) {
-      console.error('Error with RPC get_user_teams_safe:', error);
-      
-      // Fallback: probeer via team_members en daarna teams
-      try {
-        const { data: memberships, error: membershipError } = await supabase
-          .from('team_members')
-          .select('team_id')
-          .eq('user_id', userId);
-          
-        if (membershipError) {
-          console.error('Error fetching memberships:', membershipError);
-          return { data: [], error: membershipError };
-        }
-        
-        if (!memberships || memberships.length === 0) {
-          console.log('No memberships found');
-          return { data: [], error: null };
-        }
-        
-        const teamIds = memberships.map(m => m.team_id);
-        
-        const { data: teamsData, error: teamsError } = await supabase
-          .from('teams')
-          .select('*')
-          .in('id', teamIds);
-          
-        if (teamsError) {
-          console.error('Error fetching teams by IDs:', teamsError);
-          return { data: [], error: teamsError };
-        }
-        
-        console.log('Successfully fetched teams via memberships:', teamsData?.length || 0);
-        return { data: teamsData, error: null };
-      } catch (membershipError) {
-        console.error('Error in membership approach:', membershipError);
-      }
-      
-      // Als alle alternatieven mislukken, een lege array teruggeven
-      console.log('All team fetch methods failed, returning empty array');
-      return { data: [], error };
-    }
-    
-    console.log('Successfully fetched teams via RPC:', Array.isArray(data) ? data.length : 0);
-    return { data: Array.isArray(data) ? data : [], error: null };
+    const data = await getUserTeamsSafe(userId);
+    return { data, error: null };
   } catch (error) {
     console.error('Unexpected error in getUserTeams:', error);
     return { data: [], error };

@@ -1,9 +1,9 @@
-
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
 import { TeamMember } from '@/contexts/AppContext';
 import { useApp } from '@/contexts/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { calculateTipDistributionTotals } from '@/services/teamDataService';
+import { debounce } from '@/services/payoutService';
 
 interface TeamContextType {
   selectedPeriods: string[];
@@ -53,38 +53,49 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [sortedTeamMembers, setSortedTeamMembers] = useState<TeamMember[]>([]);
   const navigate = useNavigate();
   
-  // Calculate totals
-  const { totalTips, totalHours } = calculateTipDistributionTotals(
-    selectedPeriods,
-    periods,
-    teamMembers
+  const { totalTips, totalHours } = useMemo(() => 
+    calculateTipDistributionTotals(
+      selectedPeriods,
+      periods,
+      teamMembers
+    ),
+    [selectedPeriods, periods, teamMembers]
   );
 
-  const togglePeriodSelection = (periodId: string) => {
-    setSelectedPeriods(prev => {
-      if (prev.includes(periodId)) {
-        return prev.filter(id => id !== periodId);
-      } else {
-        return [...prev, periodId];
-      }
-    });
-  };
+  const debouncedTogglePeriod = useCallback(
+    debounce((periodId: string) => {
+      setSelectedPeriods(prev => {
+        if (prev.includes(periodId)) {
+          return prev.filter(id => id !== periodId);
+        } else {
+          return [...prev, periodId];
+        }
+      });
+    }, 100),
+    []
+  );
 
-  // Calculate tip distribution
+  const togglePeriodSelection = useCallback((periodId: string) => {
+    if (periodId === '') {
+      setSelectedPeriods([]);
+    } else {
+      debouncedTogglePeriod(periodId);
+    }
+  }, [debouncedTogglePeriod]);
+
   React.useEffect(() => {
     if (selectedPeriods.length === 0 || teamMembers.length === 0) {
       setDistribution([]);
       return;
     }
+    
     const calculatedDistribution = calculateTipDistribution(selectedPeriods);
     setDistribution(calculatedDistribution);
   }, [selectedPeriods, calculateTipDistribution, teamMembers.length]);
 
-  // Update sorted team members
   React.useEffect(() => {
     if (teamMembers.length === 0) return;
     
-    // Sort alphabetically
     const sorted = [...teamMembers].sort((a, b) => 
       a.name.toLowerCase().localeCompare(b.name.toLowerCase())
     );
@@ -156,7 +167,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setShowImportDialog(false);
   };
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     try {
       setLoading(true);
       await refreshTeamData();
@@ -168,7 +179,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setLoading(false);
     }
-  };
+  }, [refreshTeamData]);
 
   const value = {
     selectedPeriods,

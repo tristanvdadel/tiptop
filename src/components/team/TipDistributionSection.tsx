@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { useTeam } from '@/contexts/TeamContext';
 import { useToast } from '@/hooks/use-toast';
@@ -9,11 +9,14 @@ const TipDistributionSection: React.FC = () => {
   const { selectedPeriods, distribution, totalTips, totalHours, handlePayout } = useTeam();
   const { toast } = useToast();
 
+  // Memoize the button disabled state to prevent unnecessary re-renders
+  const isButtonDisabled = useMemo(() => selectedPeriods.length === 0, [selectedPeriods.length]);
+
   const handlePayoutClick = () => {
-    if (selectedPeriods.length === 0) {
+    if (isButtonDisabled) {
       toast({
-        title: "Select periods",
-        description: "Select at least one period for payout.",
+        title: "Selecteer periodes",
+        description: "Selecteer ten minste één periode voor uitbetaling.",
         variant: "destructive"
       });
       return;
@@ -37,7 +40,7 @@ const TipDistributionSection: React.FC = () => {
           variant="default" 
           className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white"
           onClick={handlePayoutClick} 
-          disabled={selectedPeriods.length === 0}
+          disabled={isButtonDisabled}
         >
           Uitbetaling voltooien
         </Button>

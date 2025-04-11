@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { User, CreditCard, Lock, LogOut } from "lucide-react";
+import { User, CreditCard, Lock, LogOut, Phone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -12,12 +12,27 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { supabase, getUser } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import * as z from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+const profileFormSchema = z.object({
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  phone: z.string().optional(),
+  name: z.string().min(1, "Naam is verplicht")
+});
+
+type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
 const AccountSettings = () => {
   const { toast } = useToast();
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userName, setUserName] = useState("Gebruiker");
   const [userEmail, setUserEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -29,11 +44,15 @@ const AccountSettings = () => {
           
           const { data: profile } = await supabase
             .from('profiles')
-            .select('first_name, last_name, avatar_url')
+            .select('first_name, last_name, avatar_url, phone')
             .eq('id', user.id)
             .single();
             
           if (profile) {
+            setFirstName(profile.first_name || "");
+            setLastName(profile.last_name || "");
+            setPhone(profile.phone || "");
+            
             if (profile.first_name || profile.last_name) {
               const fullName = [profile.first_name, profile.last_name]
                 .filter(Boolean)
@@ -81,16 +100,71 @@ const AccountSettings = () => {
     }
   };
 
-  const handleProfileSave = async (data: {
-    name: string;
-  }) => {
-    setUserName(data.name);
-    localStorage.setItem('userName', data.name);
-    
-    toast({
-      title: "Profiel bijgewerkt",
-      description: "Je profielgegevens zijn succesvol opgeslagen."
+  const profileForm = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileFormSchema),
+    defaultValues: {
+      firstName: firstName,
+      lastName: lastName,
+      phone: phone,
+      name: userName
+    }
+  });
+
+  // Update form values when user data is loaded
+  useEffect(() => {
+    profileForm.reset({
+      firstName: firstName,
+      lastName: lastName,
+      phone: phone,
+      name: userName
     });
+  }, [firstName, lastName, phone, userName, profileForm]);
+
+  const handleProfileSave = async (data: ProfileFormValues) => {
+    try {
+      const user = await getUser();
+      if (!user) {
+        throw new Error("Gebruiker niet gevonden");
+      }
+      
+      // Update profile in Supabase
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          first_name: data.firstName,
+          last_name: data.lastName,
+          phone: data.phone
+        })
+        .eq('id', user.id);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setFirstName(data.firstName || "");
+      setLastName(data.lastName || "");
+      setPhone(data.phone || "");
+      
+      // Update displayed name
+      const fullName = [data.firstName, data.lastName]
+        .filter(Boolean)
+        .join(' ');
+      
+      const displayName = fullName || data.name;
+      setUserName(displayName);
+      localStorage.setItem('userName', displayName);
+      
+      toast({
+        title: "Profiel bijgewerkt",
+        description: "Je profielgegevens zijn succesvol opgeslagen."
+      });
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: "Fout bij opslaan",
+        description: error.message || "Er is een fout opgetreden bij het opslaan van je profiel.",
+        variant: "destructive"
+      });
+    }
   };
 
   const passwordForm = useForm({
@@ -98,12 +172,6 @@ const AccountSettings = () => {
       currentPassword: "",
       newPassword: "",
       confirmPassword: ""
-    }
-  });
-
-  const profileForm = useForm({
-    defaultValues: {
-      name: userName
     }
   });
 
@@ -176,6 +244,7 @@ const AccountSettings = () => {
             <div>
               <p className="font-medium">{userName}</p>
               <p className="text-sm text-muted-foreground">{userEmail}</p>
+              {phone && <p className="text-sm text-muted-foreground"><Phone className="h-3 w-3 inline mr-1" />{phone}</p>}
             </div>
           </div>
         </div>
@@ -198,26 +267,79 @@ const AccountSettings = () => {
                   Pas je profielgegevens en foto aan.
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={profileForm.handleSubmit(handleProfileSave)}>
-                <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Naam</Label>
-                    <Input id="name" defaultValue={userName} {...profileForm.register("name", {
-                    required: true
-                  })} />
+              <Form {...profileForm}>
+                <form onSubmit={profileForm.handleSubmit(handleProfileSave)} className="space-y-4">
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={profileForm.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Voornaam</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Voornaam" {...field} value={field.value || ""} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={profileForm.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Achternaam</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Achternaam" {...field} value={field.value || ""} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <FormField
+                      control={profileForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Weergavenaam</FormLabel>
+                          <FormControl>
+                            <Input required {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={profileForm.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Telefoonnummer</FormLabel>
+                          <FormControl>
+                            <Input type="tel" placeholder="+31 6 12345678" {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="picture">Profielfoto</Label>
+                      <Input id="picture" type="file" accept="image/*" onChange={handleImageUpload} className="w-full" />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="picture">Profielfoto</Label>
-                    <Input id="picture" type="file" accept="image/*" onChange={handleImageUpload} className="w-full" />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" type="button" onClick={() => document.querySelector('dialog')?.close()}>
-                    Annuleren
-                  </Button>
-                  <Button type="submit">Opslaan</Button>
-                </DialogFooter>
-              </form>
+                  <DialogFooter>
+                    <Button variant="outline" type="button" onClick={() => document.querySelector('dialog')?.close()}>
+                      Annuleren
+                    </Button>
+                    <Button type="submit">Opslaan</Button>
+                  </DialogFooter>
+                </form>
+              </Form>
             </DialogContent>
           </Dialog>
         </div>

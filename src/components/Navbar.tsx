@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getUserTeamsSafe } from '@/services/teamService';
 
 interface NavbarProps {
   disabled?: boolean;
@@ -21,29 +22,12 @@ const Navbar = ({ disabled = false, onDisabledClick }: NavbarProps) => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
         
-        const { data: teamMembers, error: memberError } = await supabase
-          .from('team_members')
-          .select('team_id')
-          .eq('user_id', session.user.id)
-          .single();
+        // Use the safe function to fetch teams
+        const teams = await getUserTeamsSafe(session.user.id);
         
-        if (memberError || !teamMembers) {
-          console.error('Error fetching team membership:', memberError);
-          return;
+        if (teams && teams.length > 0) {
+          setTeamName(teams[0].name);
         }
-        
-        const { data: team, error: teamError } = await supabase
-          .from('teams')
-          .select('name')
-          .eq('id', teamMembers.team_id)
-          .single();
-        
-        if (teamError || !team) {
-          console.error('Error fetching team:', teamError);
-          return;
-        }
-        
-        setTeamName(team.name);
       } catch (error) {
         console.error('Error fetching team data:', error);
       }

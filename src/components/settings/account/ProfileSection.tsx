@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import * as React from "react";
 
 const profileFormSchema = z.object({
   firstName: z.string().optional(),

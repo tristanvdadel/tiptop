@@ -50,21 +50,21 @@ const Team = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Laad teamgegevens slechts één keer bij initiële montage
+  // Load team data only once on initial mount
   useEffect(() => {
     const loadInitialData = async () => {
       if (dataInitialized) return;
       
       try {
-        console.log("Initiële gegevens laden...");
+        console.log("Loading initial data...");
         setLoading(true);
         await refreshTeamData();
         setDataInitialized(true);
       } catch (error) {
-        console.error("Error bij laden van teamgegevens:", error);
+        console.error("Error loading team data:", error);
         toast({
-          title: "Fout bij laden",
-          description: "Er is een fout opgetreden bij het laden van de teamgegevens.",
+          title: "Error loading data",
+          description: "An error occurred while loading team data.",
           variant: "destructive"
         });
       } finally {
@@ -75,14 +75,28 @@ const Team = () => {
     loadInitialData();
   }, [refreshTeamData, toast, dataInitialized]);
 
-  // Update gesorteerde teamleden wanneer teamleden veranderen
+  // Update sorted team members when team members change
   useEffect(() => {
-    const updateSortedMembers = async () => {
+    if (teamMembers.length === 0) return;
+    
+    const sortTeamMembers = () => {
+      // Sort alphabetically
+      const sorted = [...teamMembers].sort((a, b) => 
+        a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+      );
+      
+      setSortedTeamMembers(sorted);
+    };
+    
+    sortTeamMembers();
+    
+    // Check which members have accounts (in a more efficient way)
+    const checkMembersWithAccounts = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         
-        // Gebruik een enkele query om alle profielen op te halen
+        // Use a single query to get all profiles
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id');
@@ -91,13 +105,13 @@ const Team = () => {
         
         const userIds = new Set(profiles.map(profile => profile.id));
         
-        // Lokale bewerking zonder extra queries
+        // Local processing without extra queries
         const updatedTeamMembers = teamMembers.map(member => ({
           ...member,
           hasAccount: userIds.has(member.id)
         }));
         
-        // Sorteer alfabetisch
+        // Sort alphabetically
         const sorted = [...updatedTeamMembers].sort((a, b) => 
           a.name.toLowerCase().localeCompare(b.name.toLowerCase())
         );
@@ -108,12 +122,10 @@ const Team = () => {
       }
     };
     
-    if (teamMembers.length > 0) {
-      updateSortedMembers();
-    }
+    checkMembersWithAccounts();
   }, [teamMembers]);
 
-  // Check URL parameters voor het tonen van de uitbetalingssamenvatting
+  // Check URL parameters for showing the payout summary
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const showSummary = urlParams.get('payoutSummary') === 'true';
@@ -134,7 +146,7 @@ const Team = () => {
     });
   };
 
-  // Tip distribution berekenen met memoization
+  // Calculate tip distribution with memoization
   const calculateDistributionForSelectedPeriods = useCallback(() => {
     if (selectedPeriods.length === 0 || teamMembers.length === 0) {
       setDistribution([]);
@@ -151,8 +163,8 @@ const Team = () => {
   const handlePayout = () => {
     if (selectedPeriods.length === 0) {
       toast({
-        title: "Selecteer perioden",
-        description: "Selecteer minimaal één periode voor uitbetaling.",
+        title: "Select periods",
+        description: "Select at least one period for payout.",
         variant: "destructive"
       });
       return;
@@ -171,7 +183,7 @@ const Team = () => {
     navigate('/team?payoutSummary=true');
   };
 
-  // Bereken totalen met memoization
+  // Calculate totals with memoization
   const calculateTotalTipsAndHours = useCallback(() => {
     if (selectedPeriods.length === 0) {
       return {
@@ -212,14 +224,14 @@ const Team = () => {
 
   const handleFileImport = async (file: File) => {
     try {
-      setImportedHours([]); // Reset vorige uren
+      setImportedHours([]); // Reset previous hours
       
       const extractedData = await extractHoursFromExcel(file);
       
       if (extractedData.length === 0) {
         toast({
-          title: "Geen data gevonden",
-          description: "Er zijn geen bruikbare gegevens gevonden in het bestand.",
+          title: "No data found",
+          description: "No usable data found in the file.",
           variant: "destructive"
         });
         return;
@@ -235,14 +247,14 @@ const Team = () => {
       console.log("Imported hours:", processedData);
       
       toast({
-        title: "Bestand verwerkt",
-        description: `${processedData.length} uur registraties gevonden.`,
+        title: "File processed",
+        description: `${processedData.length} hour registrations found.`,
       });
     } catch (error) {
       console.error("Error processing file:", error);
       toast({
-        title: "Verwerkingsfout",
-        description: "Er is een fout opgetreden bij het verwerken van het bestand.",
+        title: "Processing error",
+        description: "An error occurred while processing the file.",
         variant: "destructive"
       });
     }
@@ -250,33 +262,31 @@ const Team = () => {
 
   const handleConfirmImportedHours = (confirmedHours: ImportedHour[]) => {
     for (const hourData of confirmedHours) {
-      const teamMember = teamMembers.find(
+      let teamMember = teamMembers.find(
         member => member.name.toLowerCase() === hourData.name.toLowerCase()
       );
       
-      if (teamMember) {
-        updateTeamMemberHours(teamMember.id, hourData.hours);
-      } else {
-        // Voeg een nieuw teamlid toe
+      if (!teamMember) {
+        // Add a new team member
         addTeamMember(hourData.name);
         
-        // Zoek het nieuw toegevoegde lid op basis van naam
-        const newMember = teamMembers.find(member => 
+        // Find the newly added member by name
+        teamMember = teamMembers.find(member => 
           member.name.toLowerCase() === hourData.name.toLowerCase()
         );
-        
-        if (newMember) {
-          updateTeamMemberHours(newMember.id, hourData.hours);
-        }
+      }
+      
+      if (teamMember) {
+        updateTeamMemberHours(teamMember.id, hourData.hours);
       }
     }
     
     toast({
-      title: "Uren verwerkt",
-      description: `${confirmedHours.length} uren registraties succesvol verwerkt.`,
+      title: "Hours processed",
+      description: `${confirmedHours.length} hour registrations successfully processed.`,
     });
     
-    // Sluit dialoog na verwerking
+    // Close dialog after processing
     setShowImportDialog(false);
   };
 
@@ -285,14 +295,14 @@ const Team = () => {
       setLoading(true);
       await refreshTeamData();
       toast({
-        title: "Gegevens vernieuwd",
-        description: "De teamgegevens zijn succesvol bijgewerkt.",
+        title: "Data refreshed",
+        description: "Team data has been successfully updated.",
       });
     } catch (error) {
-      console.error("Error bij vernieuwen van teamgegevens:", error);
+      console.error("Error refreshing team data:", error);
       toast({
-        title: "Fout bij vernieuwen",
-        description: "Er is een fout opgetreden bij het vernieuwen van de teamgegevens.",
+        title: "Refresh error",
+        description: "An error occurred while refreshing team data.",
         variant: "destructive"
       });
     } finally {
@@ -311,12 +321,12 @@ const Team = () => {
     );
   }
 
-  // Toon laadanimatie tijdens eerste laadproces
+  // Show loading animation during first load process
   if (loading && !dataInitialized) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <RefreshCw size={32} className="animate-spin mb-4 text-primary" />
-        <p>Teamgegevens laden...</p>
+        <p>Loading team data...</p>
       </div>
     );
   }
@@ -326,7 +336,7 @@ const Team = () => {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Users size={20} />
-          <h1 className="text-xl font-bold">Team leden</h1>
+          <h1 className="text-xl font-bold">Team members</h1>
         </div>
         
         <Button 
@@ -336,7 +346,7 @@ const Team = () => {
           disabled={loading}
         >
           <RefreshCw size={16} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? 'Laden...' : 'Verversen'}
+          {loading ? 'Loading...' : 'Refresh'}
         </Button>
       </div>
       
@@ -356,7 +366,7 @@ const Team = () => {
           onClick={handleImportHours}
         >
           <Upload size={16} />
-          Uren importeren
+          Import hours
         </Button>
       </div>
       
@@ -382,7 +392,7 @@ const Team = () => {
             onClick={handlePayout} 
             disabled={selectedPeriods.length === 0}
           >
-            Uitbetaling voltooien
+            Complete payout
           </Button>
         </div>
       )}

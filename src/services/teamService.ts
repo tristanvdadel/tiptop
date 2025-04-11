@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -29,43 +30,56 @@ export const fetchTeamData = async (teamId: string) => {
       throw periodsError;
     }
     
-    // Fetch tips for each period
-    const periodsWithTips = await Promise.all(periods.map(async (period) => {
-      const { data: tips, error: tipsError } = await supabase
-        .from('tips')
-        .select('*')
-        .eq('period_id', period.id);
+    // Fetch all tips in a single query instead of per period
+    const { data: allTips, error: allTipsError } = await supabase
+      .from('tips')
+      .select('*')
+      .in('period_id', periods.map(p => p.id));
       
-      if (tipsError) {
-        console.error('Error fetching tips for period', period.id, ':', tipsError);
-        throw tipsError;
-      }
-      
-      return {
-        ...period,
-        tips: tips || []
-      };
+    if (allTipsError) {
+      console.error('Error fetching all tips:', allTipsError);
+      throw allTipsError;
+    }
+    
+    // Map tips to their respective periods
+    const periodsWithTips = periods.map(period => ({
+      ...period,
+      tips: allTips.filter(tip => tip.period_id === period.id) || []
     }));
     
-    // Fetch hour registrations for each team member
-    const teamMembersWithDetails = await Promise.all(teamMembers.map(async (member) => {
-      const { data: hourRegistrations, error: hourRegError } = await supabase
-        .from('hour_registrations')
-        .select('*')
-        .eq('team_member_id', member.id);
+    // Collect all user_ids to fetch profiles in a single query
+    const userIds = teamMembers
+      .map(member => member.user_id)
+      .filter(Boolean);
       
-      if (hourRegError) {
-        console.error('Error fetching hour registrations for member', member.id, ':', hourRegError);
-        throw hourRegError;
-      }
+    // Fetch all profiles in a single query
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .in('id', userIds);
       
-      // Fetch profile info to get member name
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('first_name, last_name')
-        .eq('id', member.user_id)
-        .single();
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+      throw profilesError;
+    }
+    
+    // Fetch all hour registrations in a single query
+    const { data: allHourRegistrations, error: hourRegsError } = await supabase
+      .from('hour_registrations')
+      .select('*')
+      .in('team_member_id', teamMembers.map(m => m.id));
       
+    if (hourRegsError) {
+      console.error('Error fetching hour registrations:', hourRegsError);
+      throw hourRegsError;
+    }
+    
+    // Build team members with details
+    const teamMembersWithDetails = teamMembers.map(member => {
+      // Find profile for this member
+      const profile = profiles.find(p => p.id === member.user_id);
+      
+      // Generate name from profile or default
       const name = profile ? 
         `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 
         'Onbekend lid';
@@ -73,13 +87,18 @@ export const fetchTeamData = async (teamId: string) => {
       // Set hasAccount to true if the member has a user_id
       const hasAccount = !!member.user_id;
       
+      // Find hour registrations for this member
+      const hourRegistrations = allHourRegistrations.filter(
+        reg => reg.team_member_id === member.id
+      );
+      
       return {
         ...member,
         name,
         hasAccount,
-        hourRegistrations: hourRegistrations || []
+        hourRegistrations
       };
-    }));
+    });
     
     // Fetch payouts
     const { data: payouts, error: payoutsError } = await supabase
@@ -92,31 +111,48 @@ export const fetchTeamData = async (teamId: string) => {
       throw payoutsError;
     }
     
-    // Fetch distribution data for each payout
-    const payoutsWithDistribution = await Promise.all(payouts.map(async (payout) => {
-      const { data: distributions, error: distError } = await supabase
-        .from('payout_distributions')
-        .select('*')
-        .eq('payout_id', payout.id);
+    // Get all payout ids for further queries
+    const payoutIds = payouts.map(p => p.id);
+    
+    // Fetch all distributions in a single query
+    const { data: allDistributions, error: allDistError } = await supabase
+      .from('payout_distributions')
+      .select('*')
+      .in('payout_id', payoutIds);
       
-      if (distError) {
-        console.error('Error fetching distributions for payout', payout.id, ':', distError);
-        throw distError;
-      }
+    if (allDistError) {
+      console.error('Error fetching all distributions:', allDistError);
+      throw allDistError;
+    }
+    
+    // Fetch all payout periods in a single query
+    const { data: allPayoutPeriods, error: allPPError } = await supabase
+      .from('payout_periods')
+      .select('*')
+      .in('payout_id', payoutIds);
       
-      // Fetch which periods were included in this payout
-      const { data: payoutPeriods, error: ppError } = await supabase
-        .from('payout_periods')
-        .select('period_id')
-        .eq('payout_id', payout.id);
+    if (allPPError) {
+      console.error('Error fetching all payout periods:', allPPError);
+      throw allPPError;
+    }
+    
+    // Build payouts with distributions and periods
+    const payoutsWithDistribution = payouts.map(payout => {
+      // Find distributions for this payout
+      const distributions = allDistributions.filter(
+        dist => dist.payout_id === payout.id
+      );
       
-      if (ppError) {
-        console.error('Error fetching payout periods for payout', payout.id, ':', ppError);
-        throw ppError;
-      }
+      // Find payout periods for this payout
+      const payoutPeriods = allPayoutPeriods.filter(
+        pp => pp.payout_id === payout.id
+      );
       
       // Calculate total amount from distributions
-      const totalAmount = distributions.reduce((sum, dist) => sum + (dist.amount || 0), 0);
+      const totalAmount = distributions.reduce(
+        (sum, dist) => sum + (dist.amount || 0), 
+        0
+      );
       
       return {
         id: payout.id,
@@ -132,7 +168,7 @@ export const fetchTeamData = async (teamId: string) => {
           balance: dist.balance
         }))
       };
-    }));
+    });
     
     // Fetch team settings
     const { data: settings, error: settingsError } = await supabase

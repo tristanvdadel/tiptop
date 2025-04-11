@@ -48,9 +48,19 @@ export const getUserEmail = async (userId: string) => {
 // Direct team member query functions to handle recursive policy errors
 export const getTeamMembers = async (teamId: string) => {
   try {
-    // Create a correctly typed function call with explicit type parameters
-    // Type for the return value and the parameters
-    const { data, error } = await supabase.rpc<any, { team_id_param: string }>(
+    // Define the type for the return data and the parameters
+    type TeamMemberResult = {
+      id: string;
+      team_id: string;
+      user_id: string;
+      role: string;
+      permissions: any;
+      hours: number | null;
+      balance: number | null;
+      created_at: string;
+    };
+    
+    const { data, error } = await supabase.rpc<TeamMemberResult[], { team_id_param: string }>(
       'get_team_members', 
       { team_id_param: teamId }
     );
@@ -82,9 +92,15 @@ export const getTeamMembers = async (teamId: string) => {
 
 export const getUserTeams = async (userId: string) => {
   try {
-    // Create a correctly typed function call with explicit type parameters
-    // Type for the return value and the parameters
-    const { data, error } = await supabase.rpc<any, { user_id_param: string }>(
+    // Define the type for the return data and the parameters
+    type TeamResult = {
+      id: string;
+      name: string;
+      created_by: string;
+      created_at: string;
+    };
+    
+    const { data, error } = await supabase.rpc<TeamResult[], { user_id_param: string }>(
       'get_user_teams', 
       { user_id_param: userId }
     );

@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from '@/components/ui/input';
@@ -32,7 +32,6 @@ const DistributionTable: React.FC<DistributionTableProps> = ({
   const isMobile = useIsMobile();
   const tableContainerRef = useRef<HTMLDivElement>(null);
   
-  // Style for the fixed name column
   const fixedColumnStyle = {
     position: 'sticky' as const,
     left: 0,
@@ -44,16 +43,16 @@ const DistributionTable: React.FC<DistributionTableProps> = ({
   return (
     <div className="border rounded-md overflow-hidden relative bg-white">
       <ScrollArea className="h-full w-full">
-        <div className="min-w-[800px]">
+        <div className="min-w-[600px]"> {/* Reduced from 800px */}
           <Table className="relative bg-white">
             <TableHeader className="bg-white">
               <TableRow className="bg-white">
-                <TableHead style={fixedColumnStyle} className="bg-white">Naam</TableHead>
-                <TableHead className="text-right min-w-[100px] bg-white">Berekend</TableHead>
-                <TableHead className="text-right min-w-[100px] bg-white">Saldo</TableHead>
-                <TableHead className="text-right min-w-[100px] bg-white">Totaal</TableHead>
-                <TableHead className="text-right min-w-[120px] bg-white">Uitbetaald</TableHead>
-                <TableHead className="text-right min-w-[120px] bg-white">Nieuw saldo</TableHead>
+                <TableHead style={fixedColumnStyle} className="bg-white w-1/6">Naam</TableHead>
+                <TableHead className="text-right w-1/6 bg-white">Berekend</TableHead>
+                <TableHead className="text-right w-1/6 bg-white">Saldo</TableHead>
+                <TableHead className="text-right w-1/6 bg-white">Totaal</TableHead>
+                <TableHead className="text-right w-1/6 bg-white">Uitbetaald</TableHead>
+                <TableHead className="text-right w-1/6 bg-white">Nieuw saldo</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="bg-white">
@@ -69,30 +68,30 @@ const DistributionTable: React.FC<DistributionTableProps> = ({
                   <TableRow key={index} className={`${isEditing && item.isEdited ? "bg-amber-50" : "bg-white"}`}>
                     <TableCell 
                       style={fixedColumnStyle}
-                      className="bg-white min-w-[120px] font-medium"
+                      className="bg-white font-medium truncate"
                     >
-                      {member ? member.name : 'Onbekend teamlid'}
+                      {member ? member.name : 'Onbekend'}
                     </TableCell>
-                    <TableCell className="text-right whitespace-nowrap bg-white">€{calculatedAmount.toFixed(2)}</TableCell>
-                    <TableCell className={`text-right whitespace-nowrap bg-white ${originalBalance > 0 ? 'text-green-600' : originalBalance < 0 ? 'text-red-600' : ''}`}>
+                    <TableCell className="text-right whitespace-nowrap bg-white text-sm">€{calculatedAmount.toFixed(2)}</TableCell>
+                    <TableCell className={`text-right whitespace-nowrap bg-white text-sm ${originalBalance > 0 ? 'text-green-600' : originalBalance < 0 ? 'text-red-600' : ''}`}>
                       {originalBalance !== 0 ? `€${Math.abs(originalBalance).toFixed(2)} ${originalBalance > 0 ? '+' : '-'}` : '-'}
                     </TableCell>
-                    <TableCell className="text-right font-medium whitespace-nowrap bg-white">
+                    <TableCell className="text-right font-medium whitespace-nowrap bg-white text-sm">
                       €{totalAmount.toFixed(2)}
                     </TableCell>
-                    <TableCell className="text-right font-medium whitespace-nowrap bg-white">
+                    <TableCell className="text-right font-medium whitespace-nowrap bg-white text-sm">
                       {isEditing ? (
                         <Input 
                           type="number" 
                           value={actualAmount} 
                           onChange={e => handleAmountChange(item.memberId, e.target.value)} 
-                          className="w-24 text-right inline-block h-8" 
+                          className="w-20 text-right inline-block h-8 text-sm" 
                           min="0" 
                           step="0.01" 
                         />
                       ) : `€${actualAmount.toFixed(2)}`}
                     </TableCell>
-                    <TableCell className={`text-right whitespace-nowrap bg-white ${newBalance && newBalance > 0 ? 'text-green-600' : newBalance && newBalance < 0 ? 'text-red-600' : ''}`}>
+                    <TableCell className={`text-right whitespace-nowrap bg-white text-sm ${newBalance && newBalance > 0 ? 'text-green-600' : newBalance && newBalance < 0 ? 'text-red-600' : ''}`}>
                       {newBalance !== undefined && newBalance !== 0 ? `€${Math.abs(newBalance).toFixed(2)} ${newBalance > 0 ? '+' : '-'}` : '-'}
                     </TableCell>
                   </TableRow>

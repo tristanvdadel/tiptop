@@ -238,8 +238,12 @@ const Team = () => {
         updateTeamMemberHours(teamMember.id, hourData.hours);
       } else {
         const newMemberId = addTeamMember(hourData.name);
-        if (newMemberId) {
-          updateTeamMemberHours(newMemberId, hourData.hours);
+        const newMember = teamMembers.find(member => 
+          member.name.toLowerCase() === hourData.name.toLowerCase()
+        );
+        
+        if (newMember) {
+          updateTeamMemberHours(newMember.id, hourData.hours);
         }
       }
     }

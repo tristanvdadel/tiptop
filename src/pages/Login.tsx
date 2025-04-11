@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Loader2, Coins, CheckCircle, Mail } from 'lucide-react';
+import { Loader2, Coins, CheckCircle, Mail, KeyRound } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -19,6 +21,10 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
   const [emailVerificationStatus, setEmailVerificationStatus] = useState<'pending' | 'verified' | null>(null);
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  const [resetPasswordSuccess, setResetPasswordSuccess] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -177,6 +183,38 @@ const Login = () => {
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetPasswordLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/login?tab=login`,
+      });
+      
+      if (error) throw error;
+      
+      setResetPasswordSuccess(true);
+      toast({
+        title: "Wachtwoord reset instructies verstuurd",
+        description: "Controleer je e-mail voor instructies om je wachtwoord te resetten.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Fout bij wachtwoord reset",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setResetPasswordLoading(false);
+    }
+  };
+
+  const closeResetPasswordDialog = () => {
+    setResetPasswordOpen(false);
+    setResetEmail('');
+    setResetPasswordSuccess(false);
+  };
+
   if (emailVerificationStatus === 'verified') {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-amber-100/30 via-amber-50/40 to-amber-100/30 p-4 relative">
@@ -239,6 +277,15 @@ const Login = () => {
                     <Label htmlFor="password">Wachtwoord</Label>
                     <Input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} />
                   </div>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="p-0 h-auto text-amber-600 hover:text-amber-700 flex items-center gap-1"
+                    onClick={() => setResetPasswordOpen(true)}
+                  >
+                    <KeyRound size={16} />
+                    Wachtwoord vergeten?
+                  </Button>
                 </CardContent>
                 <CardFooter>
                   <Button type="submit" className="w-full" variant="goldGradient" disabled={loading}>
@@ -317,6 +364,61 @@ const Login = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Password Reset Dialog */}
+      <Dialog open={resetPasswordOpen} onOpenChange={setResetPasswordOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Wachtwoord resetten</DialogTitle>
+            <DialogDescription>
+              Vul je e-mailadres in om instructies te ontvangen voor het resetten van je wachtwoord.
+            </DialogDescription>
+          </DialogHeader>
+          {resetPasswordSuccess ? (
+            <div className="flex flex-col items-center py-4 space-y-4">
+              <Mail className="h-12 w-12 text-amber-500" />
+              <p className="text-center">
+                We hebben instructies verstuurd naar <strong>{resetEmail}</strong> om je wachtwoord te resetten.
+                Controleer je inbox en volg de instructies om je wachtwoord opnieuw in te stellen.
+              </p>
+              <Button variant="goldGradient" onClick={closeResetPasswordDialog} className="w-full">
+                Sluiten
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleResetPassword}>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="resetEmail">E-mail</Label>
+                  <Input
+                    id="resetEmail"
+                    type="email"
+                    placeholder="naam@voorbeeld.nl"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={closeResetPasswordDialog} type="button">
+                  Annuleren
+                </Button>
+                <Button variant="goldGradient" type="submit" disabled={resetPasswordLoading}>
+                  {resetPasswordLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Bezig...
+                    </>
+                  ) : (
+                    "Wachtwoord resetten"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

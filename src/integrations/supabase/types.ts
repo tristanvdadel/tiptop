@@ -431,6 +431,10 @@ export type Database = {
         Args: { user_id_param: string; team_id_param: string }
         Returns: boolean
       }
+      create_team_with_admin: {
+        Args: { name_param: string; user_id_param: string }
+        Returns: string
+      }
       get_team_members: {
         Args: { team_id_param: string }
         Returns: {

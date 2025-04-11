@@ -48,19 +48,41 @@ const TeamCreate = ({
       
       console.log("Gebruiker ingelogd, wordt geprobeerd team aan te maken:", newTeamName);
       
-      // Use the RPC function to create team and add admin in one transaction
-      const { data: teamId, error: teamError } = await supabase
-        .rpc('create_team_with_admin', {
-          name_param: newTeamName,
-          user_id_param: user.id
-        });
+      // Use direct insert to create the team rather than the RPC function
+      const { data: team, error: teamError } = await supabase
+        .from('teams')
+        .insert([{ name: newTeamName, created_by: user.id }])
+        .select()
+        .single();
       
       if (teamError) {
-        console.error("Team creation error with RPC:", teamError);
+        console.error("Team creation error:", teamError);
         throw teamError;
       }
       
-      console.log("Team aangemaakt met ID:", teamId);
+      console.log("Team aangemaakt met ID:", team.id);
+      
+      // Add user as admin
+      const { data: memberData, error: memberError } = await supabase
+        .rpc('add_team_member', {
+          team_id_param: team.id,
+          user_id_param: user.id,
+          role_param: 'admin',
+          permissions_param: {
+            add_tips: true,
+            edit_tips: true,
+            add_hours: true,
+            view_team: true,
+            view_reports: true,
+            close_periods: true,
+            manage_payouts: true
+          }
+        });
+      
+      if (memberError) {
+        console.error("Error with RPC add_team_member:", memberError);
+        throw memberError;
+      }
       
       toast({
         title: "Team aangemaakt",

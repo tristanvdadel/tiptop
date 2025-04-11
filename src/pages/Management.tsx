@@ -7,7 +7,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 
-// Import components for the different tabs
 import TeamManagement from '@/components/management/TeamManagement';
 import NoTeam from '@/components/management/NoTeam';
 import PermissionsTab from '@/components/management/PermissionsTab';
@@ -67,7 +66,6 @@ const Management = () => {
         console.log("Fetching teams for user:", user.id, "Attempt:", loadAttempts);
         
         try {
-          // Use the getUserTeams function which is now using the safe RPC function
           const { data: teams, error: teamsError } = await getUserTeams(user.id);
           
           if (teamsError) {
@@ -190,17 +188,38 @@ const Management = () => {
       console.log("Creating team:", newTeamName, "for user:", user.id);
       
       const { data: team, error: teamError } = await supabase
-        .rpc('create_team_with_admin', { 
-          name_param: newTeamName, 
-          user_id_param: user.id 
-        });
+        .from('teams')
+        .insert([{ name: newTeamName, created_by: user.id }])
+        .select()
+        .single();
       
       if (teamError) {
         console.error("Team creation error:", teamError);
         throw teamError;
       }
       
-      console.log("Team created with RPC:", team);
+      console.log("Team created:", team);
+      
+      const { data: memberData, error: memberError } = await supabase
+        .rpc('add_team_member', {
+          team_id_param: team.id,
+          user_id_param: user.id,
+          role_param: 'admin',
+          permissions_param: {
+            add_tips: true,
+            edit_tips: true,
+            add_hours: true,
+            view_team: true,
+            view_reports: true,
+            close_periods: true,
+            manage_payouts: true
+          }
+        });
+      
+      if (memberError) {
+        console.error("Error with RPC add_team_member:", memberError);
+        throw memberError;
+      }
       
       toast({
         title: "Team aangemaakt",

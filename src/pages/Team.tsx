@@ -21,7 +21,8 @@ const TeamContent: React.FC = () => {
     deleteHourRegistration,
     refreshTeamData,
     updateTeamMemberName,
-    periods
+    periods,
+    teamId
   } = useApp();
   
   const { 
@@ -37,13 +38,13 @@ const TeamContent: React.FC = () => {
   const navigate = useNavigate();
   const [showPayoutSummary, setShowPayoutSummary] = React.useState(false);
 
-  // Load team data only once on initial mount
+  // Load team data on initial mount
   useEffect(() => {
     const loadInitialData = async () => {
       if (dataInitialized) return;
       
       try {
-        console.log("Loading initial data...");
+        console.log("Team.tsx: Initial data loading for team:", teamId);
         await handleRefresh();
       } catch (error) {
         console.error("Error loading team data:", error);
@@ -51,7 +52,7 @@ const TeamContent: React.FC = () => {
     };
     
     loadInitialData();
-  }, [refreshTeamData, dataInitialized, handleRefresh]);
+  }, [dataInitialized, handleRefresh, teamId]);
 
   // Check URL parameters for showing the payout summary
   useEffect(() => {
@@ -99,26 +100,39 @@ const TeamContent: React.FC = () => {
 
   return (
     <div className="pb-16">
-      <TeamHeader />
-      
-      <TeamMemberList 
-        teamMembers={sortedTeamMembers}
-        addTeamMember={addTeamMember}
-        removeTeamMember={removeTeamMember}
-        updateTeamMemberHours={updateTeamMemberHours}
-        deleteHourRegistration={deleteHourRegistration}
-        updateTeamMemberName={updateTeamMemberName}
-      />
-      
-      <ImportActions />
-      
-      <PeriodSelector 
-        periods={periods}
-        selectedPeriods={selectedPeriods}
-        onTogglePeriodSelection={togglePeriodSelection}
-      />
-      
-      {unpaidClosedPeriods && <TipDistributionSection />}
+      {showPayoutSummary ? (
+        <PayoutSummary onClose={() => {
+          setShowPayoutSummary(false);
+          navigate('/team');
+        }} />
+      ) : loading && !dataInitialized ? (
+        <LoadingIndicator />
+      ) : (
+        <>
+          <TeamHeader />
+          
+          <TeamMemberList 
+            teamMembers={sortedTeamMembers}
+            addTeamMember={addTeamMember}
+            removeTeamMember={removeTeamMember}
+            updateTeamMemberHours={updateTeamMemberHours}
+            deleteHourRegistration={deleteHourRegistration}
+            updateTeamMemberName={updateTeamMemberName}
+          />
+          
+          <ImportActions />
+          
+          <PeriodSelector 
+            periods={periods}
+            selectedPeriods={selectedPeriods}
+            onTogglePeriodSelection={togglePeriodSelection}
+          />
+          
+          {periods.filter(period => !period.isPaid && !period.isActive).length > 0 && 
+            <TipDistributionSection />
+          }
+        </>
+      )}
     </div>
   );
 };

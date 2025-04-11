@@ -41,7 +41,8 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     calculateTipDistribution,
     markPeriodsAsPaid,
     periods,
-    refreshTeamData
+    refreshTeamData,
+    teamId
   } = useApp();
   
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
@@ -170,6 +171,14 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const handleRefresh = useCallback(async () => {
     try {
       setLoading(true);
+      
+      if (!teamId) {
+        console.error("Geen team ID gevonden. Kan gegevens niet ophalen.");
+        setLoading(false);
+        return Promise.reject("Geen team ID gevonden");
+      }
+      
+      console.log("TeamContext: Data wordt opgehaald voor team:", teamId);
       await refreshTeamData();
       setDataInitialized(true);
       return Promise.resolve();
@@ -179,7 +188,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setLoading(false);
     }
-  }, [refreshTeamData]);
+  }, [refreshTeamData, teamId]);
 
   const value = {
     selectedPeriods,

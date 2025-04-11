@@ -18,13 +18,53 @@ export const saveTeamMember = async (teamId: string, member: TeamMember) => {
     
     if (checkError && checkError.code !== 'PGRST116') throw checkError;
     
-    // If it's a local member with no user_id, we skip saving to database
-    if (!existingMember || !existingMember.user_id) {
-      console.log('Skipping save for local team member:', id);
-      return null;
+    // If it doesn't exist yet in the database, create it
+    if (!existingMember) {
+      console.log('Creating new team member in database:', name);
+      
+      const { data: newMember, error: createError } = await supabase
+        .from('team_members')
+        .insert([{
+          id,
+          team_id: teamId,
+          user_id: null, // Local team members don't have a user_id
+          role: 'member',
+          hours,
+          balance,
+          permissions: {
+            add_tips: false,
+            edit_tips: false,
+            add_hours: false,
+            view_team: true,
+            view_reports: false,
+            close_periods: false,
+            manage_payouts: false
+          }
+        }])
+        .select()
+        .single();
+      
+      if (createError) throw createError;
+      
+      // After creating the team member, handle hour registrations if any
+      if (hourRegistrations && hourRegistrations.length > 0) {
+        const { error: regsError } = await supabase
+          .from('hour_registrations')
+          .insert(hourRegistrations.map(reg => ({
+            id: reg.id,
+            team_member_id: id,
+            hours: reg.hours,
+            date: reg.date,
+            processed: false
+          })));
+        
+        if (regsError) throw regsError;
+      }
+      
+      return newMember;
     }
     
-    // Update team member details
+    // For existing members, update details
     const { data: updatedMember, error: memberError } = await supabase
       .from('team_members')
       .update({

@@ -12,6 +12,7 @@ import PeriodSelector from '@/components/team/PeriodSelector';
 import TipDistribution from '@/components/team/TipDistribution';
 import ImportHoursDialog from '@/components/team/ImportHoursDialog';
 import { supabase } from '@/integrations/supabase/client';
+import { extractHoursFromExcel } from '@/services/excelService';
 
 interface ImportedHour {
   name: string;
@@ -191,16 +192,44 @@ const Team = () => {
     setShowImportDialog(true);
   };
 
-  const handleFileImport = (file: File) => {
-    console.log("File imported:", file.name);
-    toast({
-      title: "Bestand verwerkt",
-      description: "De geïmporteerde uren zijn succesvol toegevoegd aan de teamleden.",
-    });
+  const handleFileImport = async (file: File) => {
+    try {
+      const extractedData = await extractHoursFromExcel(file);
+      
+      if (extractedData.length === 0) {
+        toast({
+          title: "Geen data gevonden",
+          description: "Er zijn geen bruikbare gegevens gevonden in het bestand.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const existingNames = new Set(teamMembers.map(m => m.name.toLowerCase()));
+      const processedData = extractedData.map(item => ({
+        ...item,
+        exists: existingNames.has(item.name.toLowerCase())
+      }));
+      
+      setImportedHours(processedData);
+      console.log("Imported hours:", processedData);
+      
+      toast({
+        title: "Bestand verwerkt",
+        description: `${processedData.length} uur registraties gevonden.`,
+      });
+    } catch (error) {
+      console.error("Error processing file:", error);
+      toast({
+        title: "Verwerkingsfout",
+        description: "Er is een fout opgetreden bij het verwerken van het bestand.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleConfirmImportedHours = (confirmedHours: ImportedHour[]) => {
-    confirmedHours.forEach(hourData => {
+    for (const hourData of confirmedHours) {
       const teamMember = teamMembers.find(
         member => member.name.toLowerCase() === hourData.name.toLowerCase()
       );
@@ -208,12 +237,12 @@ const Team = () => {
       if (teamMember) {
         updateTeamMemberHours(teamMember.id, hourData.hours);
       } else {
-        const newMember = addTeamMember(hourData.name);
-        if (newMember) {
-          updateTeamMemberHours(newMember.id, hourData.hours);
+        const newMemberId = addTeamMember(hourData.name);
+        if (newMemberId) {
+          updateTeamMemberHours(newMemberId, hourData.hours);
         }
       }
-    });
+    }
     
     toast({
       title: "Uren verwerkt",
@@ -302,6 +331,8 @@ const Team = () => {
         isOpen={showImportDialog}
         onClose={() => setShowImportDialog(false)}
         onImport={handleFileImport}
+        onConfirm={handleConfirmImportedHours}
+        importedHours={importedHours}
       />
     </div>
   );

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -7,14 +6,17 @@ import { AlertCircle, Upload, FileUp, Check, FileX } from "lucide-react";
 import * as XLSX from 'xlsx';
 import ImportedHoursReview from './ImportedHoursReview';
 import { useApp } from '@/contexts/AppContext';
+import { extractHoursFromExcel } from '@/services/excelService';
 
 interface ImportHoursDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onImport: (file: File) => void;
+  onConfirm: (hours: ImportedHour[]) => void;
+  importedHours: ImportedHour[];
 }
 
-interface ExtractedHour {
+export interface ImportedHour {
   name: string;
   hours: number;
   date: string;
@@ -24,12 +26,13 @@ interface ExtractedHour {
 const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
   isOpen,
   onClose,
-  onImport
+  onImport,
+  onConfirm,
+  importedHours
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [extractedHours, setExtractedHours] = useState<ExtractedHour[]>([]);
   const [showReview, setShowReview] = useState(false);
   const { toast } = useToast();
   const { teamMembers } = useApp();
@@ -77,51 +80,10 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
     
     setIsUploading(true);
     try {
-      const fileData = await file.arrayBuffer();
-      const wb = XLSX.read(fileData);
-      const firstSheet = wb.Sheets[wb.SheetNames[0]];
-      const data = XLSX.utils.sheet_to_json<any>(firstSheet);
-
-      // Try to detect name and hours columns
-      const headers = Object.keys(data[0] || {});
-      const nameColumnCandidates = headers.filter(h => 
-        /naam|name|persoon|medewerker|employee/i.test(h)
-      );
-      const hoursColumnCandidates = headers.filter(h => 
-        /uren|uur|hours|hour/i.test(h)
-      );
+      // Process the file and call the parent's onImport function
+      onImport(file);
       
-      const nameColumn = nameColumnCandidates[0] || headers[0];
-      const hoursColumn = hoursColumnCandidates[0] || headers[1];
-
-      // Extract hours data
-      const currentDate = new Date().toISOString().split('T')[0];
-      const existingNames = new Set(teamMembers.map(m => m.name.toLowerCase()));
-      
-      const extractedData = data
-        .filter(row => row[nameColumn] && row[hoursColumn]) // Only rows with name and hours
-        .map(row => {
-          const name = String(row[nameColumn]).trim();
-          const hours = parseFloat(String(row[hoursColumn]).replace(',', '.'));
-          return {
-            name,
-            hours: isNaN(hours) ? 0 : hours,
-            date: currentDate,
-            exists: existingNames.has(name.toLowerCase())
-          };
-        });
-
-      if (extractedData.length === 0) {
-        toast({
-          title: "Geen data gevonden",
-          description: "Kon geen bruikbare data vinden in het bestand. Controleer of er namen en uren in staan.",
-          variant: "destructive"
-        });
-        setIsUploading(false);
-        return;
-      }
-
-      setExtractedHours(extractedData);
+      // Show the review dialog
       setShowReview(true);
     } catch (error) {
       console.error("Error processing Excel file:", error);
@@ -135,13 +97,12 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
     }
   };
 
-  const handleConfirmHours = (confirmedHours: ExtractedHour[]) => {
+  const handleConfirmHours = (confirmedHours: ImportedHour[]) => {
     setShowReview(false);
-    // Call onImport to allow parent component to handle the imported hours
-    onImport(file!);
+    // Call onConfirm to allow parent component to handle the imported hours
+    onConfirm(confirmedHours);
     // Reset state
     setFile(null);
-    setExtractedHours([]);
     onClose();
   };
 
@@ -149,12 +110,12 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
     setFile(null);
   };
 
-  if (showReview) {
+  if (showReview && importedHours.length > 0) {
     return (
       <ImportedHoursReview
         isOpen={isOpen}
         onClose={() => setShowReview(false)}
-        importedHours={extractedHours}
+        importedHours={importedHours}
         onConfirm={handleConfirmHours}
       />
     );

@@ -1,8 +1,14 @@
 
-// Export all services with explicit naming to avoid conflicts
+// Export services with explicit names to avoid conflicts
 export * from './teamService';
+export { saveTeamSettings as saveTeamSettingsService } from './teamService';
+
 export * from './periodService';
+export { savePeriod as savePeriodService } from './periodService';
+
 export * from './teamMemberService';
+export { saveTeamMember as saveTeamMemberService } from './teamMemberService';
+
 export * from './payoutService';
 export * from './excelService';
 export * from './teamDataService';

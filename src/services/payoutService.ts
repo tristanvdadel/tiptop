@@ -1,5 +1,5 @@
 
-import { savePayoutToSupabase } from './supabaseService';
+import { savePayout } from './supabaseService';
 
 // Add debounce utility to prevent rapid state changes
 export const debounce = <F extends (...args: any[]) => any>(
@@ -17,5 +17,5 @@ export const debounce = <F extends (...args: any[]) => any>(
   };
 };
 
-// Re-export existing functions
-export * from './supabaseService';
+// Re-export the savePayout function with a more specific name
+export const savePayoutToSupabase = savePayout;

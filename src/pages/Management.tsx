@@ -1,30 +1,18 @@
 
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Shield, History, Link } from 'lucide-react';
+import { Shield, History } from 'lucide-react';
 import { supabase, getUserEmail, getUserTeams } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useLocation } from "react-router-dom";
-import { addDays } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
-import PayoutHistory from '@/components/PayoutHistory';
-import TeamMemberPermissions from '@/components/TeamMemberPermissions';
-import TeamOverview from '@/components/TeamOverview';
-import TeamInvite from '@/components/TeamInvite';
-import TeamJoin from '@/components/TeamJoin';
-import TeamCreate from '@/components/TeamCreate';
+
+// Import components for the different tabs
+import TeamManagement from '@/components/management/TeamManagement';
+import NoTeam from '@/components/management/NoTeam';
+import PermissionsTab from '@/components/management/PermissionsTab';
+import PayoutsTab from '@/components/management/PayoutsTab';
 
 const Management = () => {
   const location = useLocation();
@@ -220,7 +208,9 @@ const Management = () => {
         console.error('Error loading team members:', error);
         toast({
           title: "Fout bij ophalen teamleden",
-          description: error.message,
+          description: typeof error === 'object' && error !== null && 'message' in error ? 
+            (error as Error).message : 
+            "Er is een fout opgetreden bij het ophalen van teamleden.",
           variant: "destructive"
         });
       } finally {
@@ -285,56 +275,11 @@ const Management = () => {
       
       window.location.reload();
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating team:', error);
       toast({
         title: "Fout bij aanmaken team",
         description: error.message || "Er is een fout opgetreden bij het aanmaken van het team.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleGenerateInvite = async (role, permissions) => {
-    if (!selectedTeamId || !user) return;
-    
-    try {
-      const code = Math.random().toString(36).substring(2, 10).toUpperCase();
-      const expiresAt = addDays(new Date(), 7).toISOString();
-      
-      const fullPermissions = {
-        ...permissions,
-        edit_tips: role === 'admin' || permissions.edit_tips || false,
-        close_periods: role === 'admin' || permissions.close_periods || false,
-        manage_payouts: role === 'admin' || permissions.manage_payouts || false
-      };
-      
-      const { error } = await supabase
-        .from('invites')
-        .insert([
-          { 
-            team_id: selectedTeamId, 
-            code, 
-            created_by: user.id,
-            role,
-            permissions: fullPermissions,
-            expires_at: expiresAt
-          }
-        ]);
-      
-      if (error) throw error;
-      
-      setInviteCode(code);
-      toast({
-        title: "Uitnodigingscode aangemaakt",
-        description: "De code is 7 dagen geldig."
-      });
-      
-    } catch (error) {
-      console.error('Error generating invite:', error);
-      toast({
-        title: "Fout bij aanmaken uitnodiging",
-        description: error.message || "Er is een fout opgetreden bij het aanmaken van de uitnodiging.",
         variant: "destructive"
       });
     }
@@ -396,7 +341,7 @@ const Management = () => {
         window.location.reload();
       }, 1500);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error joining team:', error);
       toast({
         title: "Fout bij deelnemen aan team",
@@ -406,169 +351,12 @@ const Management = () => {
     }
   };
 
-  const handleTeamChange = (teamId) => {
+  const handleTeamChange = (teamId: string) => {
     setSelectedTeamId(teamId);
     
     const membership = userTeamMemberships.find(tm => tm.team_id === teamId);
     if (membership) {
       setSelectedMembershipId(membership.id);
-    }
-  };
-  
-  const handleLeaveTeam = async () => {
-    if (!selectedTeamId || !selectedMembershipId || !user) return;
-    
-    try {
-      const { data: teamAdmins, error: adminsError } = await supabase
-        .from('team_members')
-        .select('id, role')
-        .eq('team_id', selectedTeamId)
-        .eq('role', 'admin');
-        
-      if (adminsError) throw adminsError;
-      
-      const isLastAdmin = teamAdmins && teamAdmins.length === 1 && 
-                          teamAdmins[0] && teamAdmins[0].id === selectedMembershipId;
-      
-      if (isLastAdmin) {
-        throw new Error("Je kunt het team niet verlaten omdat je de enige beheerder bent. Maak eerst een ander lid beheerder of verwijder het team.");
-      }
-      
-      const { error: deleteError } = await supabase
-        .from('team_members')
-        .delete()
-        .eq('id', selectedMembershipId);
-        
-      if (deleteError) throw deleteError;
-      
-      toast({
-        title: "Team verlaten",
-        description: "Je bent niet langer lid van dit team."
-      });
-      
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
-      
-    } catch (error) {
-      console.error('Error leaving team:', error);
-      toast({
-        title: "Fout bij verlaten team",
-        description: error.message || "Er is een fout opgetreden bij het verlaten van het team.",
-        variant: "destructive"
-      });
-    }
-  };
-  
-  const handleDeleteTeam = async () => {
-    if (!selectedTeamId || !user) return;
-    
-    try {
-      const { data: adminMembership, error: adminError } = await supabase
-        .from('team_members')
-        .select('id')
-        .eq('team_id', selectedTeamId)
-        .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-        
-      if (adminError) {
-        console.error("Error checking admin status:", adminError);
-        throw new Error("Er is een fout opgetreden bij het verifiëren van je rechten.");
-      }
-      
-      if (!adminMembership) {
-        throw new Error("Je hebt geen rechten om dit team te verwijderen.");
-      }
-      
-      const { error: inviteDeleteError } = await supabase
-        .from('invites')
-        .delete()
-        .eq('team_id', selectedTeamId);
-        
-      if (inviteDeleteError) throw inviteDeleteError;
-      
-      const { error: memberDeleteError } = await supabase
-        .from('team_members')
-        .delete()
-        .eq('team_id', selectedTeamId);
-        
-      if (memberDeleteError) throw memberDeleteError;
-      
-      const { error: teamDeleteError } = await supabase
-        .from('teams')
-        .delete()
-        .eq('id', selectedTeamId);
-        
-      if (teamDeleteError) throw teamDeleteError;
-      
-      toast({
-        title: "Team verwijderd",
-        description: "Het team is succesvol verwijderd."
-      });
-      
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
-      
-    } catch (error) {
-      console.error('Error deleting team:', error);
-      toast({
-        title: "Fout bij verwijderen team",
-        description: error.message || "Er is een fout opgetreden bij het verwijderen van het team.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleRenameTeam = async (teamId, newName) => {
-    if (!teamId || !newName.trim() || !user) return;
-    
-    try {
-      const { data: adminMembership, error: adminError } = await supabase
-        .from('team_members')
-        .select('id')
-        .eq('team_id', teamId)
-        .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-        
-      if (adminError) {
-        console.error("Error checking admin status:", adminError);
-        throw new Error("Er is een fout opgetreden bij het verifiëren van je rechten.");
-      }
-      
-      if (!adminMembership) {
-        throw new Error("Je hebt geen rechten om de teamnaam te wijzigen.");
-      }
-      
-      const { error: updateError } = await supabase
-        .from('teams')
-        .update({ name: newName.trim() })
-        .eq('id', teamId);
-        
-      if (updateError) throw updateError;
-      
-      setUserTeams(prev => 
-        prev.map(team => 
-          team.id === teamId 
-            ? { ...team, name: newName.trim() } 
-            : team
-        )
-      );
-      
-      toast({
-        title: "Teamnaam bijgewerkt",
-        description: "De naam van het team is succesvol bijgewerkt.",
-      });
-      
-    } catch (error) {
-      console.error('Error renaming team:', error);
-      toast({
-        title: "Fout bij hernoemen team",
-        description: error.message || "Er is een fout opgetreden bij het hernoemen van het team.",
-        variant: "destructive"
-      });
     }
   };
 
@@ -582,9 +370,9 @@ const Management = () => {
           <AlertTitle>Fout bij laden van teams</AlertTitle>
           <AlertDescription className="space-y-3">
             <p>{error}</p>
-            <Button variant="outline" onClick={retryLoading}>
+            <button className="btn-link text-blue-500" onClick={retryLoading}>
               Opnieuw proberen
-            </Button>
+            </button>
           </AlertDescription>
         </Alert>
       )}
@@ -603,102 +391,46 @@ const Management = () => {
         </TabsList>
         
         <TabsContent value="teams" className="space-y-4 mt-4">
-          {loadingTeams ? (
-            <div className="flex justify-center py-8">
-              <div className="text-center space-y-4">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
-                <p>Laden van teams...</p>
-              </div>
-            </div>
-          ) : userTeams.length > 0 ? (
-            <div className="space-y-6">
-              <Carousel
-                className="w-full"
-                opts={{
-                  align: "start",
-                }}
-              >
-                <CarouselContent className="-ml-1">
-                  <CarouselItem className="pl-1">
-                    <div className="p-1">
-                      <TeamOverview 
-                        userTeams={userTeams}
-                        teamMembers={teamMembers}
-                        loadingMembers={loadingMembers}
-                        selectedTeamId={selectedTeamId}
-                        selectedMembershipId={selectedMembershipId}
-                        onTeamChange={handleTeamChange}
-                        onLeaveTeam={handleLeaveTeam}
-                        onDeleteTeam={handleDeleteTeam}
-                        onRenameTeam={handleRenameTeam}
-                      />
-                    </div>
-                  </CarouselItem>
-                </CarouselContent>
-                <div className="hidden md:flex">
-                  <CarouselPrevious className="left-1" />
-                  <CarouselNext className="right-1" />
-                </div>
-              </Carousel>
-              
-              <TeamInvite 
-                selectedTeamId={selectedTeamId}
-                onGenerateInvite={handleGenerateInvite}
-                inviteCode={inviteCode}
-              />
-            </div>
+          {userTeams.length > 0 ? (
+            <TeamManagement
+              user={user}
+              userTeams={userTeams}
+              teamMembers={teamMembers}
+              userTeamMemberships={userTeamMemberships}
+              loadingTeams={loadingTeams}
+              loadingMembers={loadingMembers}
+              selectedTeamId={selectedTeamId}
+              selectedMembershipId={selectedMembershipId}
+              isAdmin={isAdmin}
+              error={error}
+              onTeamChange={handleTeamChange}
+              onRetryLoading={retryLoading}
+            />
           ) : (
-            <div className="space-y-4">
-              <TeamJoin 
-                inviteCode={inviteCode}
-                onInviteCodeChange={setInviteCode}
-                onJoinTeam={handleJoinTeam}
-              />
-              
-              <TeamCreate 
-                newTeamName={newTeamName}
-                onNewTeamNameChange={setNewTeamName}
-                onCreateTeam={handleCreateTeam}
-              />
-            </div>
+            <NoTeam
+              loadingTeams={loadingTeams}
+              error={error}
+              handleJoinTeam={handleJoinTeam}
+              handleCreateTeam={handleCreateTeam}
+              newTeamName={newTeamName}
+              setNewTeamName={setNewTeamName}
+              inviteCode={inviteCode}
+              setInviteCode={setInviteCode}
+            />
           )}
         </TabsContent>
         
         <TabsContent value="permissions" className="mt-4">
-          <Carousel
-            className="w-full"
-            opts={{
-              align: "start",
-            }}
-          >
-            <CarouselContent className="-ml-1">
-              <CarouselItem className="pl-1">
-                <div className="p-1">
-                  <TeamMemberPermissions teamId={selectedTeamId} isAdmin={isAdmin} />
-                </div>
-              </CarouselItem>
-            </CarouselContent>
-            <div className="hidden md:flex">
-              <CarouselPrevious className="left-1" />
-              <CarouselNext className="right-1" />
-            </div>
-          </Carousel>
+          <PermissionsTab 
+            selectedTeamId={selectedTeamId}
+            isAdmin={isAdmin}
+          />
         </TabsContent>
         
         <TabsContent value="payouts" className="mt-4">
-          <PayoutHistory />
+          <PayoutsTab />
         </TabsContent>
       </Tabs>
-      
-      {userTeams.length === 0 && !loadingTeams && !error && (
-        <Alert className="mt-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Geen team gevonden</AlertTitle>
-          <AlertDescription>
-            Je hebt nog geen team. Maak een nieuw team aan of treed toe tot een bestaand team met een uitnodigingscode.
-          </AlertDescription>
-        </Alert>
-      )}
     </div>
   );
 };

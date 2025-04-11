@@ -48,7 +48,7 @@ export const getUserEmail = async (userId: string) => {
 // Direct team member query functions to handle recursive policy errors
 export const getTeamMembers = async (teamId: string) => {
   try {
-    // Define the type for the return data and the parameters
+    // Define the type for the return data
     type TeamMemberResult = {
       id: string;
       team_id: string;
@@ -60,10 +60,10 @@ export const getTeamMembers = async (teamId: string) => {
       created_at: string;
     };
     
-    const { data, error } = await supabase.rpc<TeamMemberResult[], { team_id_param: string }>(
-      'get_team_members', 
-      { team_id_param: teamId }
-    );
+    // Use the correct type structure for RPC calls
+    const { data, error } = await supabase
+      .rpc('get_team_members', { team_id_param: teamId })
+      .returns<TeamMemberResult[]>();
     
     if (error) {
       console.error('Error fetching team members via RPC:', error);
@@ -92,7 +92,7 @@ export const getTeamMembers = async (teamId: string) => {
 
 export const getUserTeams = async (userId: string) => {
   try {
-    // Define the type for the return data and the parameters
+    // Define the type for the return data
     type TeamResult = {
       id: string;
       name: string;
@@ -100,10 +100,10 @@ export const getUserTeams = async (userId: string) => {
       created_at: string;
     };
     
-    const { data, error } = await supabase.rpc<TeamResult[], { user_id_param: string }>(
-      'get_user_teams', 
-      { user_id_param: userId }
-    );
+    // Use the correct type structure for RPC calls
+    const { data, error } = await supabase
+      .rpc('get_user_teams', { user_id_param: userId })
+      .returns<TeamResult[]>();
     
     if (error) {
       console.error('Error fetching teams via RPC:', error);

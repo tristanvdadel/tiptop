@@ -3,7 +3,13 @@ import { useToast } from '@/hooks/use-toast';
 import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth, set, getWeek, format, startOfMonth, nextMonday } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
-import { fetchTeamData, savePeriod, saveTeamMember, savePayout, saveTeamSettings } from '@/services/supabaseService';
+import { 
+  savePeriodToSupabase, 
+  saveTeamMemberToSupabase, 
+  savePayoutToSupabase, 
+  saveTeamSettingsToSupabase 
+} from '@/services';
+import { fetchTeamData } from '@/services/teamService';
 
 // Define types
 export type TeamMember = {
@@ -388,7 +394,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const syncPeriods = async () => {
         try {
           for (const period of periods) {
-            await savePeriod(teamId, period);
+            await savePeriodToSupabase(teamId, period);
           }
         } catch (error) {
           console.error("Error syncing periods to Supabase:", error);
@@ -406,7 +412,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const syncTeamMembers = async () => {
         try {
           for (const member of teamMembers) {
-            await saveTeamMember(teamId, member);
+            await saveTeamMemberToSupabase(teamId, member);
           }
         } catch (error) {
           console.error("Error syncing team members to Supabase:", error);
@@ -424,7 +430,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const syncPayouts = async () => {
         try {
           for (const payout of payouts) {
-            await savePayout(teamId, payout);
+            await savePayoutToSupabase(teamId, payout);
           }
         } catch (error) {
           console.error("Error syncing payouts to Supabase:", error);
@@ -459,7 +465,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (teamId) {
       const saveSettings = async () => {
         try {
-          await saveTeamSettings(teamId, {
+          await saveTeamSettingsToSupabase(teamId, {
             autoClosePeriods,
             periodDuration,
             alignWithCalendar,

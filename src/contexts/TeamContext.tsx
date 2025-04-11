@@ -109,6 +109,11 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
+    console.log('Starting payout process for periods:', selectedPeriods);
+    console.log('Distribution data:', distribution);
+    console.log('Total tips to distribute:', totalTips);
+    console.log('Total hours worked:', totalHours);
+
     const customDistribution = distribution.map(member => ({
       memberId: member.id,
       amount: member.tipAmount || 0,
@@ -116,28 +121,37 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       balance: member.balance
     }));
     
+    console.log('Formatted distribution for payout:', customDistribution);
+    
     markPeriodsAsPaid(selectedPeriods, customDistribution);
     navigate('/team?payoutSummary=true');
   };
 
   const handleImportHours = () => {
+    console.log('Opening import hours dialog');
     setShowImportDialog(true);
   };
 
   const closeImportDialog = () => {
+    console.log('Closing import hours dialog');
     setShowImportDialog(false);
   };
 
   const handleFileImport = async (file: File) => {
     try {
+      console.log('Starting file import process:', file.name);
       setImportedHours([]); // Reset previous hours
       
       const { extractHoursFromExcel } = await import('@/services/excelService');
+      console.log('Extracting hours from Excel file');
       const extractedData = await extractHoursFromExcel(file);
       
       if (extractedData.length === 0) {
+        console.error("No usable data found in the file.");
         throw new Error("No usable data found in the file.");
       }
+      
+      console.log(`Extracted ${extractedData.length} hour entries from file`);
       
       const existingNames = new Set(teamMembers.map(m => m.name.toLowerCase()));
       const processedData = extractedData.map(item => ({
@@ -145,6 +159,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         exists: existingNames.has(item.name.toLowerCase())
       }));
       
+      console.log('Processed extracted data:', processedData);
       setImportedHours(processedData);
       return Promise.resolve();
     } catch (error) {
@@ -154,9 +169,11 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const handleConfirmImportedHours = (confirmedHours: ImportedHour[]) => {
+    console.log(`Confirming import of ${confirmedHours.length} hour entries`);
     const { processImportedHours } = require('@/services/teamDataService');
     
     for (const hourData of confirmedHours) {
+      console.log(`Processing hours for ${hourData.name}: ${hourData.hours} hours on ${hourData.date}`);
       processImportedHours(
         hourData, 
         teamMembers, 
@@ -165,11 +182,13 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       );
     }
     
+    console.log('Import process completed');
     setShowImportDialog(false);
   };
 
   const handleRefresh = useCallback(async () => {
     try {
+      console.log('TeamContext: Starting refresh process');
       setLoading(true);
       
       if (!teamId) {
@@ -180,6 +199,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       console.log("TeamContext: Data wordt opgehaald voor team:", teamId);
       await refreshTeamData();
+      console.log("TeamContext: Data succesvol opgehaald");
       setDataInitialized(true);
       return Promise.resolve();
     } catch (error) {

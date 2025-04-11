@@ -41,16 +41,21 @@ const TeamContent: React.FC = () => {
   // Load team data on initial mount
   useEffect(() => {
     const loadInitialData = async () => {
-      if (dataInitialized) return;
+      if (dataInitialized) {
+        console.log("Team.tsx: Data already initialized, skipping initial load");
+        return;
+      }
       
       try {
         console.log("Team.tsx: Initial data loading for team:", teamId);
         await handleRefresh();
+        console.log("Team.tsx: Initial data loaded successfully");
       } catch (error) {
         console.error("Error loading team data:", error);
       }
     };
     
+    console.log("Team.tsx: Initializing component, loading data");
     loadInitialData();
   }, [dataInitialized, handleRefresh, teamId]);
 
@@ -58,6 +63,7 @@ const TeamContent: React.FC = () => {
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const showSummary = urlParams.get('payoutSummary') === 'true';
+    console.log("Team.tsx: URL param 'payoutSummary':", showSummary);
     setShowPayoutSummary(showSummary);
     
     if (!showSummary) {
@@ -68,10 +74,15 @@ const TeamContent: React.FC = () => {
   // Update team members with account status
   useEffect(() => {
     const updateTeamMembersWithAccounts = async () => {
-      if (teamMembers.length === 0) return;
+      if (teamMembers.length === 0) {
+        console.log("Team.tsx: No team members to check for accounts");
+        return;
+      }
       
       try {
+        console.log("Team.tsx: Checking team members with accounts, count:", teamMembers.length);
         await checkTeamMembersWithAccounts(teamMembers);
+        console.log("Team.tsx: Team members with accounts checked successfully");
       } catch (error) {
         console.error("Error checking team members with accounts:", error);
       }
@@ -84,6 +95,7 @@ const TeamContent: React.FC = () => {
     return (
       <div className="pb-16">
         <PayoutSummary onClose={() => {
+          console.log("Team.tsx: Closing payout summary");
           setShowPayoutSummary(false);
           navigate('/team');
         }} />
@@ -93,15 +105,18 @@ const TeamContent: React.FC = () => {
 
   // Show loading animation during first load process
   if (loading && !dataInitialized) {
+    console.log("Team.tsx: Showing loading indicator");
     return <LoadingIndicator />;
   }
 
   const unpaidClosedPeriods = periods.filter(period => !period.isPaid && !period.isActive).length > 0;
+  console.log("Team.tsx: Has unpaid closed periods:", unpaidClosedPeriods);
 
   return (
     <div className="pb-16">
       {showPayoutSummary ? (
         <PayoutSummary onClose={() => {
+          console.log("Team.tsx: Closing payout summary");
           setShowPayoutSummary(false);
           navigate('/team');
         }} />
@@ -138,6 +153,7 @@ const TeamContent: React.FC = () => {
 };
 
 const Team: React.FC = () => {
+  console.log("Team.tsx: Rendering Team component with TeamProvider");
   return (
     <TeamProvider>
       <TeamContent />

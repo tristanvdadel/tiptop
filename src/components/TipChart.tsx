@@ -123,40 +123,42 @@ const TipChart = () => {
       </CardHeader>
       <CardContent>
         {hasTipsInLastWeek ? (
-          <div className="h-48">
-            <ChartContainer config={chartConfig} className="h-full">
-              <BarChart data={chartData} margin={{ top: 5, right: isMobile ? 5 : 20, bottom: 5, left: isMobile ? 5 : 20 }}>
-                <XAxis dataKey="name" />
-                <ChartTooltip 
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <ChartTooltipContent 
-                          formatter={(value: number) => [`€${value.toFixed(2)}`, payload[0].name]}
-                        />
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Legend 
-                  layout="horizontal" 
-                  verticalAlign="bottom" 
-                  align="center" 
-                  wrapperStyle={{ 
-                    maxHeight: '50px', 
-                    overflowY: 'auto', 
-                    fontSize: isMobile ? '10px' : '12px',
-                    width: '100%',
-                    maxWidth: isMobile ? '300px' : 'none',
-                  }} 
-                />
-                {barComponents}
-              </BarChart>
+          <div className="h-[300px] sm:h-[350px] md:h-[400px] w-full">
+            <ChartContainer config={chartConfig} className="h-full w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 5, right: isMobile ? 5 : 20, bottom: 5, left: isMobile ? 5 : 20 }}>
+                  <XAxis dataKey="name" />
+                  <ChartTooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <ChartTooltipContent 
+                            formatter={(value: number) => [`€${value.toFixed(2)}`, payload[0].name]}
+                          />
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend 
+                    layout="horizontal" 
+                    verticalAlign="bottom" 
+                    align="center" 
+                    wrapperStyle={{ 
+                      maxHeight: '50px', 
+                      overflowY: 'auto', 
+                      fontSize: isMobile ? '10px' : '12px',
+                      width: '100%',
+                      maxWidth: isMobile ? '300px' : 'none',
+                    }} 
+                  />
+                  {barComponents}
+                </BarChart>
+              </ResponsiveContainer>
             </ChartContainer>
           </div>
         ) : (
-          <div className="text-center py-4 text-muted-foreground h-48 flex items-center justify-center">
+          <div className="text-center py-4 text-muted-foreground h-[300px] sm:h-[350px] md:h-[400px] flex items-center justify-center">
             <div>
               <p>Geen fooien in de afgelopen 7 dagen.</p>
             </div>

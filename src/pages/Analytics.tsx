@@ -124,45 +124,74 @@ const Analytics = () => {
             Deze grafiek toont het verloop van de gemiddelde fooi per uur over verschillende periodes, inclusief uitbetaalde periodes.
             {lineChartData.length < periodData.filter(period => period.total > 0).length && ` (Laatste ${lineChartData.length} periodes weergegeven)`}
           </p>
-          {hasAnyPeriodWithTips ? <div className="h-60 w-full overflow-x-auto">
-              <ChartContainer config={chartConfig} className="h-full min-w-[320px]">
-                <LineChart data={lineChartData} margin={{
-              top: 10,
-              right: isMobile ? 5 : 20,
-              left: isMobile ? 5 : 20,
-              bottom: isMobile ? 70 : 40
-            }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" tickMargin={5} height={60} tick={{
-                fontSize: isMobile ? 8 : 10
-              }} interval={0} angle={-45} textAnchor="end" />
-                  <YAxis width={isMobile ? 30 : 40} tick={{
-                fontSize: isMobile ? 10 : 12
-              }} />
-                  <ChartTooltip content={({
-                active,
-                payload
-              }) => {
-                if (active && payload && payload.length) {
-                  return <ChartTooltipContent formatter={(value: number) => [`€${value.toFixed(2)}`, 'Gem. fooi per uur']} />;
-                }
-                return null;
-              }} />
-                  <Legend wrapperStyle={{
-                fontSize: isMobile ? '10px' : '12px',
-                marginTop: isMobile ? '10px' : '5px'
-              }} />
-                  <Line type="monotone" dataKey="average" name="Gem. fooi per uur" stroke="#33C3F0" strokeWidth={2} dot={{
-                r: isMobile ? 3 : 5
-              }} activeDot={{
-                r: isMobile ? 5 : 8
-              }} />
-                </LineChart>
+          {hasAnyPeriodWithTips ? (
+            <div className="h-[300px] sm:h-[350px] md:h-[400px] w-full">
+              <ChartContainer config={chartConfig} className="h-full w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart 
+                    data={lineChartData} 
+                    margin={{
+                      top: 10,
+                      right: isMobile ? 5 : 20,
+                      left: isMobile ? 5 : 20,
+                      bottom: isMobile ? 70 : 40
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="name" 
+                      tickMargin={5} 
+                      height={60} 
+                      tick={{
+                        fontSize: isMobile ? 8 : 10
+                      }} 
+                      interval={0} 
+                      angle={-45} 
+                      textAnchor="end" 
+                    />
+                    <YAxis 
+                      width={isMobile ? 30 : 40} 
+                      tick={{
+                        fontSize: isMobile ? 10 : 12
+                      }} 
+                    />
+                    <ChartTooltip 
+                      content={({active, payload}) => {
+                        if (active && payload && payload.length) {
+                          return <ChartTooltipContent formatter={(value: number) => [`€${value.toFixed(2)}`, 'Gem. fooi per uur']} />;
+                        }
+                        return null;
+                      }} 
+                    />
+                    <Legend 
+                      wrapperStyle={{
+                        fontSize: isMobile ? '10px' : '12px',
+                        marginTop: isMobile ? '10px' : '5px'
+                      }} 
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="average" 
+                      name="Gem. fooi per uur" 
+                      stroke="#33C3F0" 
+                      strokeWidth={2} 
+                      dot={{
+                        r: isMobile ? 3 : 5
+                      }} 
+                      activeDot={{
+                        r: isMobile ? 5 : 8
+                      }} 
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </ChartContainer>
-            </div> : <div className="text-center py-6 text-muted-foreground">
+            </div>
+          ) : (
+            <div className="text-center py-6 text-muted-foreground h-[300px] sm:h-[350px] md:h-[400px] flex items-center justify-center">
               <p>Er zijn nog geen periodes met fooi gegevens.</p>
               <p className="mt-1">Voeg fooi toe aan een periode om deze grafiek te zien.</p>
-            </div>}
+            </div>
+          )}
         </CardContent>
       </Card>
       
@@ -174,24 +203,32 @@ const Analytics = () => {
           <p className="text-muted-foreground mb-2 text-sm">
             Het gemiddelde fooi per uur wordt berekend op basis van de totale fooi en de gewerkte uren van het team.
           </p>
-          {hasAnyPeriodWithTips ? <ScrollArea className="h-64 w-full">
+          {hasAnyPeriodWithTips ? (
+            <ScrollArea className="h-64 w-full">
               <div className="space-y-2 pr-2">
-                {periodData.filter(period => period.total > 0).reverse().map(period => <div key={period.id} className="flex justify-between p-2 border rounded-md">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm">{period.name}</span>
-                        {period.isPaid && <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
-                            Uitbetaald
-                          </span>}
-                      </div>
-                      <div className="font-medium text-sm">
-                        €{period.average.toFixed(2)}/uur
-                      </div>
-                    </div>)}
+                {periodData.filter(period => period.total > 0).reverse().map(period => (
+                  <div key={period.id} className="flex justify-between p-2 border rounded-md">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{period.name}</span>
+                      {period.isPaid && (
+                        <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
+                          Uitbetaald
+                        </span>
+                      )}
+                    </div>
+                    <div className="font-medium text-sm">
+                      €{period.average.toFixed(2)}/uur
+                    </div>
+                  </div>
+                ))}
               </div>
-            </ScrollArea> : <div className="text-center py-6 text-muted-foreground">
+            </ScrollArea>
+          ) : (
+            <div className="text-center py-6 text-muted-foreground">
               <p>Er zijn nog geen periodes met fooi gegevens.</p>
               <p className="mt-1">Voeg fooi toe aan een periode om deze lijst te zien.</p>
-            </div>}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>;

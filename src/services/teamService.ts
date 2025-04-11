@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -6,13 +5,18 @@ import { supabase } from "@/integrations/supabase/client";
  */
 export const fetchTeamData = async (teamId: string) => {
   try {
+    console.log('Starting to fetch team data for team ID:', teamId);
+    
     // Fetch team members
     const { data: teamMembers, error: teamMembersError } = await supabase
       .from('team_members')
       .select('id, user_id, role, permissions, hours, balance')
       .eq('team_id', teamId);
     
-    if (teamMembersError) throw teamMembersError;
+    if (teamMembersError) {
+      console.error('Error fetching team members:', teamMembersError);
+      throw teamMembersError;
+    }
     
     // Fetch periods
     const { data: periods, error: periodsError } = await supabase
@@ -20,7 +24,10 @@ export const fetchTeamData = async (teamId: string) => {
       .select('*')
       .eq('team_id', teamId);
     
-    if (periodsError) throw periodsError;
+    if (periodsError) {
+      console.error('Error fetching periods:', periodsError);
+      throw periodsError;
+    }
     
     // Fetch tips for each period
     const periodsWithTips = await Promise.all(periods.map(async (period) => {
@@ -29,7 +36,10 @@ export const fetchTeamData = async (teamId: string) => {
         .select('*')
         .eq('period_id', period.id);
       
-      if (tipsError) throw tipsError;
+      if (tipsError) {
+        console.error('Error fetching tips for period', period.id, ':', tipsError);
+        throw tipsError;
+      }
       
       return {
         ...period,
@@ -44,7 +54,10 @@ export const fetchTeamData = async (teamId: string) => {
         .select('*')
         .eq('team_member_id', member.id);
       
-      if (hourRegError) throw hourRegError;
+      if (hourRegError) {
+        console.error('Error fetching hour registrations for member', member.id, ':', hourRegError);
+        throw hourRegError;
+      }
       
       // Fetch profile info to get member name
       const { data: profile } = await supabase
@@ -74,7 +87,10 @@ export const fetchTeamData = async (teamId: string) => {
       .select('*')
       .eq('team_id', teamId);
     
-    if (payoutsError) throw payoutsError;
+    if (payoutsError) {
+      console.error('Error fetching payouts:', payoutsError);
+      throw payoutsError;
+    }
     
     // Fetch distribution data for each payout
     const payoutsWithDistribution = await Promise.all(payouts.map(async (payout) => {
@@ -83,7 +99,10 @@ export const fetchTeamData = async (teamId: string) => {
         .select('*')
         .eq('payout_id', payout.id);
       
-      if (distError) throw distError;
+      if (distError) {
+        console.error('Error fetching distributions for payout', payout.id, ':', distError);
+        throw distError;
+      }
       
       // Fetch which periods were included in this payout
       const { data: payoutPeriods, error: ppError } = await supabase
@@ -91,7 +110,10 @@ export const fetchTeamData = async (teamId: string) => {
         .select('period_id')
         .eq('payout_id', payout.id);
       
-      if (ppError) throw ppError;
+      if (ppError) {
+        console.error('Error fetching payout periods for payout', payout.id, ':', ppError);
+        throw ppError;
+      }
       
       // Calculate total amount from distributions
       const totalAmount = distributions.reduce((sum, dist) => sum + (dist.amount || 0), 0);
@@ -119,17 +141,27 @@ export const fetchTeamData = async (teamId: string) => {
       .eq('team_id', teamId)
       .single();
     
-    if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
+    if (settingsError && settingsError.code !== 'PGRST116') {
+      console.error('Error fetching team settings:', settingsError);
+      throw settingsError;
+    }
     
-    return {
+    const result = {
       teamMembers: teamMembersWithDetails,
       periods: periodsWithTips,
       payouts: payoutsWithDistribution,
       settings
     };
     
+    console.log('Successfully fetched team data:', 
+      `${teamMembersWithDetails.length} team members, `,
+      `${periodsWithTips.length} periods, `,
+      `${payoutsWithDistribution.length} payouts`);
+    
+    return result;
+    
   } catch (error) {
-    console.error('Error fetching team data:', error);
+    console.error('Error in fetchTeamData:', error);
     throw error;
   }
 };
@@ -223,6 +255,11 @@ export const getUserTeamsSafe = async (userId: string) => {
   try {
     console.log('Fetching teams for user using safe function:', userId);
     
+    if (!userId) {
+      console.error('getUserTeamsSafe called with empty userId');
+      return [];
+    }
+    
     // Try the RPC function first
     const { data, error } = await supabase
       .rpc('get_user_teams_safe', { user_id_param: userId });
@@ -233,7 +270,8 @@ export const getUserTeamsSafe = async (userId: string) => {
       // Fallback to direct query if RPC fails
       const { data: directData, error: directError } = await supabase
         .from('teams')
-        .select('*');
+        .select('*')
+        .order('created_at', { ascending: false });
       
       if (directError) {
         console.error('Fallback direct query failed:', directError);
@@ -243,6 +281,7 @@ export const getUserTeamsSafe = async (userId: string) => {
       return directData || [];
     }
     
+    console.log('Successfully fetched teams for user:', data ? data.length : 0, 'teams');
     return data || [];
   } catch (error) {
     console.error('Error in getUserTeamsSafe:', error);
@@ -256,6 +295,11 @@ export const getUserTeamsSafe = async (userId: string) => {
 export const getTeamMembersSafe = async (teamId: string) => {
   try {
     console.log('Fetching team members using safe function:', teamId);
+    
+    if (!teamId) {
+      console.error('getTeamMembersSafe called with empty teamId');
+      return [];
+    }
     
     // Try the RPC function first
     const { data, error } = await supabase
@@ -278,6 +322,7 @@ export const getTeamMembersSafe = async (teamId: string) => {
       return directData || [];
     }
     
+    console.log('Successfully fetched team members:', data ? data.length : 0, 'members');
     return data || [];
   } catch (error) {
     console.error('Error in getTeamMembersSafe:', error);

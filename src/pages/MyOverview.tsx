@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Clock, UserRound } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
@@ -23,40 +22,29 @@ const MyOverview = () => {
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<any>(null);
 
-  // Fetch current user data
+  // Fetch current user data and refresh team data on component mount
   useEffect(() => {
-    const getCurrentUser = async () => {
+    const loadData = async () => {
       try {
+        setLoading(true);
+        // Get current user
         const { data: { user } } = await supabase.auth.getUser();
         
         if (user) {
           setUserData(user);
-        }
-        
-        // Ensure team data is refreshed
-        if (!isLoading) {
-          setLoading(false);
+          // Ensure team data is refreshed when component is mounted
+          await refreshTeamData();
         }
       } catch (error) {
-        console.error("Error fetching user:", error);
+        console.error("Error fetching user or team data:", error);
+      } finally {
+        setLoading(false);
       }
     };
     
-    getCurrentUser();
-  }, [isLoading]);
+    loadData();
+  }, [refreshTeamData]);
   
-  // Effect to set loading state based on app loading
-  useEffect(() => {
-    if (!isLoading) {
-      // Short timeout to ensure UI updates
-      const timer = setTimeout(() => {
-        setLoading(false);
-      }, 300);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isLoading]);
-
   // Find the current user in team members
   const getCurrentTeamMember = () => {
     if (!userData || !teamMembers.length) return null;
@@ -68,7 +56,7 @@ const MyOverview = () => {
   const currentUser = getCurrentTeamMember();
 
   // Show loading skeleton while data is loading
-  if (loading) {
+  if (loading || isLoading) {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Mijn Overzicht</h1>
@@ -146,17 +134,17 @@ const MyOverview = () => {
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Naam</span>
-              <span className="font-medium">{currentUser.name}</span>
+              <span className="font-medium">{currentUser?.name}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Totaal gewerkte uren</span>
-              <span className="font-medium">{totalHours} uur</span>
+              <span className="font-medium">{currentUser?.hours || 0} uur</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Totaal ontvangen fooi</span>
               <span className="font-medium">€{totalTip.toFixed(2)}</span>
             </div>
-            {currentUser.balance !== undefined && (
+            {currentUser?.balance !== undefined && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Openstaand saldo</span>
                 <span className="font-medium">€{currentUser.balance.toFixed(2)}</span>
@@ -166,7 +154,7 @@ const MyOverview = () => {
         </CardContent>
       </Card>
       
-      {currentUser.hourRegistrations && currentUser.hourRegistrations.length > 0 && (
+      {currentUser?.hourRegistrations && currentUser.hourRegistrations.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center">

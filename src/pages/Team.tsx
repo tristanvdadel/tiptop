@@ -4,7 +4,7 @@ import { TeamMember } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Upload } from 'lucide-react';
+import { Users, Upload, RefreshCw } from 'lucide-react';
 import { PayoutSummary } from '@/components/PayoutSummary';
 import { useNavigate, useLocation } from 'react-router-dom';
 import TeamMemberList from '@/components/team/TeamMemberList';
@@ -25,6 +25,7 @@ const Team = () => {
     periods,
     payouts,
     updateTeamMemberName,
+    refreshTeamData
   } = useApp();
   
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
@@ -33,9 +34,30 @@ const Team = () => {
   const [sortedTeamMembers, setSortedTeamMembers] = useState<TeamMember[]>([]);
   const [importUrl, setImportUrl] = useState<string>('');
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        await refreshTeamData();
+      } catch (error) {
+        console.error("Error refreshing team data:", error);
+        toast({
+          title: "Fout bij laden",
+          description: "Er is een fout opgetreden bij het laden van de teamgegevens.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [refreshTeamData, toast]);
 
   useEffect(() => {
     const checkTeamMembersWithAccounts = async () => {
@@ -182,9 +204,21 @@ const Team = () => {
 
   return (
     <div className="pb-16">
-      <div className="flex items-center gap-2 mb-4">
-        <Users size={20} />
-        <h1 className="text-xl font-bold">Team leden</h1>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Users size={20} />
+          <h1 className="text-xl font-bold">Team leden</h1>
+        </div>
+        
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => refreshTeamData()}
+          disabled={loading}
+        >
+          <RefreshCw size={16} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+          {loading ? 'Laden...' : 'Verversen'}
+        </Button>
       </div>
       
       <TeamMemberList 

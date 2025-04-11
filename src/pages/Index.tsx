@@ -14,7 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { getUserTeamsSafe } from '@/services/teamService';
 
 const Index = () => {
-  const { currentPeriod } = useApp();
+  const { currentPeriod, refreshTeamData } = useApp();
   const [hasTeam, setHasTeam] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -22,6 +22,7 @@ const Index = () => {
   useEffect(() => {
     const checkTeamMembership = async () => {
       try {
+        setLoading(true);
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
           setLoading(false);
@@ -30,7 +31,13 @@ const Index = () => {
         
         // Use the safe function to get user teams
         const teams = await getUserTeamsSafe(session.user.id);
-        setHasTeam(teams && teams.length > 0);
+        const userHasTeam = teams && teams.length > 0;
+        setHasTeam(userHasTeam);
+        
+        // If user has a team, refresh team data to ensure it's up to date
+        if (userHasTeam) {
+          await refreshTeamData();
+        }
       } catch (err) {
         console.error('Error checking team membership:', err);
         setHasTeam(false);
@@ -40,7 +47,7 @@ const Index = () => {
     };
     
     checkTeamMembership();
-  }, []);
+  }, [refreshTeamData]);
   
   const formatPeriodDate = (date: string) => {
     return format(new Date(date), 'd MMMM yyyy', { locale: nl });

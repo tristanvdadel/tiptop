@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { extractHoursFromExcel } from '@/services/excelService';
 interface ImportHoursDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (file: File) => void;
+  onImport: (file: File) => Promise<void>; // Updated to Promise<void>
   onConfirm: (hours: ImportedHour[]) => void;
   importedHours: ImportedHour[];
 }

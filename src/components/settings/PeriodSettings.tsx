@@ -1,5 +1,4 @@
-
-import { Calendar, Clock } from "lucide-react";
+import { Calendar, Clock, HelpCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -11,6 +10,8 @@ import { useApp, PeriodDuration } from "@/contexts/AppContext";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { useEffect, useState } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 
 const PeriodSettings = () => {
   const { toast } = useToast();
@@ -136,13 +137,25 @@ const PeriodSettings = () => {
             <div className="flex items-center space-x-2">
               <Clock className="h-4 w-4" />
               <Label htmlFor="closingTime">Sluitingstijd</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-5 w-5 p-0">
+                      <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                      <span className="sr-only">Uitleg sluitingstijd</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs">
+                      Tijden tussen 00:00-11:59 (AM) worden beschouwd als na het einde van de dag. 
+                      Tijden tussen 12:00-23:59 (PM) worden beschouwd als binnen dezelfde dag.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             <p className="text-sm text-muted-foreground ml-6 mt-1">
               Tijd waarop periodes automatisch worden afgesloten
-            </p>
-            <p className="text-xs text-muted-foreground ml-6">
-              Tijden tussen 00:00-11:59 (AM) worden beschouwd als na het einde van de dag.
-              Tijden tussen 12:00-23:59 (PM) worden beschouwd als binnen dezelfde dag.
             </p>
           </div>
           <Input

@@ -12,34 +12,47 @@ import { AlertCircle, Users } from "lucide-react";
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { getUserTeamsSafe } from '@/services/teamService';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const Index = () => {
   const { currentPeriod, refreshTeamData } = useApp();
   const [hasTeam, setHasTeam] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [periodLoading, setPeriodLoading] = useState(false);
   const navigate = useNavigate();
   
   useEffect(() => {
     const checkTeamMembership = async () => {
       try {
+        console.log('Index: Checking team membership');
         setLoading(true);
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
+          console.log('Index: No session found');
           setLoading(false);
           return;
         }
         
         // Use the safe function to get user teams
+        console.log('Index: Getting user teams');
         const teams = await getUserTeamsSafe(session.user.id);
         const userHasTeam = teams && teams.length > 0;
         setHasTeam(userHasTeam);
         
         // If user has a team, refresh team data to ensure it's up to date
         if (userHasTeam) {
-          await refreshTeamData();
+          console.log('Index: User has a team, refreshing team data');
+          setPeriodLoading(true);
+          try {
+            await refreshTeamData();
+          } catch (error) {
+            console.error('Index: Error refreshing team data:', error);
+          } finally {
+            setPeriodLoading(false);
+          }
         }
       } catch (err) {
-        console.error('Error checking team membership:', err);
+        console.error('Index: Error checking team membership:', err);
         setHasTeam(false);
       } finally {
         setLoading(false);
@@ -79,18 +92,26 @@ const Index = () => {
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 gap-6">
         <div>
-          <PeriodSummary />
-          
-          <div className="mt-6">
-            <TipInput />
-          </div>
+          {periodLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-[220px] w-full rounded-md" />
+              <Skeleton className="h-[180px] w-full rounded-md" />
+            </div>
+          ) : (
+            <>
+              <PeriodSummary />
+              <div className="mt-6">
+                <TipInput />
+              </div>
+            </>
+          )}
         </div>
         
         <div>
           <h2 className="text-lg font-medium mb-4 flex items-center justify-between">
             <div>
               Recente fooi
-              {currentPeriod && (
+              {currentPeriod && !periodLoading && (
                 <span className="text-sm font-normal text-muted-foreground ml-2">
                   {currentPeriod.name ? currentPeriod.name : `Periode ${formatPeriodDate(currentPeriod.startDate)}`}
                 </span>
@@ -98,7 +119,13 @@ const Index = () => {
             </div>
           </h2>
           
-          {currentPeriod && currentPeriod.tips.length > 0 ? (
+          {periodLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-[80px] w-full rounded-md" />
+              ))}
+            </div>
+          ) : currentPeriod && currentPeriod.tips && currentPeriod.tips.length > 0 ? (
             <div>
               {[...currentPeriod.tips]
                 .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())

@@ -40,6 +40,8 @@ const TeamContent: React.FC = () => {
 
   // Load team data on initial mount
   useEffect(() => {
+    let isMounted = true;
+    
     const loadInitialData = async () => {
       if (dataInitialized) {
         console.log("Team.tsx: Data already initialized, skipping initial load");
@@ -54,7 +56,9 @@ const TeamContent: React.FC = () => {
       try {
         console.log("Team.tsx: Initial data loading for team:", teamId);
         await handleRefresh();
-        console.log("Team.tsx: Initial data loaded successfully");
+        if (isMounted) {
+          console.log("Team.tsx: Initial data loaded successfully");
+        }
       } catch (error) {
         console.error("Error loading team data:", error);
       }
@@ -62,6 +66,10 @@ const TeamContent: React.FC = () => {
     
     console.log("Team.tsx: Initializing component, loading data");
     loadInitialData();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [dataInitialized, handleRefresh, teamId]);
 
   // Check URL parameters for showing the payout summary
@@ -72,12 +80,16 @@ const TeamContent: React.FC = () => {
     setShowPayoutSummary(showSummary);
     
     if (!showSummary) {
+      // Clear period selection when not showing payout summary
+      console.log("Team.tsx: Clearing period selection");
       togglePeriodSelection('');
     }
   }, [location.search, togglePeriodSelection]);
 
   // Update team members with account status
   useEffect(() => {
+    let isMounted = true;
+
     const updateTeamMembersWithAccounts = async () => {
       if (teamMembers.length === 0) {
         console.log("Team.tsx: No team members to check for accounts");
@@ -86,14 +98,20 @@ const TeamContent: React.FC = () => {
       
       try {
         console.log("Team.tsx: Checking team members with accounts, count:", teamMembers.length);
-        await checkTeamMembersWithAccounts(teamMembers);
-        console.log("Team.tsx: Team members with accounts checked successfully");
+        if (isMounted) {
+          await checkTeamMembersWithAccounts(teamMembers);
+          console.log("Team.tsx: Team members with accounts checked successfully");
+        }
       } catch (error) {
         console.error("Error checking team members with accounts:", error);
       }
     };
     
     updateTeamMembersWithAccounts();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [teamMembers]);
 
   // Show payout summary if payoutSummary URL param is present

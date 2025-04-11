@@ -28,6 +28,7 @@ const TipInput = () => {
   const [date, setDate] = useState<Date>(new Date());
   const [showDateWarning, setShowDateWarning] = useState(false);
   const [showQRDialog, setShowQRDialog] = useState(false);
+  const [isCreatingPeriod, setIsCreatingPeriod] = useState(false);
   const { toast } = useToast();
   
   const placeholders = [
@@ -40,7 +41,7 @@ const TipInput = () => {
     placeholders[Math.floor(Math.random() * placeholders.length)]
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const parsedAmount = parseFloat(amount);
@@ -50,14 +51,33 @@ const TipInput = () => {
     
     // Check if there's an active period, if not, create one first
     if (!currentPeriod) {
-      // Start a new period
-      startNewPeriod();
-      // Then immediately add the tip to the new period
-      // No need for setTimeout as startNewPeriod is synchronous
-      addTip(parsedAmount, note.trim() || undefined, date.toISOString());
-      resetForm();
+      console.log('TipInput: No current period, creating new one before adding tip');
+      try {
+        setIsCreatingPeriod(true);
+        
+        // Start a new period
+        await startNewPeriod();
+        console.log('TipInput: New period created successfully');
+        
+        // Then add the tip to the new period after a small delay to allow state updates
+        setTimeout(() => {
+          console.log('TipInput: Adding tip to newly created period');
+          addTip(parsedAmount, note.trim() || undefined, date.toISOString());
+          resetForm();
+          setIsCreatingPeriod(false);
+        }, 500);
+      } catch (error) {
+        console.error('TipInput: Error creating new period:', error);
+        toast({
+          title: "Fout",
+          description: "Er is een fout opgetreden bij het maken van een nieuwe periode",
+          variant: "destructive",
+        });
+        setIsCreatingPeriod(false);
+      }
     } else {
       // Normal flow when period exists
+      console.log('TipInput: Adding tip to existing period:', currentPeriod.id);
       addTip(parsedAmount, note.trim() || undefined, date.toISOString());
       resetForm();
     }
@@ -123,6 +143,7 @@ const TipInput = () => {
               step="0.01"
               min="0"
               className="flex-1"
+              disabled={isCreatingPeriod}
             />
           </div>
           
@@ -134,6 +155,7 @@ const TipInput = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => handlePresetClick(preset)}
+                disabled={isCreatingPeriod}
               >
                 €{preset}
               </Button>
@@ -149,6 +171,7 @@ const TipInput = () => {
                     "w-full justify-start text-left font-normal",
                     showDateWarning && "border-amber-500 text-amber-600"
                   )}
+                  disabled={isCreatingPeriod}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {date ? format(date, 'd MMMM yyyy', { locale: nl }) : <span>Selecteer datum</span>}
@@ -179,6 +202,7 @@ const TipInput = () => {
               placeholder={placeholder}
               className="mb-4 placeholder:italic"
               rows={2}
+              disabled={isCreatingPeriod}
             />
           ) : (
             <Button
@@ -187,6 +211,7 @@ const TipInput = () => {
               size="sm"
               className="mb-4 text-muted-foreground"
               onClick={() => setShowNote(true)}
+              disabled={isCreatingPeriod}
             >
               + Notitie toevoegen
             </Button>
@@ -195,11 +220,20 @@ const TipInput = () => {
           <Button 
             type="submit" 
             variant="goldGradient" 
-            className="w-full animate-pulse-subtle group relative overflow-hidden" 
-            disabled={!amount || isNaN(parseFloat(amount))}
+            className={cn(
+              "w-full group relative overflow-hidden",
+              !isCreatingPeriod && "animate-pulse-subtle"
+            )} 
+            disabled={!amount || isNaN(parseFloat(amount)) || isCreatingPeriod}
           >
-            <Sparkles size={16} className="mr-1 text-amber-700 animate-pulse" />
-            <span className="relative z-10">Top Tip</span>
+            {isCreatingPeriod ? (
+              "Periode aanmaken..."
+            ) : (
+              <>
+                <Sparkles size={16} className="mr-1 text-amber-700 animate-pulse" />
+                <span className="relative z-10">Top Tip</span>
+              </>
+            )}
           </Button>
         </form>
       </CardContent>

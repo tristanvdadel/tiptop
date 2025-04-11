@@ -48,7 +48,7 @@ const TeamCreate = ({
       
       console.log("Gebruiker ingelogd, wordt geprobeerd team aan te maken:", newTeamName);
       
-      // Use direct insert to create the team rather than the RPC function
+      // Use direct insert to create the team
       const { data: team, error: teamError } = await supabase
         .from('teams')
         .insert([{ name: newTeamName, created_by: user.id }])

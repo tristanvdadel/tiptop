@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, History } from 'lucide-react';
@@ -68,75 +67,40 @@ const Management = () => {
         console.log("Fetching teams for user:", user.id, "Attempt:", loadAttempts);
         
         try {
-          const { data: teams, error: teamsError } = await supabase
-            .from('teams')
-            .select('*');
+          // Use the getUserTeams function which is now using the safe RPC function
+          const { data: teams, error: teamsError } = await getUserTeams(user.id);
           
           if (teamsError) {
-            console.error('Error fetching teams directly:', teamsError);
+            console.error('Error in getUserTeams:', teamsError);
             throw teamsError;
           }
           
-          console.log("Received teams:", teams?.length || 0);
-          if (teams && teams.length > 0) {
+          console.log("Received teams from getUserTeams:", teams?.length || 0);
+          if (teams && Array.isArray(teams) && teams.length > 0) {
             setUserTeams(teams);
             setHasAnyTeam(true);
             setSelectedTeamId(teams[0].id);
-            
+              
             const { data: memberships, error: membershipsError } = await supabase
               .from('team_members')
               .select('id, team_id, role')
               .eq('user_id', user.id);
-            
+              
             if (membershipsError) {
               console.error('Error fetching memberships:', membershipsError);
             } else {
               setUserTeamMemberships(memberships || []);
-              
+                
               const firstTeamMembership = memberships?.find(m => m.team_id === teams[0].id);
               if (firstTeamMembership) {
                 setSelectedMembershipId(firstTeamMembership.id);
               }
-              
+                
               const adminMemberships = memberships?.filter(tm => tm.role === 'admin') || [];
               setIsAdmin(adminMemberships.length > 0);
             }
           } else {
-            console.log("No teams found directly, trying getUserTeams function");
-            const { data: userTeamsData, error: userTeamsError } = await getUserTeams(user.id);
-              
-            if (userTeamsError) {
-              console.error('Error in getUserTeams:', userTeamsError);
-              throw userTeamsError;
-            }
-              
-            console.log("Received teams from getUserTeams:", userTeamsData?.length || 0);
-            if (userTeamsData && Array.isArray(userTeamsData) && userTeamsData.length > 0) {
-              setUserTeams(userTeamsData);
-              setHasAnyTeam(true);
-              setSelectedTeamId(userTeamsData[0].id);
-                
-              const { data: memberships, error: membershipsError } = await supabase
-                .from('team_members')
-                .select('id, team_id, role')
-                .eq('user_id', user.id);
-                
-              if (membershipsError) {
-                console.error('Error fetching memberships:', membershipsError);
-              } else {
-                setUserTeamMemberships(memberships || []);
-                  
-                const firstTeamMembership = memberships?.find(m => m.team_id === userTeamsData[0].id);
-                if (firstTeamMembership) {
-                  setSelectedMembershipId(firstTeamMembership.id);
-                }
-                  
-                const adminMemberships = memberships?.filter(tm => tm.role === 'admin') || [];
-                setIsAdmin(adminMemberships.length > 0);
-              }
-            } else {
-              setHasAnyTeam(false);
-            }
+            setHasAnyTeam(false);
           }
         } catch (err: any) {
           console.error('Error in team fetch:', err);
@@ -161,12 +125,10 @@ const Management = () => {
       setLoadingMembers(true);
       try {
         const { data: members, error: membersError } = await supabase
-          .from('team_members')
-          .select('*')
-          .eq('team_id', selectedTeamId);
+          .rpc('get_team_members_safe', { team_id_param: selectedTeamId });
           
         if (membersError) {
-          console.error('Error fetching team members:', membersError);
+          console.error('Error fetching team members using RPC:', membersError);
           throw membersError;
         }
         
@@ -228,43 +190,17 @@ const Management = () => {
       console.log("Creating team:", newTeamName, "for user:", user.id);
       
       const { data: team, error: teamError } = await supabase
-        .from('teams')
-        .insert([
-          { name: newTeamName, created_by: user.id }
-        ])
-        .select()
-        .single();
+        .rpc('create_team_with_admin', { 
+          name_param: newTeamName, 
+          user_id_param: user.id 
+        });
       
       if (teamError) {
         console.error("Team creation error:", teamError);
         throw teamError;
       }
       
-      console.log("Team created:", team);
-      
-      const { error: memberError } = await supabase
-        .from('team_members')
-        .insert([
-          { 
-            team_id: team.id, 
-            user_id: user.id, 
-            role: 'admin',
-            permissions: {
-              add_tips: true,
-              edit_tips: true,
-              add_hours: true,
-              view_team: true,
-              view_reports: true,
-              close_periods: true,
-              manage_payouts: true
-            }
-          }
-        ]);
-      
-      if (memberError) {
-        console.error("Team member creation error:", memberError);
-        throw memberError;
-      }
+      console.log("Team created with RPC:", team);
       
       toast({
         title: "Team aangemaakt",
@@ -273,7 +209,9 @@ const Management = () => {
       
       setNewTeamName('');
       
-      window.location.reload();
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
       
     } catch (error: any) {
       console.error('Error creating team:', error);

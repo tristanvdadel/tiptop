@@ -7,7 +7,6 @@ import { PlusCircle } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { createTeam } from "@/services/teamService";
 
 interface TeamCreateProps {
   newTeamName: string;
@@ -49,12 +48,19 @@ const TeamCreate = ({
       
       console.log("Gebruiker ingelogd, wordt geprobeerd team aan te maken:", newTeamName);
       
-      // Create team using the service function that uses RPC
-      const team = await createTeam(newTeamName, user.id);
+      // Use the RPC function to create team and add admin in one transaction
+      const { data: teamId, error: teamError } = await supabase
+        .rpc('create_team_with_admin', {
+          name_param: newTeamName,
+          user_id_param: user.id
+        });
       
-      if (!team) {
-        throw new Error("Er is een onverwachte fout opgetreden bij het aanmaken van het team.");
+      if (teamError) {
+        console.error("Team creation error with RPC:", teamError);
+        throw teamError;
       }
+      
+      console.log("Team aangemaakt met ID:", teamId);
       
       toast({
         title: "Team aangemaakt",

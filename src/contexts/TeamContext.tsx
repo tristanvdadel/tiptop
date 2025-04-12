@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
 import { TeamMember } from '@/contexts/AppContext';
 import { useApp } from '@/contexts/AppContext';
@@ -86,7 +85,6 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [debouncedTogglePeriod]);
 
-  // Effect to calculate distribution when selectedPeriods or teamMembers change
   React.useEffect(() => {
     if (selectedPeriods.length === 0 || teamMembers.length === 0) {
       setDistribution([]);
@@ -97,7 +95,6 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setDistribution(calculatedDistribution);
   }, [selectedPeriods, calculateTipDistribution, teamMembers.length]);
 
-  // Effect to sort team members by name
   React.useEffect(() => {
     if (teamMembers.length === 0) return;
     
@@ -203,7 +200,6 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       console.log("TeamContext: Data wordt opgehaald voor team:", teamId);
       
-      // Eerst controleren of er al data is in de AppContext
       if (periods.length === 0) {
         console.log("TeamContext: No periods found in AppContext, refreshing data");
         await refreshTeamData();

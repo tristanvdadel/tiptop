@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -93,15 +92,18 @@ const TeamContent: React.FC = () => {
           table: 'periods',
           filter: `team_id=eq.${teamId}`
         },
-        async (payload) => {
+        (payload) => {
           console.log('Team.tsx: Real-time period update received:', payload);
-          try {
-            // Refresh team data to update the UI
-            await refreshTeamData();
-            console.log('Team.tsx: Data refreshed after period update');
-          } catch (error) {
-            console.error('Team.tsx: Error refreshing data after period update:', error);
-          }
+          // Use an IIFE to handle the async operation
+          (async () => {
+            try {
+              // Refresh team data to update the UI
+              await refreshTeamData();
+              console.log('Team.tsx: Data refreshed after period update');
+            } catch (error) {
+              console.error('Team.tsx: Error refreshing data after period update:', error);
+            }
+          })();
         }
       )
       .subscribe();

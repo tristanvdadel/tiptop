@@ -20,6 +20,7 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [periodLoading, setPeriodLoading] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   useEffect(() => {
     const checkTeamMembership = async () => {
@@ -82,17 +83,18 @@ const Index = () => {
           table: 'tips',
           filter: `period_id=eq.${currentPeriod.id}`
         },
-        async (payload) => {
+        (payload) => {
           console.log('Real-time tip update received:', payload);
           // Refresh team data to get updated tips
-          // We don't need to call the full refreshTeamData as it's heavy,
-          // instead just get the current period's data
-          try {
-            await refreshTeamData();
-            console.log('Index: Team data refreshed after real-time tip update');
-          } catch (error) {
-            console.error('Index: Error refreshing data after real-time tip update:', error);
-          }
+          // We use an IIFE to handle the async operation
+          (async () => {
+            try {
+              await refreshTeamData();
+              console.log('Index: Team data refreshed after real-time tip update');
+            } catch (error) {
+              console.error('Index: Error refreshing data after real-time tip update:', error);
+            }
+          })();
         }
       )
       .subscribe();
@@ -108,14 +110,17 @@ const Index = () => {
           table: 'periods',
           filter: `id=eq.${currentPeriod.id}`
         },
-        async (payload) => {
+        (payload) => {
           console.log('Real-time period update received:', payload);
-          try {
-            await refreshTeamData();
-            console.log('Index: Team data refreshed after real-time period update');
-          } catch (error) {
-            console.error('Index: Error refreshing data after real-time period update:', error);
-          }
+          // Use an IIFE to handle the async operation
+          (async () => {
+            try {
+              await refreshTeamData();
+              console.log('Index: Team data refreshed after real-time period update');
+            } catch (error) {
+              console.error('Index: Error refreshing data after real-time period update:', error);
+            }
+          })();
         }
       )
       .subscribe();
@@ -208,5 +213,8 @@ const Index = () => {
     </div>
   );
 };
+
+// Make sure to fix the import for useToast
+import { useToast } from "@/hooks/use-toast";
 
 export default Index;

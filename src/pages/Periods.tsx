@@ -61,19 +61,22 @@ const Periods = () => {
     
     console.log("Periods.tsx: Loading data on initial mount for team:", teamId);
     setIsLoading(true);
-    try {
-      await refreshTeamData();
-      console.log("Periods.tsx: Data loaded successfully");
-    } catch (error) {
-      console.error("Error loading team data on Periods page:", error);
-      toast({
-        title: "Fout bij laden",
-        description: "Er is een fout opgetreden bij het laden van de periodes.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    
+    (async () => {
+      try {
+        await refreshTeamData();
+        console.log("Periods.tsx: Data loaded successfully");
+      } catch (error) {
+        console.error("Error loading team data on Periods page:", error);
+        toast({
+          title: "Fout bij laden",
+          description: "Er is een fout opgetreden bij het laden van de periodes.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    })();
   }, [teamId, refreshTeamData, toast]);
   
   useEffect(() => {
@@ -120,10 +123,11 @@ const Periods = () => {
         async (payload) => {
           console.log('Periods.tsx: Real-time tip update received:', payload);
           
-          const tipPeriodId = payload.new?.period_id || payload.old?.period_id;
-          const isPeriodOurs = periods.some(p => p.id === tipPeriodId);
+          const newPeriodId = payload.new && 'period_id' in payload.new ? payload.new.period_id : undefined;
+          const oldPeriodId = payload.old && 'period_id' in payload.old ? payload.old.period_id : undefined;
+          const tipPeriodId = newPeriodId || oldPeriodId;
           
-          if (isPeriodOurs) {
+          if (tipPeriodId && periods.some(p => p.id === tipPeriodId)) {
             try {
               await refreshTeamData();
               console.log('Periods.tsx: Data refreshed after tip update in our period');

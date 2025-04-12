@@ -121,11 +121,12 @@ const TeamContent: React.FC = () => {
         async (payload) => {
           console.log('Team.tsx: Real-time tip update received:', payload);
           
-          // Check if this tip belongs to one of our periods
-          const tipPeriodId = payload.new?.period_id || payload.old?.period_id;
-          const isPeriodOurs = periods.some(p => p.id === tipPeriodId);
+          // Safely access nested properties with optional chaining and type guards
+          const newPeriodId = payload.new && 'period_id' in payload.new ? payload.new.period_id : undefined;
+          const oldPeriodId = payload.old && 'period_id' in payload.old ? payload.old.period_id : undefined;
+          const tipPeriodId = newPeriodId || oldPeriodId;
           
-          if (isPeriodOurs) {
+          if (tipPeriodId && periods.some(p => p.id === tipPeriodId)) {
             try {
               await refreshTeamData();
               console.log('Team.tsx: Data refreshed after tip update in our period');
@@ -153,11 +154,12 @@ const TeamContent: React.FC = () => {
         async (payload) => {
           console.log('Team.tsx: Real-time hour registration update received:', payload);
           
-          // Check if this hour registration belongs to one of our team members
-          const hourTeamMemberId = payload.new?.team_member_id || payload.old?.team_member_id;
-          const isTeamMemberOurs = teamMembers.some(m => m.id === hourTeamMemberId);
+          // Safely access nested properties with optional chaining and type guards
+          const newTeamMemberId = payload.new && 'team_member_id' in payload.new ? payload.new.team_member_id : undefined;
+          const oldTeamMemberId = payload.old && 'team_member_id' in payload.old ? payload.old.team_member_id : undefined;
+          const hourTeamMemberId = newTeamMemberId || oldTeamMemberId;
           
-          if (isTeamMemberOurs) {
+          if (hourTeamMemberId && teamMembers.some(m => m.id === hourTeamMemberId)) {
             try {
               await refreshTeamData();
               console.log('Team.tsx: Data refreshed after hour registration update for our team member');

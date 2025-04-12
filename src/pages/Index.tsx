@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { getUserTeamsSafe } from '@/services/teamService';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const { currentPeriod, refreshTeamData, addTip, updatePeriod } = useApp();
@@ -85,7 +86,6 @@ const Index = () => {
         },
         (payload) => {
           console.log('Real-time tip update received:', payload);
-          // Refresh team data to get updated tips
           // We use an IIFE to handle the async operation
           (async () => {
             try {
@@ -213,8 +213,5 @@ const Index = () => {
     </div>
   );
 };
-
-// Make sure to fix the import for useToast
-import { useToast } from "@/hooks/use-toast";
 
 export default Index;

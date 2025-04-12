@@ -15,7 +15,7 @@ import { getUserTeamsSafe } from '@/services/teamService';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const Index = () => {
-  const { currentPeriod, refreshTeamData } = useApp();
+  const { currentPeriod, refreshTeamData, addTip, updatePeriod } = useApp();
   const [hasTeam, setHasTeam] = useState(false);
   const [loading, setLoading] = useState(true);
   const [periodLoading, setPeriodLoading] = useState(false);
@@ -61,6 +61,72 @@ const Index = () => {
     
     checkTeamMembership();
   }, [refreshTeamData]);
+
+  // Setup real-time updates for tips
+  useEffect(() => {
+    if (!currentPeriod || !currentPeriod.id) {
+      console.log('Index: No current period for real-time updates');
+      return;
+    }
+
+    console.log('Index: Setting up real-time tip updates for period:', currentPeriod.id);
+    
+    // Subscribe to tips changes for the current period
+    const tipChannel = supabase
+      .channel('real-time-tips')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'tips',
+          filter: `period_id=eq.${currentPeriod.id}`
+        },
+        async (payload) => {
+          console.log('Real-time tip update received:', payload);
+          // Refresh team data to get updated tips
+          // We don't need to call the full refreshTeamData as it's heavy,
+          // instead just get the current period's data
+          try {
+            await refreshTeamData();
+            console.log('Index: Team data refreshed after real-time tip update');
+          } catch (error) {
+            console.error('Index: Error refreshing data after real-time tip update:', error);
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to period changes to update current period details
+    const periodChannel = supabase
+      .channel('real-time-period')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'periods',
+          filter: `id=eq.${currentPeriod.id}`
+        },
+        async (payload) => {
+          console.log('Real-time period update received:', payload);
+          try {
+            await refreshTeamData();
+            console.log('Index: Team data refreshed after real-time period update');
+          } catch (error) {
+            console.error('Index: Error refreshing data after real-time period update:', error);
+          }
+        }
+      )
+      .subscribe();
+    
+    // Cleanup function to remove subscriptions when component unmounts
+    return () => {
+      console.log('Index: Cleaning up real-time subscriptions');
+      supabase.removeChannel(tipChannel);
+      supabase.removeChannel(periodChannel);
+    };
+  }, [currentPeriod, refreshTeamData]);
   
   const formatPeriodDate = (date: string) => {
     return format(new Date(date), 'd MMMM yyyy', { locale: nl });

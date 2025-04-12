@@ -11,6 +11,7 @@ import ImportActions from '@/components/team/ImportActions';
 import TipDistributionSection from '@/components/team/TipDistributionSection';
 import LoadingIndicator from '@/components/team/LoadingIndicator';
 import { checkTeamMembersWithAccounts } from '@/services/teamDataService';
+import { supabase } from '@/integrations/supabase/client';
 
 const TeamContent: React.FC = () => {
   const {
@@ -71,6 +72,113 @@ const TeamContent: React.FC = () => {
       isMounted = false;
     };
   }, [dataInitialized, handleRefresh, teamId]);
+
+  // Set up real-time updates for periods and team members
+  useEffect(() => {
+    if (!teamId) {
+      console.log("Team.tsx: No team ID for real-time updates");
+      return;
+    }
+
+    console.log("Team.tsx: Setting up real-time updates for team:", teamId);
+    
+    // Listen for period changes
+    const periodChannel = supabase
+      .channel('team-periods-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // All events
+          schema: 'public',
+          table: 'periods',
+          filter: `team_id=eq.${teamId}`
+        },
+        async (payload) => {
+          console.log('Team.tsx: Real-time period update received:', payload);
+          try {
+            // Refresh team data to update the UI
+            await refreshTeamData();
+            console.log('Team.tsx: Data refreshed after period update');
+          } catch (error) {
+            console.error('Team.tsx: Error refreshing data after period update:', error);
+          }
+        }
+      )
+      .subscribe();
+    
+    // Listen for tip changes that might affect periods
+    const tipChannel = supabase
+      .channel('team-tips-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // All events
+          schema: 'public',
+          table: 'tips',
+          // No filter here as we can't easily filter by team_id for tips
+          // We'll filter in the callback
+        },
+        async (payload) => {
+          console.log('Team.tsx: Real-time tip update received:', payload);
+          
+          // Check if this tip belongs to one of our periods
+          const tipPeriodId = payload.new?.period_id || payload.old?.period_id;
+          const isPeriodOurs = periods.some(p => p.id === tipPeriodId);
+          
+          if (isPeriodOurs) {
+            try {
+              await refreshTeamData();
+              console.log('Team.tsx: Data refreshed after tip update in our period');
+            } catch (error) {
+              console.error('Team.tsx: Error refreshing data after tip update:', error);
+            }
+          } else {
+            console.log('Team.tsx: Ignoring tip update for period not in our team');
+          }
+        }
+      )
+      .subscribe();
+    
+    // Listen for hour registrations changes
+    const hourChannel = supabase
+      .channel('team-hours-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // All events
+          schema: 'public',
+          table: 'hour_registrations',
+          // We'll filter by team_member_id in the callback
+        },
+        async (payload) => {
+          console.log('Team.tsx: Real-time hour registration update received:', payload);
+          
+          // Check if this hour registration belongs to one of our team members
+          const hourTeamMemberId = payload.new?.team_member_id || payload.old?.team_member_id;
+          const isTeamMemberOurs = teamMembers.some(m => m.id === hourTeamMemberId);
+          
+          if (isTeamMemberOurs) {
+            try {
+              await refreshTeamData();
+              console.log('Team.tsx: Data refreshed after hour registration update for our team member');
+            } catch (error) {
+              console.error('Team.tsx: Error refreshing data after hour update:', error);
+            }
+          } else {
+            console.log('Team.tsx: Ignoring hour update for team member not in our team');
+          }
+        }
+      )
+      .subscribe();
+    
+    // Cleanup function
+    return () => {
+      console.log("Team.tsx: Cleaning up real-time subscriptions");
+      supabase.removeChannel(periodChannel);
+      supabase.removeChannel(tipChannel);
+      supabase.removeChannel(hourChannel);
+    };
+  }, [teamId, periods, teamMembers, refreshTeamData]);
 
   // Check URL parameters for showing the payout summary
   useEffect(() => {

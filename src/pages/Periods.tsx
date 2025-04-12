@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { fetchTeamPeriods } from '@/services/periodService';
+import { supabase } from '@/integrations/supabase/client';
 
 const Periods = () => {
   const {
@@ -51,33 +52,97 @@ const Periods = () => {
   const {
     toast
   } = useToast();
+
+  useEffect(() => {
+    if (!teamId) {
+      console.log("Periods.tsx: No team ID found, cannot load data");
+      return;
+    }
+    
+    console.log("Periods.tsx: Loading data on initial mount for team:", teamId);
+    setIsLoading(true);
+    try {
+      await refreshTeamData();
+      console.log("Periods.tsx: Data loaded successfully");
+    } catch (error) {
+      console.error("Error loading team data on Periods page:", error);
+      toast({
+        title: "Fout bij laden",
+        description: "Er is een fout opgetreden bij het laden van de periodes.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [teamId, refreshTeamData, toast]);
   
   useEffect(() => {
-    const loadData = async () => {
-      if (!teamId) {
-        console.log("Periods.tsx: No team ID found, cannot load data");
-        return;
-      }
-      
-      console.log("Periods.tsx: Loading data on initial mount for team:", teamId);
-      setIsLoading(true);
-      try {
-        await refreshTeamData();
-        console.log("Periods.tsx: Data loaded successfully");
-      } catch (error) {
-        console.error("Error loading team data on Periods page:", error);
-        toast({
-          title: "Fout bij laden",
-          description: "Er is een fout opgetreden bij het laden van de periodes.",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    if (!teamId) {
+      console.log("Periods.tsx: No team ID for real-time updates");
+      return;
+    }
+
+    console.log("Periods.tsx: Setting up real-time updates for periods");
     
-    loadData();
-  }, [teamId, refreshTeamData, toast]);
+    const periodChannel = supabase
+      .channel('periods-page-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // All events
+          schema: 'public',
+          table: 'periods',
+          filter: `team_id=eq.${teamId}`
+        },
+        async (payload) => {
+          console.log('Periods.tsx: Real-time period update received:', payload);
+          try {
+            await refreshTeamData();
+            console.log('Periods.tsx: Data refreshed after period update');
+          } catch (error) {
+            console.error('Periods.tsx: Error refreshing data after period update:', error);
+          }
+        }
+      )
+      .subscribe();
+    
+    const tipChannel = supabase
+      .channel('periods-tips-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // All events
+          schema: 'public',
+          table: 'tips',
+          // No filter here as we can't easily filter by team_id for tips
+          // We'll check in the callback if the tip affects one of our periods
+        },
+        async (payload) => {
+          console.log('Periods.tsx: Real-time tip update received:', payload);
+          
+          const tipPeriodId = payload.new?.period_id || payload.old?.period_id;
+          const isPeriodOurs = periods.some(p => p.id === tipPeriodId);
+          
+          if (isPeriodOurs) {
+            try {
+              await refreshTeamData();
+              console.log('Periods.tsx: Data refreshed after tip update in our period');
+            } catch (error) {
+              console.error('Periods.tsx: Error refreshing data after tip update:', error);
+            }
+          } else {
+            console.log('Periods.tsx: Ignoring tip update for period not in our team');
+          }
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      console.log("Periods.tsx: Cleaning up real-time subscriptions");
+      supabase.removeChannel(periodChannel);
+      supabase.removeChannel(tipChannel);
+    };
+  }, [teamId, periods, refreshTeamData]);
   
   const sortedPeriods = [...periods].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   

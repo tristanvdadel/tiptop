@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -18,6 +18,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { fetchTeamPeriods } from '@/services/periodService';
 import { supabase } from '@/integrations/supabase/client';
 
+/**
+ * Periods component for managing time periods
+ */
 const Periods = () => {
   const {
     periods,
@@ -48,125 +51,209 @@ const Periods = () => {
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [showCloseConfirmDialog, setShowCloseConfirmDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [realtimeSetup, setRealtimeSetup] = useState(false);
   
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
 
-  useEffect(() => {
+  // Enhanced load data function with better error handling
+  const loadData = useCallback(async () => {
     if (!teamId) {
-      console.log("Periods.tsx: No team ID found, cannot load data");
+      console.log("Periods.tsx: No team ID found, setting error state");
+      setHasError(true);
+      setErrorMessage("Geen team ID gevonden. Ga naar het dashboard om een team aan te maken of lid te worden van een team.");
+      setIsLoading(false);
       return;
     }
     
-    console.log("Periods.tsx: Loading data on initial mount for team:", teamId);
+    console.log("Periods.tsx: Loading data for team:", teamId);
     setIsLoading(true);
+    setHasError(false);
+    setErrorMessage(null);
     
-    (async () => {
-      try {
-        await refreshTeamData();
-        console.log("Periods.tsx: Data loaded successfully");
-      } catch (error) {
-        console.error("Error loading team data on Periods page:", error);
-        toast({
-          title: "Fout bij laden",
-          description: "Er is een fout opgetreden bij het laden van de periodes.",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    })();
+    try {
+      await refreshTeamData();
+      console.log("Periods.tsx: Data loaded successfully");
+    } catch (error) {
+      console.error("Error loading team data on Periods page:", error);
+      setHasError(true);
+      setErrorMessage("Er is een fout opgetreden bij het laden van de periodes. Probeer het opnieuw.");
+      toast({
+        title: "Fout bij laden",
+        description: "Er is een fout opgetreden bij het laden van de periodes.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }, [teamId, refreshTeamData, toast]);
   
+  // Initial data loading
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+  
+  // Improved real-time updates with better cleanup and error handling
   useEffect(() => {
     if (!teamId) {
       console.log("Periods.tsx: No team ID for real-time updates");
       return;
     }
+    
+    // Prevent duplicate subscriptions
+    if (realtimeSetup) {
+      return;
+    }
 
     console.log("Periods.tsx: Setting up real-time updates for periods");
+    setRealtimeSetup(true);
     
-    const periodChannel = supabase
-      .channel('periods-page-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // All events
-          schema: 'public',
-          table: 'periods',
-          filter: `team_id=eq.${teamId}`
-        },
-        async (payload) => {
-          console.log('Periods.tsx: Real-time period update received:', payload);
-          try {
-            await refreshTeamData();
-            console.log('Periods.tsx: Data refreshed after period update');
-          } catch (error) {
-            console.error('Periods.tsx: Error refreshing data after period update:', error);
-          }
-        }
-      )
-      .subscribe();
+    let periodChannel;
+    let tipChannel;
     
-    const tipChannel = supabase
-      .channel('periods-tips-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // All events
-          schema: 'public',
-          table: 'tips',
-          // No filter here as we can't easily filter by team_id for tips
-          // We'll check in the callback if the tip affects one of our periods
-        },
-        async (payload) => {
-          console.log('Periods.tsx: Real-time tip update received:', payload);
-          
-          const newPeriodId = payload.new && 'period_id' in payload.new ? payload.new.period_id : undefined;
-          const oldPeriodId = payload.old && 'period_id' in payload.old ? payload.old.period_id : undefined;
-          const tipPeriodId = newPeriodId || oldPeriodId;
-          
-          if (tipPeriodId && periods.some(p => p.id === tipPeriodId)) {
+    try {
+      periodChannel = supabase
+        .channel('periods-page-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // All events
+            schema: 'public',
+            table: 'periods',
+            filter: `team_id=eq.${teamId}`
+          },
+          async (payload) => {
+            console.log('Periods.tsx: Real-time period update received:', payload);
             try {
               await refreshTeamData();
-              console.log('Periods.tsx: Data refreshed after tip update in our period');
+              console.log('Periods.tsx: Data refreshed after period update');
             } catch (error) {
-              console.error('Periods.tsx: Error refreshing data after tip update:', error);
+              console.error('Periods.tsx: Error refreshing data after period update:', error);
+              toast({
+                title: "Fout bij vernieuwen",
+                description: "Kon gegevens niet vernieuwen na wijziging. Ververs de pagina handmatig.",
+                variant: "destructive"
+              });
             }
-          } else {
-            console.log('Periods.tsx: Ignoring tip update for period not in our team');
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe((status) => {
+          if (status !== 'SUBSCRIBED') {
+            console.error('Periods.tsx: Failed to subscribe to period changes:', status);
+          }
+        });
+      
+      tipChannel = supabase
+        .channel('periods-tips-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // All events
+            schema: 'public',
+            table: 'tips',
+          },
+          async (payload) => {
+            console.log('Periods.tsx: Real-time tip update received:', payload);
+            
+            const newPeriodId = payload.new && 'period_id' in payload.new ? payload.new.period_id : undefined;
+            const oldPeriodId = payload.old && 'period_id' in payload.old ? payload.old.period_id : undefined;
+            const tipPeriodId = newPeriodId || oldPeriodId;
+            
+            // Only refresh if the tip belongs to one of our periods
+            if (tipPeriodId && periods.some(p => p.id === tipPeriodId)) {
+              try {
+                await refreshTeamData();
+                console.log('Periods.tsx: Data refreshed after tip update in our period');
+              } catch (error) {
+                console.error('Periods.tsx: Error refreshing data after tip update:', error);
+                toast({
+                  title: "Fout bij vernieuwen",
+                  description: "Kon gegevens niet vernieuwen na wijziging. Ververs de pagina handmatig.",
+                  variant: "destructive"
+                });
+              }
+            } else {
+              console.log('Periods.tsx: Ignoring tip update for period not in our team');
+            }
+          }
+        )
+        .subscribe((status) => {
+          if (status !== 'SUBSCRIBED') {
+            console.error('Periods.tsx: Failed to subscribe to tip changes:', status);
+          }
+        });
+    } catch (error) {
+      console.error("Periods.tsx: Error setting up real-time subscriptions:", error);
+      toast({
+        title: "Fout bij realtime updates",
+        description: "Kon geen live updates ontvangen. Ververs de pagina handmatig voor nieuwe gegevens.",
+        variant: "destructive"
+      });
+    }
     
     return () => {
       console.log("Periods.tsx: Cleaning up real-time subscriptions");
-      supabase.removeChannel(periodChannel);
-      supabase.removeChannel(tipChannel);
+      setRealtimeSetup(false);
+      
+      if (periodChannel) {
+        supabase.removeChannel(periodChannel).catch(err => 
+          console.error("Error removing period channel:", err)
+        );
+      }
+      
+      if (tipChannel) {
+        supabase.removeChannel(tipChannel).catch(err => 
+          console.error("Error removing tip channel:", err)
+        );
+      }
     };
-  }, [teamId, periods, refreshTeamData]);
+  }, [teamId, periods, refreshTeamData, realtimeSetup, toast]);
   
-  const sortedPeriods = [...periods].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-  
+  // Helper functions for date formatting
   const formatPeriodDate = (date: string) => {
-    return format(new Date(date), 'd MMMM yyyy', {
-      locale: nl
-    });
+    try {
+      return format(new Date(date), 'd MMMM yyyy', {
+        locale: nl
+      });
+    } catch (error) {
+      console.error("Error formatting date:", date, error);
+      return "Ongeldige datum";
+    }
   };
   
   const formatPeriodDateTime = (date: string) => {
-    return format(new Date(date), 'EEEE d MMMM yyyy HH:mm', {
-      locale: nl
-    });
+    try {
+      return format(new Date(date), 'EEEE d MMMM yyyy HH:mm', {
+        locale: nl
+      });
+    } catch (error) {
+      console.error("Error formatting datetime:", date, error);
+      return "Ongeldige datum/tijd";
+    }
   };
   
+  // Safe access to data with defaults
   const tierPeriodLimit = Infinity;
   const unpaidPeriodesCount = getUnpaidPeriodsCount();
   const paidPeriodesCount = periods.filter(p => p.isPaid).length;
   const averageTipPerHour = calculateAverageTipPerHour();
   
+  // Sort periods safely with error handling
+  const sortedPeriods = React.useMemo(() => {
+    try {
+      return [...periods].sort((a, b) => {
+        const dateA = new Date(a.startDate);
+        const dateB = new Date(b.startDate);
+        return dateB.getTime() - dateA.getTime();
+      });
+    } catch (error) {
+      console.error("Error sorting periods:", error);
+      return [...periods]; // Return unsorted if sorting fails
+    }
+  }, [periods]);
+  
+  // Enhanced handlers with error handling
   const handleStartNewPeriod = () => {
     if (currentPeriod) {
       return; // Already have an active period
@@ -180,11 +267,21 @@ const Periods = () => {
       }
       return;
     }
-    startNewPeriod();
-    toast({
-      title: "Nieuwe periode gestart",
-      description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode."
-    });
+    
+    try {
+      startNewPeriod();
+      toast({
+        title: "Nieuwe periode gestart",
+        description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode."
+      });
+    } catch (error) {
+      console.error("Error starting new period:", error);
+      toast({
+        title: "Fout bij starten periode",
+        description: "Er is een fout opgetreden bij het starten van een nieuwe periode.",
+        variant: "destructive"
+      });
+    }
   };
   
   const handleDeletePaidPeriods = () => {
@@ -193,14 +290,23 @@ const Periods = () => {
   };
   
   const confirmDeletePaidPeriods = () => {
-    deletePaidPeriods();
-    setShowDeleteConfirmDialog(false);
-    setShowDeleteAllPaidDialog(false);
-    toast({
-      title: "Uitbetaalde periodes verwijderd",
-      description: "Alle uitbetaalde periodes zijn verwijderd. Je kunt nu nieuwe periodes starten.",
-      variant: "default"
-    });
+    try {
+      deletePaidPeriods();
+      setShowDeleteConfirmDialog(false);
+      setShowDeleteAllPaidDialog(false);
+      toast({
+        title: "Uitbetaalde periodes verwijderd",
+        description: "Alle uitbetaalde periodes zijn verwijderd. Je kunt nu nieuwe periodes starten.",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error("Error deleting paid periods:", error);
+      toast({
+        title: "Fout bij verwijderen",
+        description: "Er is een fout opgetreden bij het verwijderen van uitbetaalde periodes.",
+        variant: "destructive"
+      });
+    }
   };
   
   const handleUpgrade = () => {
@@ -226,14 +332,23 @@ const Periods = () => {
   
   const confirmDeletePeriod = () => {
     if (periodToDelete) {
-      deletePeriod(periodToDelete);
-      setPeriodToDelete(null);
-      setShowDeletePeriodDialog(false);
-      toast({
-        title: "Periode verwijderd",
-        description: "De periode is succesvol verwijderd.",
-        variant: "default"
-      });
+      try {
+        deletePeriod(periodToDelete);
+        setPeriodToDelete(null);
+        setShowDeletePeriodDialog(false);
+        toast({
+          title: "Periode verwijderd",
+          description: "De periode is succesvol verwijderd.",
+          variant: "default"
+        });
+      } catch (error) {
+        console.error("Error deleting period:", error);
+        toast({
+          title: "Fout bij verwijderen",
+          description: "Er is een fout opgetreden bij het verwijderen van de periode.",
+          variant: "destructive"
+        });
+      }
     }
   };
   
@@ -253,6 +368,13 @@ const Periods = () => {
       setEditPeriodName(period.name || '');
       setEditPeriodNotes(period.notes || '');
       setShowEditPeriodDialog(true);
+    } else {
+      console.error("Period not found:", periodId);
+      toast({
+        title: "Fout bij bewerken",
+        description: "De geselecteerde periode kan niet worden gevonden.",
+        variant: "destructive"
+      });
     }
   };
   
@@ -323,10 +445,58 @@ const Periods = () => {
     }
   };
   
+  // Retry loading handler
+  const handleRetryLoading = () => {
+    loadData();
+  };
+  
+  // Enhanced error and loading states rendering
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#9b87f5]"></div>
+      </div>
+    );
+  }
+  
+  if (hasError) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-destructive/50">
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center justify-center text-center space-y-4">
+              <AlertCircle className="h-10 w-10 text-destructive" />
+              <div>
+                <h3 className="text-lg font-medium">Fout bij laden</h3>
+                <p className="text-muted-foreground mt-1">{errorMessage || "Er is een fout opgetreden bij het laden van de periodes."}</p>
+              </div>
+              <Button onClick={handleRetryLoading}>
+                Opnieuw proberen
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!teamId) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-amber-300">
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center justify-center text-center space-y-4">
+              <AlertTriangle className="h-10 w-10 text-amber-500" />
+              <div>
+                <h3 className="text-lg font-medium">Geen team gevonden</h3>
+                <p className="text-muted-foreground mt-1">Je moet eerst een team aanmaken of lid worden van een team voordat je periodes kunt beheren.</p>
+              </div>
+              <Button onClick={() => navigate('/management')}>
+                Naar Teambeheer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -617,171 +787,4 @@ const Periods = () => {
       <Dialog open={showEditPeriodDialog} onOpenChange={setShowEditPeriodDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-center text-xl">Periode bewerken</DialogTitle>
-            <DialogDescription className="text-center pt-2">
-              <div className="flex items-center justify-center mb-4">
-                <div className="w-12 h-12 rounded-full bg-[#9b87f5]/20 flex items-center justify-center">
-                  <Edit className="text-[#9b87f5]" size={24} />
-                </div>
-              </div>
-              Geef deze periode een duidelijke naam en voeg notities toe
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="period-name">Naam</Label>
-              <Input id="period-name" placeholder="Zomer 2023" value={editPeriodName} onChange={e => setEditPeriodName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="period-notes">Notities</Label>
-              <Textarea id="period-notes" placeholder="Voeg relevante notities toe over deze periode..." value={editPeriodNotes} onChange={e => setEditPeriodNotes(e.target.value)} className="min-h-[120px]" />
-            </div>
-          </div>
-          <DialogFooter className="sm:justify-center gap-2 flex-col sm:flex-row mt-4">
-            <Button variant="outline" onClick={() => setShowEditPeriodDialog(false)}>
-              Annuleren
-            </Button>
-            <Button onClick={confirmEditPeriod} className="bg-[#9b87f5] hover:bg-[#7E69AB]">
-              Opslaan
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      <AlertDialog open={showDeleteAllPaidDialog} onOpenChange={setShowDeleteAllPaidDialog}>
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-center text-xl">Alle uitbetaalde periodes verwijderen?</AlertDialogTitle>
-            <AlertDialogDescription>
-              <div className="flex items-center justify-center mb-4">
-                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                  <Trash2 className="text-red-500" size={24} />
-                </div>
-              </div>
-              <p className="text-center mb-4">
-                Weet je zeker dat je alle uitbetaalde periodes wilt verwijderen?
-              </p>
-              <div className="bg-red-50 p-4 rounded-md border border-red-200 mb-2">
-                <p className="text-red-700 font-medium mb-2">Deze actie is onomkeerbaar!</p>
-                <p className="text-sm text-red-600">
-                  Alle uitbetaalde periodes worden permanent verwijderd. Je verliest alle gegevens van deze periodes, inclusief fooi-invoeren en statistieken.
-                </p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel>Annuleren</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeletePaidPeriods} className="bg-destructive hover:bg-destructive/90">
-              Ja, verwijder uitbetaalde periodes
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      
-      <AlertDialog open={showCloseConfirmDialog} onOpenChange={setShowCloseConfirmDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Periode afronden?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Deze periode is ingesteld om automatisch af te sluiten op 
-              {currentPeriod?.autoCloseDate && (
-                <span className="font-medium"> {formatPeriodDateTime(currentPeriod.autoCloseDate)}</span>
-              )}. 
-              Weet je zeker dat je deze periode nu handmatig wilt afronden?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuleren</AlertDialogCancel>
-            <AlertDialogAction onClick={doClosePeriod}>
-              Nu afronden
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      
-      {sortedPeriods.length > 0 ? <div className="space-y-4">
-          
-          {sortedPeriods.filter(period => !period.isActive) // Filter out active period since we show it separately at the top
-      .map((period, index) => {
-        const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
-        const periodAverageTipPerHour = period.isPaid ? calculateAverageTipPerHour(period.id) : 0;
-        return <Card key={period.id}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex justify-between items-center text-base">
-                      <span>
-                        {period.name || `Periode ${formatPeriodDate(period.startDate)}`}
-                      </span>
-                      <div className="flex gap-2">
-                        {period.isPaid && <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                            Uitbetaald
-                          </span>}
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-[#9b87f5]" onClick={() => handleEditPeriod(period.id)}>
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => handleDeletePeriod(period.id)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Startdatum</span>
-                        <span>{formatPeriodDate(period.startDate)}</span>
-                      </div>
-                      
-                      {period.endDate && <div className="flex justify-between">
-                          <span className="text-muted-foreground">Einddatum</span>
-                          <span>{formatPeriodDate(period.endDate)}</span>
-                        </div>}
-                    
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Totaal fooi</span>
-                        <span className="font-medium">
-                          €{totalTips.toFixed(2)}
-                        </span>
-                      </div>
-                    
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Aantal invoeren</span>
-                        <span>{period.tips.length}</span>
-                      </div>
-                    
-                      {period.isPaid && periodAverageTipPerHour > 0 && <div className="flex justify-between">
-                          <span className="text-muted-foreground flex items-center">
-                            <TrendingUp size={14} className="mr-1 text-[#9b87f5]" /> Gem. fooi per uur
-                          </span>
-                          <span className="text-[#9b87f5] font-medium">
-                            €{periodAverageTipPerHour.toFixed(2)}
-                          </span>
-                        </div>}
-                      
-                      {period.notes && <div className="mt-3 pt-3 border-t">
-                          <div className="flex items-start gap-2">
-                            <FileText size={16} className="shrink-0 mt-0.5 text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground">{period.notes}</p>
-                          </div>
-                        </div>}
-                    </div>
-                  </CardContent>
-                </Card>;
-      })}
-          
-          {paidPeriodesCount > 0 && <div className="pt-4 border-t border-border mt-8">
-              <Button variant="outline" className="w-full border-destructive/30 text-destructive hover:bg-destructive/10" onClick={handleDeleteAllPaidPeriods}>
-                <Trash2 size={16} className="mr-2" /> Verwijder alle uitbetaalde periodes
-              </Button>
-            </div>}
-        </div> : <Card>
-          <CardContent className="p-6 text-center">
-            <p className="text-muted-foreground">Nog geen periodes gestart.</p>
-            <Button onClick={startNewPeriod} className="mt-4 gold-button">
-              <Plus size={16} className="mr-1" /> Start eerste periode
-            </Button>
-          </CardContent>
-        </Card>}
-    </div>;
-};
-
-export default Periods;
+            <DialogTitle className="text-center text-xl">Periode bewerken</Dialog

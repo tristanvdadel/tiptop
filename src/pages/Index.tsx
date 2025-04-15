@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import TipInput from '@/components/TipInput';
 import TipCard from '@/components/TipCard';
 import PeriodSummary from '@/components/PeriodSummary';
@@ -23,48 +22,55 @@ const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  useEffect(() => {
-    const checkTeamMembership = async () => {
-      try {
-        console.log('Index: Checking team membership');
-        setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          console.log('Index: No session found');
-          setLoading(false);
-          return;
-        }
-        
-        // Use the safe function to get user teams
-        console.log('Index: Getting user teams');
-        const teams = await getUserTeamsSafe(session.user.id);
-        const userHasTeam = teams && teams.length > 0;
-        setHasTeam(userHasTeam);
-        
-        // If user has a team, refresh team data to ensure it's up to date
-        if (userHasTeam) {
-          console.log('Index: User has a team, refreshing team data');
-          setPeriodLoading(true);
-          try {
-            await refreshTeamData();
-          } catch (error) {
-            console.error('Index: Error refreshing team data:', error);
-          } finally {
-            setPeriodLoading(false);
-          }
-        }
-      } catch (err) {
-        console.error('Index: Error checking team membership:', err);
-        setHasTeam(false);
-      } finally {
+  const checkTeamMembership = useCallback(async () => {
+    try {
+      console.log('Index: Checking team membership');
+      setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.log('Index: No session found');
         setLoading(false);
+        return;
       }
-    };
-    
+      
+      console.log('Index: Getting user teams');
+      const teams = await getUserTeamsSafe(session.user.id);
+      const userHasTeam = teams && teams.length > 0;
+      setHasTeam(userHasTeam);
+      
+      if (userHasTeam) {
+        console.log('Index: User has a team, refreshing team data');
+        setPeriodLoading(true);
+        try {
+          await refreshTeamData();
+        } catch (error) {
+          console.error('Index: Error refreshing team data:', error);
+          toast({
+            title: "Fout bij laden",
+            description: "Kon teamgegevens niet vernieuwen",
+            variant: "destructive"
+          });
+        } finally {
+          setPeriodLoading(false);
+        }
+      }
+    } catch (err) {
+      console.error('Index: Error checking team membership:', err);
+      setHasTeam(false);
+      toast({
+        title: "Fout",
+        description: "Kon teamlidmaatschap niet controleren",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [refreshTeamData, toast]);
+  
+  useEffect(() => {
     checkTeamMembership();
-  }, [refreshTeamData]);
+  }, [checkTeamMembership]);
 
-  // Setup real-time updates for tips
   useEffect(() => {
     if (!currentPeriod || !currentPeriod.id) {
       console.log('Index: No current period for real-time updates');
@@ -73,7 +79,6 @@ const Index = () => {
 
     console.log('Index: Setting up real-time tip updates for period:', currentPeriod.id);
     
-    // Subscribe to tips changes for the current period
     const tipChannel = supabase
       .channel('real-time-tips')
       .on(
@@ -86,7 +91,6 @@ const Index = () => {
         },
         (payload) => {
           console.log('Real-time tip update received:', payload);
-          // We use an IIFE to handle the async operation
           (async () => {
             try {
               await refreshTeamData();
@@ -99,7 +103,6 @@ const Index = () => {
       )
       .subscribe();
 
-    // Subscribe to period changes to update current period details
     const periodChannel = supabase
       .channel('real-time-period')
       .on(
@@ -112,7 +115,6 @@ const Index = () => {
         },
         (payload) => {
           console.log('Real-time period update received:', payload);
-          // Use an IIFE to handle the async operation
           (async () => {
             try {
               await refreshTeamData();
@@ -125,7 +127,6 @@ const Index = () => {
       )
       .subscribe();
     
-    // Cleanup function to remove subscriptions when component unmounts
     return () => {
       console.log('Index: Cleaning up real-time subscriptions');
       supabase.removeChannel(tipChannel);
@@ -138,7 +139,11 @@ const Index = () => {
   };
   
   if (loading) {
-    return <div className="flex justify-center py-8">Laden...</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#9b87f5]"></div>
+      </div>
+    );
   }
   
   if (!hasTeam) {
@@ -152,8 +157,7 @@ const Index = () => {
           </AlertDescription>
         </Alert>
         <Button onClick={() => navigate('/management')} className="mt-2">
-          <Users className="mr-2 h-4 w-4" />
-          Naar Teambeheer
+          <Users className="mr-2 h-4 w-4" /> Naar Teambeheer
         </Button>
       </div>
     );

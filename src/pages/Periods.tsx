@@ -1,14 +1,14 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Plus, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileText, DollarSign, Crown, Calendar, Pencil } from 'lucide-react';
+import { Plus, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileText, DollarSign, Crown, Calendar, Pencil, AlertCircle } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -501,7 +501,8 @@ const Periods = () => {
     );
   }
   
-  return <div className="space-y-6">
+  return (
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Periodes</h1>
         <div className="flex items-center gap-2">
@@ -787,4 +788,78 @@ const Periods = () => {
       <Dialog open={showEditPeriodDialog} onOpenChange={setShowEditPeriodDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-center text-xl">Periode bewerken</Dialog
+            <DialogTitle className="text-center text-xl">Periode bewerken</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="period-name">Naam van periode</Label>
+              <Input
+                id="period-name"
+                placeholder="Bijvoorbeeld: Week 28"
+                value={editPeriodName}
+                onChange={(e) => setEditPeriodName(e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="period-notes">Notities (optioneel)</Label>
+              <Textarea
+                id="period-notes"
+                placeholder="Notities over deze periode"
+                value={editPeriodNotes}
+                onChange={(e) => setEditPeriodNotes(e.target.value)}
+                className="min-h-[100px]"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setShowEditPeriodDialog(false)}>
+              Annuleren
+            </Button>
+            <Button onClick={confirmEditPeriod}>
+              Periode bijwerken
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <AlertDialog open={showCloseConfirmDialog} onOpenChange={setShowCloseConfirmDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-center text-xl">Periode afronden?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                  <Calendar className="text-amber-500" size={24} />
+                </div>
+              </div>
+              <p className="text-center mb-4">
+                Je hebt automatisch afronden ingeschakeld voor deze periode.
+              </p>
+              <p className="text-center">
+                De periode wordt automatisch afgerond op:
+                <br />
+                <span className="font-medium">
+                  {currentPeriod && currentPeriod.autoCloseDate ? formatPeriodDateTime(currentPeriod.autoCloseDate) : 'Onbekende datum'}
+                </span>
+              </p>
+              <p className="mt-4 text-center">
+                Wil je de periode nu handmatig afronden?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction onClick={doClosePeriod}>
+              Ja, nu afronden
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
+
+export default Periods;

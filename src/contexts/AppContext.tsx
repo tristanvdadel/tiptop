@@ -11,6 +11,12 @@ import {
 } from '@/services';
 import { fetchTeamData } from '@/services/teamService';
 
+export interface HourRegistration {
+  id: string;
+  hours: number;
+  date: string;
+}
+
 export interface TeamMember {
   id: string;
   user_id?: string;
@@ -19,7 +25,7 @@ export interface TeamMember {
   hours: number;
   tipAmount?: number;
   balance?: number;
-  hourRegistrations?: any[];
+  hourRegistrations?: HourRegistration[];
 }
 
 export interface PayoutDistributionItem {
@@ -1036,7 +1042,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      setLoading(true);
+      setIsLoading(true);
       console.log("Marking periods as paid:", periodIds);
       console.log("With distribution:", distribution);
       
@@ -1130,7 +1136,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   }, [teamId, toast, refreshTeamData]);
 

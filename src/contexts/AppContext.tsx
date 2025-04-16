@@ -198,11 +198,112 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
   
-  const refreshTeamData = useCallback(async (tid?: string) => {
+  const loadLocalData = useCallback(() => {
+    const storedPeriods = localStorage.getItem('periods');
+    const storedTeamMembers = localStorage.getItem('teamMembers');
+    const storedPayouts = localStorage.getItem('payouts');
+    const storedAutoClosePeriods = localStorage.getItem('autoClosePeriods');
+    const storedPeriodDuration = localStorage.getItem('periodDuration');
+    const storedAlignWithCalendar = localStorage.getItem('alignWithCalendar');
+    const storedClosingTime = localStorage.getItem('closingTime');
+    
+    if (storedPeriods) {
+      try {
+        const parsedPeriods = JSON.parse(storedPeriods);
+        setPeriods(parsedPeriods);
+        
+        const active = parsedPeriods.find((p: Period) => p.isActive);
+        if (active) {
+          setCurrentPeriod(active);
+        }
+      } catch (error) {
+        console.error("Error parsing periods from localStorage:", error);
+      }
+    }
+    
+    if (storedTeamMembers) {
+      try {
+        setTeamMembers(JSON.parse(storedTeamMembers));
+      } catch (error) {
+        console.error("Error parsing teamMembers from localStorage:", error);
+      }
+    }
+    
+    if (storedPayouts) {
+      try {
+        const parsedPayouts = JSON.parse(storedPayouts);
+        setPayouts(parsedPayouts);
+        if (parsedPayouts.length > 0) {
+          setMostRecentPayout(parsedPayouts[parsedPayouts.length - 1]);
+        }
+      } catch (error) {
+        console.error("Error parsing payouts from localStorage:", error);
+      }
+    }
+    
+    if (storedAutoClosePeriods !== null) {
+      try {
+        setAutoClosePeriods(JSON.parse(storedAutoClosePeriods));
+      } catch (error) {
+        console.error("Error parsing autoClosePeriods from localStorage:", error);
+        setAutoClosePeriods(true);
+      }
+    }
+    
+    if (storedPeriodDuration) {
+      try {
+        const parsedDuration = JSON.parse(storedPeriodDuration);
+        if (parsedDuration === 'day' || parsedDuration === 'week' || parsedDuration === 'month') {
+          setPeriodDuration(parsedDuration);
+        } else {
+          setPeriodDuration('week');
+        }
+      } catch (error) {
+        console.error("Error parsing periodDuration from localStorage:", error);
+        setPeriodDuration('week');
+      }
+    }
+    
+    if (storedAlignWithCalendar !== null) {
+      try {
+        setAlignWithCalendar(JSON.parse(storedAlignWithCalendar));
+      } catch (error) {
+        console.error("Error parsing alignWithCalendar from localStorage:", error);
+        setAlignWithCalendar(false);
+      }
+    }
+
+    if (storedClosingTime) {
+      try {
+        const parsedClosingTime = JSON.parse(storedClosingTime);
+        if (
+          typeof parsedClosingTime === 'object' && 
+          parsedClosingTime !== null &&
+          'hour' in parsedClosingTime && 
+          'minute' in parsedClosingTime &&
+          typeof parsedClosingTime.hour === 'number' && 
+          typeof parsedClosingTime.minute === 'number'
+        ) {
+          setClosingTime({
+            hour: parsedClosingTime.hour,
+            minute: parsedClosingTime.minute
+          });
+        } else {
+          console.error("Invalid closing time format in localStorage, using default");
+          setClosingTime({ hour: 0, minute: 0 });
+        }
+      } catch (error) {
+        console.error("Error parsing closingTime from localStorage:", error);
+        setClosingTime({ hour: 0, minute: 0 });
+      }
+    }
+  }, []);
+
+  const refreshTeamData = useCallback(async (tid?: string): Promise<void> => {
     const targetTeamId = tid || teamId;
     if (!targetTeamId) {
       console.log('refreshTeamData: No team ID available, skipping refresh');
-      return Promise.resolve({ success: false, reason: 'no-team-id' });
+      return;
     }
     
     console.log(`refreshTeamData: Starting refresh for team ${targetTeamId}`);
@@ -236,7 +337,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           variant: "destructive"
         });
         setIsLoading(false);
-        return Promise.resolve({ success: false, reason: 'no-data' });
+        return;
       }
       
       console.log('refreshTeamData: Successfully fetched team data:', 
@@ -351,8 +452,36 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         description: "De teamgegevens zijn succesvol gesynchroniseerd.",
       });
       
-      console.log('refreshTeamData: Successfully completed data refresh');
-      return Promise.resolve({ success: true });
+      // Add real-time synchronization across devices
+      const teamChannel = supabase
+        .channel(`team-${targetTeamId}`)
+        .on(
+          'postgres_changes',
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'tips' 
+          },
+          async (payload) => {
+            console.log('Real-time tip update:', payload);
+            await refreshTeamData(targetTeamId);
+          }
+        )
+        .on(
+          'postgres_changes',
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'periods' 
+          },
+          async (payload) => {
+            console.log('Real-time period update:', payload);
+            await refreshTeamData(targetTeamId);
+          }
+        )
+        .subscribe();
+
+      return;
     } catch (error) {
       console.error("refreshTeamData: Error refreshing team data:", error);
       toast({
@@ -361,120 +490,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         variant: "destructive"
       });
       
-      // On failure, try to load local data as fallback
-      try {
-        console.log('refreshTeamData: Attempting to load local data as fallback');
-        loadLocalData();
-      } catch (fallbackError) {
-        console.error('refreshTeamData: Error loading local fallback data:', fallbackError);
-      }
-      
-      return Promise.resolve({ success: false, reason: 'error', error });
+      // Fallback to local data
+      loadLocalData();
     } finally {
       setIsLoading(false);
     }
   }, [teamId, toast, loadLocalData, setTeamMembers, setPeriods, setCurrentPeriod, setPayouts, setMostRecentPayout, setAutoClosePeriods, setPeriodDuration, setAlignWithCalendar, setClosingTime, setIsLoading]);
-
-  const loadLocalData = () => {
-    const storedPeriods = localStorage.getItem('periods');
-    const storedTeamMembers = localStorage.getItem('teamMembers');
-    const storedPayouts = localStorage.getItem('payouts');
-    const storedAutoClosePeriods = localStorage.getItem('autoClosePeriods');
-    const storedPeriodDuration = localStorage.getItem('periodDuration');
-    const storedAlignWithCalendar = localStorage.getItem('alignWithCalendar');
-    const storedClosingTime = localStorage.getItem('closingTime');
-    
-    if (storedPeriods) {
-      try {
-        const parsedPeriods = JSON.parse(storedPeriods);
-        setPeriods(parsedPeriods);
-        
-        const active = parsedPeriods.find((p: Period) => p.isActive);
-        if (active) {
-          setCurrentPeriod(active);
-        }
-      } catch (error) {
-        console.error("Error parsing periods from localStorage:", error);
-      }
-    }
-    
-    if (storedTeamMembers) {
-      try {
-        setTeamMembers(JSON.parse(storedTeamMembers));
-      } catch (error) {
-        console.error("Error parsing teamMembers from localStorage:", error);
-      }
-    }
-    
-    if (storedPayouts) {
-      try {
-        const parsedPayouts = JSON.parse(storedPayouts);
-        setPayouts(parsedPayouts);
-        if (parsedPayouts.length > 0) {
-          setMostRecentPayout(parsedPayouts[parsedPayouts.length - 1]);
-        }
-      } catch (error) {
-        console.error("Error parsing payouts from localStorage:", error);
-      }
-    }
-    
-    if (storedAutoClosePeriods !== null) {
-      try {
-        setAutoClosePeriods(JSON.parse(storedAutoClosePeriods));
-      } catch (error) {
-        console.error("Error parsing autoClosePeriods from localStorage:", error);
-        setAutoClosePeriods(true);
-      }
-    }
-    
-    if (storedPeriodDuration) {
-      try {
-        const parsedDuration = JSON.parse(storedPeriodDuration);
-        if (parsedDuration === 'day' || parsedDuration === 'week' || parsedDuration === 'month') {
-          setPeriodDuration(parsedDuration);
-        } else {
-          setPeriodDuration('week');
-        }
-      } catch (error) {
-        console.error("Error parsing periodDuration from localStorage:", error);
-        setPeriodDuration('week');
-      }
-    }
-    
-    if (storedAlignWithCalendar !== null) {
-      try {
-        setAlignWithCalendar(JSON.parse(storedAlignWithCalendar));
-      } catch (error) {
-        console.error("Error parsing alignWithCalendar from localStorage:", error);
-        setAlignWithCalendar(false);
-      }
-    }
-
-    if (storedClosingTime) {
-      try {
-        const parsedClosingTime = JSON.parse(storedClosingTime);
-        if (
-          typeof parsedClosingTime === 'object' && 
-          parsedClosingTime !== null &&
-          'hour' in parsedClosingTime && 
-          'minute' in parsedClosingTime &&
-          typeof parsedClosingTime.hour === 'number' && 
-          typeof parsedClosingTime.minute === 'number'
-        ) {
-          setClosingTime({
-            hour: parsedClosingTime.hour,
-            minute: parsedClosingTime.minute
-          });
-        } else {
-          console.error("Invalid closing time format in localStorage, using default");
-          setClosingTime({ hour: 0, minute: 0 });
-        }
-      } catch (error) {
-        console.error("Error parsing closingTime from localStorage:", error);
-        setClosingTime({ hour: 0, minute: 0 });
-      }
-    }
-  };
 
   useEffect(() => {
     localStorage.setItem('periods', JSON.stringify(periods));
@@ -957,474 +978,3 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!newName.trim()) {
       toast({
         title: "Ongeldige naam",
-        description: "Naam mag niet leeg zijn.",
-        variant: "destructive",
-      });
-      return false;
-    }
-    
-    const nameExists = teamMembers.some(
-      member => member.id !== memberId && 
-                member.name.toLowerCase() === newName.trim().toLowerCase()
-    );
-    
-    if (nameExists) {
-      toast({
-        title: "Naam bestaat al",
-        description: "Er is al een teamlid met deze naam.",
-        variant: "destructive",
-      });
-      return false;
-    }
-    
-    setTeamMembers(prev => 
-      prev.map(member => 
-        member.id === memberId 
-          ? { ...member, name: newName.trim() } 
-          : member
-      )
-    );
-    
-    toast({
-      title: "Naam bijgewerkt",
-      description: "De naam van het teamlid is bijgewerkt.",
-    });
-    
-    return true;
-  };
-
-  const hasReachedLimit = () => {
-    return false;
-  };
-  
-  const hasReachedPeriodLimit = () => {
-    return false;
-  };
-  
-  const getUnpaidPeriodsCount = () => {
-    return periods.filter(p => !p.isActive && !p.isPaid).length;
-  };
-
-  const startNewPeriod = () => {
-    if (currentPeriod && currentPeriod.isActive) {
-      endCurrentPeriod();
-    }
-    
-    const startDate = new Date();
-    const startDateISO = startDate.toISOString();
-    let autoCloseDate = null;
-    
-    if (autoClosePeriods) {
-      autoCloseDate = calculateAutoCloseDate(startDateISO, periodDuration);
-    }
-    
-    let periodName = "";
-    if (autoClosePeriods) {
-      periodName = generateAutomaticPeriodName(startDate, periodDuration);
-    }
-    
-    const newPeriod: Period = {
-      id: generateId(),
-      startDate: startDateISO,
-      isActive: true,
-      tips: [],
-      isPaid: false,
-      ...(periodName && { name: periodName }),
-      ...(autoCloseDate && { autoCloseDate }),
-      ...(teamId && { team_id: teamId })
-    };
-    
-    setCurrentPeriod(newPeriod);
-    setPeriods(prev => [...prev, newPeriod]);
-    
-    if (autoCloseDate) {
-      toast({
-        title: "Nieuwe periode gestart",
-        description: `Deze periode wordt automatisch afgesloten op ${new Date(autoCloseDate).toLocaleDateString('nl-NL')}.`,
-      });
-    }
-  };
-
-  const endCurrentPeriod = () => {
-    if (!currentPeriod) return;
-    
-    const endedPeriod = {
-      ...currentPeriod,
-      endDate: new Date().toISOString(),
-      isActive: false,
-    };
-    
-    setCurrentPeriod(null);
-    
-    setPeriods(prev => 
-      prev.map(p => p.id === endedPeriod.id ? endedPeriod : p)
-    );
-  };
-
-  const calculateTipDistribution = useCallback((selectedPeriodIds: string[]) => {
-    let periodsToCalculate: Period[] = [];
-    
-    if (selectedPeriodIds && selectedPeriodIds.length > 0) {
-      periodsToCalculate = periods.filter(period => selectedPeriodIds.includes(period.id));
-    } else if (currentPeriod) {
-      periodsToCalculate = [currentPeriod];
-    } else {
-      return teamMembers.map(member => ({
-        ...member,
-        tipAmount: 0
-      }));
-    }
-    
-    const totalTips = periodsToCalculate.reduce((total, period) => 
-      total + period.tips.reduce((sum, tip) => sum + tip.amount, 0), 0);
-    
-    const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
-    
-    if (totalHours === 0 || totalTips === 0) {
-      const tipPerMember = totalTips / teamMembers.length || 0;
-      
-      return teamMembers.map(member => ({
-        ...member,
-        tipAmount: tipPerMember
-      }));
-    }
-    
-    const tipPerHour = totalTips / totalHours;
-    
-    return teamMembers.map(member => {
-      const tipAmount = member.hours * tipPerHour;
-      
-      return {
-        ...member,
-        tipAmount
-      };
-    });
-  }, [periods, teamMembers]);
-
-  const calculateAverageTipPerHour = (periodId?: string, calculationMode: 'period' | 'day' | 'week' | 'month' = 'period') => {
-    let periodsToCalculate: Period[] = [];
-    
-    if (periodId) {
-      const period = periods.find(p => p.id === periodId);
-      if (period) {
-        periodsToCalculate = [period];
-      }
-    } else if (currentPeriod) {
-      periodsToCalculate = [currentPeriod];
-    }
-    
-    if (periodsToCalculate.length === 0) {
-      return 0;
-    }
-    
-    const totalTips = periodsToCalculate.reduce((total, period) => 
-      total + period.tips.reduce((sum, tip) => sum + tip.amount, 0), 0);
-    
-    const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
-    
-    if (totalHours === 0) {
-      return 0;
-    }
-    
-    return totalTips / totalHours;
-  };
-  
-  const markPeriodsAsPaid = useCallback(async (periodIds: string[], distribution: PayoutDistributionItem[]) => {
-    if (!teamId) {
-      console.error("No team ID available, cannot mark periods as paid");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      console.log("Marking periods as paid:", periodIds);
-      console.log("With distribution:", distribution);
-      
-      // Create a new payout
-      const { data: payout, error: payoutError } = await supabase
-        .from('payouts')
-        .insert([{
-          team_id: teamId,
-          date: new Date().toISOString(),
-          payout_time: new Date().toISOString()
-        }])
-        .select()
-        .single();
-
-      if (payoutError) {
-        console.error("Error creating payout:", payoutError);
-        throw payoutError;
-      }
-      
-      console.log("Created payout:", payout);
-      
-      // Insert payout distributions
-      const payoutDistributions = distribution.map(item => ({
-        payout_id: payout.id,
-        team_member_id: item.memberId,
-        amount: item.amount,
-        actual_amount: item.actualAmount || item.amount,
-        balance: item.balance || 0
-      }));
-      
-      const { error: distributionError } = await supabase
-        .from('payout_distributions')
-        .insert(payoutDistributions);
-        
-      if (distributionError) {
-        console.error("Error inserting payout distributions:", distributionError);
-        throw distributionError;
-      }
-      
-      // Link periods to the payout
-      const payoutPeriods = periodIds.map(periodId => ({
-        payout_id: payout.id,
-        period_id: periodId
-      }));
-      
-      const { error: periodsError } = await supabase
-        .from('payout_periods')
-        .insert(payoutPeriods);
-        
-      if (periodsError) {
-        console.error("Error linking periods to payout:", periodsError);
-        throw periodsError;
-      }
-      
-      // Mark periods as paid
-      const { error: updateError } = await supabase
-        .from('periods')
-        .update({ is_paid: true })
-        .in('id', periodIds);
-        
-      if (updateError) {
-        console.error("Error marking periods as paid:", updateError);
-        throw updateError;
-      }
-      
-      // Update team member balances
-      for (const item of distribution) {
-        const { error: balanceError } = await supabase
-          .from('team_members')
-          .update({ balance: item.balance || 0 })
-          .eq('id', item.memberId);
-          
-        if (balanceError) {
-          console.error(`Error updating balance for member ${item.memberId}:`, balanceError);
-        }
-      }
-      
-      // Refresh data
-      await refreshTeamData();
-      
-      toast({
-        title: "Uitbetaling voltooid",
-        description: "De fooi is succesvol uitbetaald en de periodes zijn gemarkeerd als uitbetaald.",
-      });
-
-    } catch (error) {
-      console.error("Error in markPeriodsAsPaid:", error);
-      toast({
-        title: "Fout bij uitbetalen",
-        description: "Er is een fout opgetreden bij het uitbetalen van de fooi.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [teamId, toast, refreshTeamData]);
-
-  const deletePaidPeriods = () => {
-    const unpaidPeriods = periods.filter(period => !period.isPaid);
-    setPeriods(unpaidPeriods);
-    
-    toast({
-      title: "Betaalde periodes verwijderd",
-      description: "Alle betaalde periodes zijn verwijderd.",
-    });
-  };
-  
-  const deletePeriod = (periodId: string) => {
-    const periodToDelete = periods.find(p => p.id === periodId);
-    
-    if (!periodToDelete) {
-      toast({
-        title: "Fout bij verwijderen",
-        description: "De periode kon niet worden gevonden.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (periodToDelete.isPaid) {
-      toast({
-        title: "Kan niet verwijderen",
-        description: "Een betaalde periode kan niet worden verwijderd.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setPeriods(prev => prev.filter(p => p.id !== periodId));
-    
-    if (currentPeriod && currentPeriod.id === periodId) {
-      setCurrentPeriod(null);
-    }
-    
-    toast({
-      title: "Periode verwijderd",
-      description: "De periode is succesvol verwijderd.",
-    });
-  };
-  
-  const deleteTip = (periodId: string, tipId: string) => {
-    const period = periods.find(p => p.id === periodId);
-    
-    if (!period) {
-      return;
-    }
-    
-    const updatedTips = period.tips.filter(tip => tip.id !== tipId);
-    
-    const updatedPeriod = {
-      ...period,
-      tips: updatedTips
-    };
-    
-    setPeriods(prev => 
-      prev.map(p => p.id === periodId ? updatedPeriod : p)
-    );
-    
-    if (currentPeriod && currentPeriod.id === periodId) {
-      setCurrentPeriod(updatedPeriod);
-    }
-  };
-  
-  const updateTip = (periodId: string, tipId: string, amount: number, note?: string, date?: string) => {
-    const period = periods.find(p => p.id === periodId);
-    
-    if (!period) {
-      return;
-    }
-    
-    const updatedTips = period.tips.map(tip => 
-      tip.id === tipId 
-        ? { 
-            ...tip, 
-            amount, 
-            note: note !== undefined ? note : tip.note,
-            date: date || tip.date
-          } 
-        : tip
-    );
-    
-    const updatedPeriod = {
-      ...period,
-      tips: updatedTips
-    };
-    
-    setPeriods(prev => 
-      prev.map(p => p.id === periodId ? updatedPeriod : p)
-    );
-    
-    if (currentPeriod && currentPeriod.id === periodId) {
-      setCurrentPeriod(updatedPeriod);
-    }
-    
-    toast({
-      title: "Fooi bijgewerkt",
-      description: "De fooi is succesvol bijgewerkt.",
-    });
-  };
-  
-  const updatePeriod = (periodId: string, updates: {name?: string, notes?: string}) => {
-    setPeriods(prev => 
-      prev.map(period => {
-        if (period.id === periodId) {
-          const updatedPeriod = { ...period };
-          
-          if (updates.name !== undefined) {
-            updatedPeriod.name = updates.name;
-          }
-          
-          if (updates.notes !== undefined) {
-            updatedPeriod.notes = updates.notes;
-          }
-          
-          if (currentPeriod && currentPeriod.id === periodId) {
-            setCurrentPeriod(updatedPeriod);
-          }
-          
-          return updatedPeriod;
-        }
-        return period;
-      })
-    );
-  };
-  
-  return (
-    <AppContext.Provider
-      value={{
-        // State
-        currentPeriod,
-        periods,
-        teamMembers,
-        payouts,
-        autoClosePeriods,
-        periodDuration,
-        alignWithCalendar,
-        setAlignWithCalendar,
-        closingTime,
-        setClosingTime,
-        isLoading,
-        teamId,
-        
-        // Actions
-        addTip,
-        addTeamMember,
-        removeTeamMember,
-        updateTeamMemberHours,
-        startNewPeriod,
-        endCurrentPeriod,
-        calculateTipDistribution,
-        calculateAverageTipPerHour,
-        markPeriodsAsPaid,
-        hasReachedLimit,
-        hasReachedPeriodLimit,
-        getUnpaidPeriodsCount,
-        deletePaidPeriods,
-        deletePeriod,
-        deleteTip,
-        updateTip,
-        updatePeriod,
-        deleteHourRegistration,
-        updateTeamMemberBalance,
-        clearTeamMemberHours,
-        updateTeamMemberName,
-        mostRecentPayout,
-        setMostRecentPayout,
-        setAutoClosePeriods,
-        setPeriodDuration,
-        scheduleAutoClose,
-        calculateAutoCloseDate,
-        getNextAutoCloseDate,
-        getFormattedClosingTime,
-        refreshTeamData,
-        updateTeamMemberPermissions,
-        updateTeamMemberRole,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
-  );
-};
-
-export const useApp = () => {
-  const context = useContext(AppContext);
-  if (context === undefined) {
-    throw new Error('useApp must be used within an AppProvider');
-  }
-  return context;
-};
-
-export default AppContext;

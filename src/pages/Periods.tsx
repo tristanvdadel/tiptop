@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -786,3 +787,219 @@ const Periods = () => {
             <AlertDialogAction onClick={confirmDeletePeriod} className="bg-destructive hover:bg-destructive/90">
               Ja, verwijder deze periode
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <Dialog open={showEditPeriodDialog} onOpenChange={setShowEditPeriodDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Periode bewerken</DialogTitle>
+            <DialogDescription>
+              Pas de naam en notities van de periode aan.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="period-name">Naam</Label>
+              <Input 
+                id="period-name" 
+                value={editPeriodName} 
+                onChange={(e) => setEditPeriodName(e.target.value)}
+                placeholder="Periodename (optioneel)"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="period-notes">Notities</Label>
+              <Textarea 
+                id="period-notes" 
+                value={editPeriodNotes}
+                onChange={(e) => setEditPeriodNotes(e.target.value)}
+                placeholder="Notities voor deze periode (optioneel)"
+                rows={3}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditPeriodDialog(false)}>
+              Annuleren
+            </Button>
+            <Button onClick={confirmEditPeriod}>
+              Opslaan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <AlertDialog open={showCloseConfirmDialog} onOpenChange={setShowCloseConfirmDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-center text-xl">Periode afronden?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                  <Calendar className="text-amber-500" size={24} />
+                </div>
+              </div>
+              <p className="text-center mb-4">
+                Weet je zeker dat je deze periode wilt afronden?
+              </p>
+              <p className="bg-blue-50 p-4 rounded-md border border-blue-100 text-blue-700 text-sm">
+                Deze periode zou automatisch worden afgerond op <span className="font-medium">{currentPeriod && currentPeriod.autoCloseDate ? formatPeriodDateTime(currentPeriod.autoCloseDate) : "-"}</span>.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction onClick={doClosePeriod}>
+              Ja, periode nu afronden
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <AlertDialog open={showDeleteAllPaidDialog} onOpenChange={setShowDeleteAllPaidDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-center text-xl">Alle uitbetaalde perioden verwijderen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                  <Trash2 className="text-red-500" size={24} />
+                </div>
+              </div>
+              <p className="text-center mb-2">
+                Je staat op het punt alle {paidPeriodesCount} uitbetaalde perioden te verwijderen.
+              </p>
+              <div className="bg-red-50 p-4 rounded-md border border-red-200 mb-2">
+                <p className="text-red-700 font-medium mb-2">Deze actie is onomkeerbaar!</p>
+                <p className="text-sm text-red-600">
+                  Alle uitbetaalde perioden en hun gegevens worden permanent verwijderd.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeletePaidPeriods} className="bg-destructive hover:bg-destructive/90">
+              Ja, verwijder alle uitbetaalde perioden
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {sortedPeriods.length > 0 && (
+        <>
+          <div className="mt-4">
+            <h2 className="text-lg font-semibold mb-4">Alle periodes</h2>
+            <div className="space-y-4">
+              {sortedPeriods.map((period) => (
+                <Card key={period.id} className={`hover:shadow-md transition-shadow ${period.isPaid ? 'border-green-200' : ''}`}>
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium">
+                            {period.name || `Periode ${formatPeriodDate(period.startDate)}`}
+                          </h3>
+                          {period.isPaid && (
+                            <Badge variant="outline" className="text-xs border-green-500 text-green-700 bg-green-50">
+                              Uitbetaald
+                            </Badge>
+                          )}
+                          {!period.isPaid && !period.isActive && (
+                            <Badge variant="outline" className="text-xs">
+                              Niet uitbetaald
+                            </Badge>
+                          )}
+                          {period.isActive && (
+                            <Badge className="text-xs bg-tier-free text-white">
+                              Actief
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {period.startDate && formatPeriodDate(period.startDate)}
+                          {period.endDate && ` - ${formatPeriodDate(period.endDate)}`}
+                        </div>
+                        {period.notes && (
+                          <p className="text-sm mt-2 text-muted-foreground">
+                            <span className="font-medium">Notities:</span> {period.notes}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <div className="font-medium">
+                          €{period.tips.reduce((sum, tip) => sum + tip.amount, 0).toFixed(2)}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {period.tips.length} {period.tips.length === 1 ? 'invoer' : 'invoeren'}
+                        </div>
+                        <div className="flex mt-2">
+                          {!period.isPaid && !period.isActive && (
+                            <Button 
+                              onClick={() => handleDeletePeriod(period.id)} 
+                              size="sm" 
+                              variant="ghost"
+                              className="h-8 px-2"
+                            >
+                              <Trash2 size={16} className="text-destructive" />
+                            </Button>
+                          )}
+                          {!period.isActive && (
+                            <Button 
+                              onClick={() => handleEditPeriod(period.id)} 
+                              size="sm" 
+                              variant="ghost"
+                              className="h-8 px-2"
+                            >
+                              <Pencil size={16} className="text-muted-foreground" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+          
+          {paidPeriodesCount > 0 && (
+            <div className="flex justify-end mt-4">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={handleDeleteAllPaidPeriods}
+              >
+                <Trash2 size={14} className="mr-1" /> Verwijder alle uitbetaalde periodes
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+      
+      {sortedPeriods.length === 0 && !currentPeriod && !isLoading && (
+        <Card className="mt-4">
+          <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+              <FileText className="text-gray-400" size={24} />
+            </div>
+            <h3 className="text-lg font-medium">Geen periodes gevonden</h3>
+            <p className="text-muted-foreground mt-1">
+              Start een nieuwe periode om fooien bij te houden.
+            </p>
+            <Button onClick={handleStartNewPeriod} className="mt-4">
+              <Plus size={16} className="mr-1" /> Nieuwe periode starten
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+};
+
+export default Periods;

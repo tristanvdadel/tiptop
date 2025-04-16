@@ -994,7 +994,7 @@ const Periods = () => {
             <p className="text-muted-foreground mt-1">
               Start een nieuwe periode om fooien bij te houden.
             </p>
-            <Button onClick={handleStartNewPeriod} className="mt-4">
+            <Button onClick={handleStartNewPeriod} className="mt-4" variant="goldGradient">
               <Plus size={16} className="mr-1" /> Nieuwe periode starten
             </Button>
           </CardContent>

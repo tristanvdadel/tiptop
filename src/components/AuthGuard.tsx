@@ -29,7 +29,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       }
     });
 
-    // THEN check for existing session, but only set state if we don't already have a session
+    // THEN check for existing session, but ONLY if the event listener hasn't already resolved
     const getInitialSession = async () => {
       try {
         console.log('Performing fast session check');
@@ -51,16 +51,16 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
-    // Start initial session check
+    // Start initial session check immediately
     getInitialSession();
     
-    // Set a shorter timeout as a fallback - reduce from 800ms to 500ms
+    // Set a shorter timeout as a fallback - reduce from 500ms to 300ms
     const timeoutId = setTimeout(() => {
       if (mounted && isLoading) {
         console.log('Session check timeout - forcing completion');
         setIsLoading(false);
       }
-    }, 500); // Reduced from 800ms to 500ms for faster fallback
+    }, 300); // Reduced from 500ms to 300ms for faster fallback
 
     return () => {
       mounted = false;
@@ -80,11 +80,12 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (needsRedirect) {
       console.log('No session, redirecting to login from:', location.pathname);
+      // Use replace instead of push to prevent back button from going back to protected routes
       navigate('/login', { replace: true });
     }
   }, [needsRedirect, navigate, location.pathname]);
 
-  // Only show loading state for a maximum of 500 milliseconds
+  // Shorten loading state to max 300ms to improve user experience
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">

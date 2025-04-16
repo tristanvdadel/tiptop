@@ -24,21 +24,34 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Don't allow multiple simultaneous login attempts
+    if (loading) return;
+    
     setLoading(true);
-    setLoginProgress(20); // Start at 20 instead of 10
+    setLoginProgress(30); // Start at 30 instead of 20 - faster feedback
     
     try {
-      setLoginProgress(50); // Jump to 50 faster
+      setLoginProgress(60); // Jump to 60 faster
       
-      const {
-        data,
-        error
-      } = await supabase.auth.signInWithPassword({
+      // Use a timeout to ensure the UI shows progress
+      const loginPromise = supabase.auth.signInWithPassword({
         email,
         password
       });
       
-      setLoginProgress(80); // Jump to 80 faster
+      // Show toast immediately to give feedback that login is processing
+      toast({
+        title: "Bezig met inloggen...",
+        description: "Even geduld aub",
+      });
+      
+      const {
+        data,
+        error
+      } = await loginPromise;
+      
+      setLoginProgress(90); // Jump to 90 faster
       
       if (error) throw error;
       
@@ -49,19 +62,30 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
           title: "Succesvol ingelogd"
         });
         
-        // Redirect faster
-        setTimeout(() => {
-          navigate('/', { replace: true });
-        }, 100); // Reduced from 300ms to 100ms
+        // Redirect immediately - no waiting
+        navigate('/', { replace: true });
       }
     } catch (error: any) {
+      setLoginProgress(0);
+      
+      // Show more descriptive error message
+      let errorMessage = "Controleer je gegevens en probeer opnieuw.";
+      
+      if (error.message.includes("Invalid login credentials")) {
+        errorMessage = "Ongeldige inloggegevens. Controleer je e-mail en wachtwoord.";
+      } else if (error.message.includes("Email not confirmed")) {
+        errorMessage = "E-mail nog niet bevestigd. Controleer je inbox.";
+      } else if (error.message.includes("network")) {
+        errorMessage = "Netwerkfout. Controleer je internetverbinding.";
+      }
+      
       toast({
         title: "Fout bij inloggen",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive"
       });
+    } finally {
       setLoading(false);
-      setLoginProgress(0);
     }
   };
 
@@ -77,6 +101,8 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
             required 
             value={email} 
             onChange={e => setEmail(e.target.value)}
+            disabled={loading}
+            autoComplete="email"
           />
         </div>
         <div className="space-y-2">
@@ -87,6 +113,8 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
             required 
             value={password} 
             onChange={e => setPassword(e.target.value)}
+            disabled={loading}
+            autoComplete="current-password"
           />
         </div>
         <Button
@@ -94,6 +122,7 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
           variant="link"
           className="p-0 h-auto text-amber-600 hover:text-amber-700 flex items-center gap-1"
           onClick={onResetPasswordClick}
+          disabled={loading}
         >
           <KeyRound size={16} />
           Wachtwoord vergeten?
@@ -104,7 +133,7 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
           <div className="w-full">
             <Progress value={loginProgress} className="h-2 bg-amber-100">
               <div 
-                className="h-full bg-gradient-to-r from-amber-400 to-amber-300"
+                className="h-full bg-gradient-to-r from-amber-400 to-amber-300 transition-all duration-300"
                 style={{ width: `${loginProgress}%` }}
               />
             </Progress>

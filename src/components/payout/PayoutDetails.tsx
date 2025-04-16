@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TeamMember } from '@/contexts/AppContext';
 import { formatCurrency } from '@/lib/utils';
+import { useApp } from '@/contexts/AppContext';
 
 interface PayoutDetailItem {
   memberId: string;
@@ -28,6 +29,7 @@ interface PayoutDetailsProps {
 
 const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDetailsProps) => {
   const [hourlyRate, setHourlyRate] = useState<number>(0);
+  const { teamMembers } = useApp();
   
   useEffect(() => {
     if (totalHours && totalHours > 0 && totalTips && totalTips > 0) {
@@ -40,9 +42,12 @@ const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDe
   // Convert payout data to the format needed for rendering if payout is provided
   const displayDistribution = distribution || 
     (payout?.distribution.map(item => {
+      // Find the team member by ID to get their name
+      const teamMember = teamMembers.find(m => m.id === item.memberId);
+      
       const member = {
         id: item.memberId,
-        name: '', // This will be filled by TeamMember lookup in the parent component
+        name: teamMember?.name || 'Onbekend lid', // Use the name from teamMembers if found
         hours: 0,
         tipAmount: item.amount,
         balance: item.balance || 0

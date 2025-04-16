@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth, set, getWeek, format, startOfMonth, nextMonday } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -95,9 +95,9 @@ type AppContextType = {
   updateTeamMemberHours: (id: string, hours: number) => void;
   startNewPeriod: () => void;
   endCurrentPeriod: () => void;
-  calculateTipDistribution: (periodIds?: string[], calculationMode?: 'period' | 'day' | 'week' | 'month') => TeamMember[];
+  calculateTipDistribution: (selectedPeriodIds: string[]) => TeamMember[];
   calculateAverageTipPerHour: (periodId?: string, calculationMode?: 'period' | 'day' | 'week' | 'month') => number;
-  markPeriodsAsPaid: (periodIds: string[], customDistribution?: PayoutData['distribution']) => void;
+  markPeriodsAsPaid: (periodIds: string[], distribution: PayoutData['distribution']) => void;
   hasReachedLimit: () => boolean;
   hasReachedPeriodLimit: () => boolean;
   getUnpaidPeriodsCount: () => number;
@@ -972,11 +972,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     );
   };
 
-  const calculateTipDistribution = (periodIds?: string[], calculationMode: 'period' | 'day' | 'week' | 'month' = 'period') => {
+  const calculateTipDistribution = useCallback((selectedPeriodIds: string[]) => {
     let periodsToCalculate: Period[] = [];
     
-    if (periodIds && periodIds.length > 0) {
-      periodsToCalculate = periods.filter(period => periodIds.includes(period.id));
+    if (selectedPeriodIds && selectedPeriodIds.length > 0) {
+      periodsToCalculate = periods.filter(period => selectedPeriodIds.includes(period.id));
     } else if (currentPeriod) {
       periodsToCalculate = [currentPeriod];
     } else {
@@ -1010,8 +1010,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         tipAmount
       };
     });
-  };
-  
+  }, [periods, teamMembers]);
+
   const calculateAverageTipPerHour = (periodId?: string, calculationMode: 'period' | 'day' | 'week' | 'month' = 'period') => {
     let periodsToCalculate: Period[] = [];
     
@@ -1040,21 +1040,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return totalTips / totalHours;
   };
   
-  const markPeriodsAsPaid = (periodIds: string[], customDistribution?: PayoutData['distribution']) => {
-    setPeriods(prev => 
-      prev.map(period => 
-        periodIds.includes(period.id)
-          ? { ...period, isPaid: true, isActive: false }
-          : period
-      )
-    );
+  const markPeriodsAsPaid = useCallback(async (periodIds: string[], distribution: PayoutData['distribution']) => {
+    const updatedPeriods = periods.map(period => {
+      if (periodIds.includes(period.id)) {
+        // Preserve the period but mark it as paid
+        return {
+          ...period,
+          isPaid: true,
+          // Preserve the averageTipPerHour value so it appears in analytics after being paid out
+          averageTipPerHour: period.averageTipPerHour || calculateAverageTipPerHour(period.id)
+        };
+      }
+      return period;
+    });
     
+    setPeriods(updatedPeriods);
+
     const paidPeriods = periods.filter(period => periodIds.includes(period.id));
     
     const totalTips = paidPeriods.reduce((total, period) => 
       total + period.tips.reduce((sum, tip) => sum + tip.amount, 0), 0);
     
-    const distributionData = customDistribution || calculateTipDistribution(periodIds).map(member => ({
+    const distributionData = distribution.map(member => ({
       memberId: member.id,
       amount: member.tipAmount || 0
     }));
@@ -1076,8 +1083,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       title: "Uitbetaling afgerond",
       description: `${periodIds.length} periode(s) zijn gemarkeerd als uitbetaald.`,
     });
-  };
-  
+  }, [periods, calculateAverageTipPerHour, refreshTeamData]);
+
   const deletePaidPeriods = () => {
     const unpaidPeriods = periods.filter(period => !period.isPaid);
     setPeriods(unpaidPeriods);

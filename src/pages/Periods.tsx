@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -512,8 +511,11 @@ const Periods = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Periodes</h1>
         <div className="flex items-center gap-2">
-          
-          <Button onClick={handleStartNewPeriod} disabled={!!currentPeriod} className="gold-button">
+          <Button 
+            onClick={handleStartNewPeriod} 
+            disabled={!!currentPeriod} 
+            variant="goldGradient"
+          >
             <Plus size={16} className="mr-1" /> Nieuwe periode
           </Button>
         </div>

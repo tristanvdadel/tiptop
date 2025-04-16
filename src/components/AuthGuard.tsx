@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
@@ -9,83 +9,103 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
+  const authCheckTimeout = useRef<number | null>(null);
+  const maxAuthCheckTime = 200; // Reduced from 300ms to 200ms
 
   useEffect(() => {
+    // For quick initial render, check if we have a cached token
+    const cachedToken = localStorage.getItem('sb-auth-token-cached');
+    const isCachedSessionLikely = !!cachedToken;
+    
     let mounted = true;
-    let initialCheckComplete = false;
-
-    // Set up auth state listener FIRST to catch all auth events
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      console.log('Auth state changed:', _event, newSession ? 'User logged in' : 'No session');
+    
+    // Setup auth state listener for ALL auth events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+      console.log('Auth state changed:', event, newSession ? 'User logged in' : 'No session');
       
       if (mounted) {
         setSession(newSession);
+        setIsLoading(false);
         
-        // Only end loading here if we actually got a definitive answer
-        if (_event === 'SIGNED_IN' || _event === 'SIGNED_OUT' || _event === 'TOKEN_REFRESHED') {
-          setIsLoading(false);
-          initialCheckComplete = true;
+        // If user logs out, clear the cached token
+        if (event === 'SIGNED_OUT') {
+          localStorage.removeItem('sb-auth-token-cached');
+        }
+        
+        // If user logs in, set the cached token
+        if (event === 'SIGNED_IN' && newSession?.access_token) {
+          localStorage.setItem('sb-auth-token-cached', newSession.access_token);
         }
       }
     });
 
-    // THEN check for existing session, but ONLY if the event listener hasn't already resolved
-    const getInitialSession = async () => {
+    // Perform fast session check
+    const checkSession = async () => {
       try {
-        console.log('Performing fast session check');
+        // Go with fast session check
         const { data, error } = await supabase.auth.getSession();
-        console.log('Initial session check:', data.session ? 'Session found' : 'No session found');
         
         if (error) {
           console.error('Error getting session:', error);
+          if (mounted) setIsLoading(false);
+          return;
         }
         
-        // Only update if mounted and initial check from auth change event hasn't completed
-        if (mounted && !initialCheckComplete) {
+        if (mounted) {
           setSession(data.session);
           setIsLoading(false);
         }
       } catch (error) {
-        console.error('Error getting session:', error);
+        console.error('Unexpected error in session check:', error);
         if (mounted) setIsLoading(false);
       }
     };
 
-    // Start initial session check immediately
-    getInitialSession();
+    // Start session check immediately
+    checkSession();
     
-    // Set a shorter timeout as a fallback - reduce from 500ms to 300ms
-    const timeoutId = setTimeout(() => {
+    // Set a shorter timeout for better user experience
+    authCheckTimeout.current = window.setTimeout(() => {
       if (mounted && isLoading) {
         console.log('Session check timeout - forcing completion');
+        // If we have a cached token, assume user is logged in for now
+        // This gives a smoother UX while the full check completes
+        if (isCachedSessionLikely) {
+          setSession({ dummy: 'temporary' }); // Temporary session object
+        } else {
+          setSession(null);
+        }
         setIsLoading(false);
       }
-    }, 300); // Reduced from 500ms to 300ms for faster fallback
+    }, maxAuthCheckTime);
 
     return () => {
       mounted = false;
       subscription?.unsubscribe();
-      clearTimeout(timeoutId);
+      if (authCheckTimeout.current) {
+        clearTimeout(authCheckTimeout.current);
+      }
     };
   }, []);
 
-  // Avoid updating state during render - use local variables instead
+  // Define public routes that don't require authentication
   const isPublicRoute = location.pathname === '/splash' || 
                         location.pathname === '/login' || 
                         location.pathname.startsWith('/fast-tip');
                         
+  // Determine if redirect is needed
   const needsRedirect = !isLoading && !session && !isPublicRoute;
 
-  // Handle redirect if needed
+  // Handle redirect if needed - separate effect for redirects
   useEffect(() => {
     if (needsRedirect) {
       console.log('No session, redirecting to login from:', location.pathname);
-      // Use replace instead of push to prevent back button from going back to protected routes
+      // Use replace instead of push for better history management
       navigate('/login', { replace: true });
     }
   }, [needsRedirect, navigate, location.pathname]);
 
-  // Shorten loading state to max 300ms to improve user experience
+  // Show minimal loading state
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -94,7 +114,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  // Don't return children until we've redirected if needed
+  // Don't render children during redirect
   if (needsRedirect) {
     return null;
   }

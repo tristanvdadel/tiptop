@@ -25,62 +25,67 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Don't allow multiple simultaneous login attempts
-    if (loading) return;
+    // Prevent empty submissions or multiple attempts
+    if (!email || !password || loading) return;
     
     setLoading(true);
-    setLoginProgress(30); // Start at 30 instead of 20 - faster feedback
+    setLoginProgress(40); // Start progress higher
     
     try {
-      setLoginProgress(60); // Jump to 60 faster
-      
-      // Use a timeout to ensure the UI shows progress
-      const loginPromise = supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      
-      // Show toast immediately to give feedback that login is processing
+      // Show immediate feedback
       toast({
         title: "Bezig met inloggen...",
         description: "Even geduld aub",
       });
       
-      const {
-        data,
-        error
-      } = await loginPromise;
+      setLoginProgress(60);
       
-      setLoginProgress(90); // Jump to 90 faster
+      // Direct login without artificial waits
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
       
-      if (error) throw error;
-      
-      setLoginProgress(100);
-      
-      if (data.session) {
+      // Handle success immediately
+      if (!error && data.session) {
+        setLoginProgress(100);
+        
+        // Cache session locally for faster auth check
+        localStorage.setItem('sb-auth-token-cached', data.session.access_token);
+        
         toast({
-          title: "Succesvol ingelogd"
+          title: "Succesvol ingelogd",
+          description: "Je wordt doorgestuurd naar het dashboard"
         });
         
-        // Redirect immediately - no waiting
+        // Immediate navigation, no delays
         navigate('/', { replace: true });
+        return; // Exit early on successful login
       }
+      
+      // Only reach here if there was no session but also no error
+      throw new Error("Geen sessie ontvangen van authenticatiesysteem");
+      
     } catch (error: any) {
       setLoginProgress(0);
       
-      // Show more descriptive error message
+      // More specific error messages
       let errorMessage = "Controleer je gegevens en probeer opnieuw.";
+      let errorTitle = "Fout bij inloggen";
       
-      if (error.message.includes("Invalid login credentials")) {
+      if (error.message?.includes("Invalid login credentials")) {
         errorMessage = "Ongeldige inloggegevens. Controleer je e-mail en wachtwoord.";
-      } else if (error.message.includes("Email not confirmed")) {
+      } else if (error.message?.includes("Email not confirmed")) {
         errorMessage = "E-mail nog niet bevestigd. Controleer je inbox.";
-      } else if (error.message.includes("network")) {
-        errorMessage = "Netwerkfout. Controleer je internetverbinding.";
+      } else if (error.message?.includes("too many requests")) {
+        errorMessage = "Te veel inlogpogingen. Probeer het later opnieuw.";
+      } else if (error.message?.includes("network") || !navigator.onLine) {
+        errorTitle = "Netwerkfout";
+        errorMessage = "Controleer je internetverbinding en probeer opnieuw.";
       }
       
       toast({
-        title: "Fout bij inloggen",
+        title: errorTitle,
         description: errorMessage,
         variant: "destructive"
       });
@@ -103,6 +108,7 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
             onChange={e => setEmail(e.target.value)}
             disabled={loading}
             autoComplete="email"
+            autoFocus
           />
         </div>
         <div className="space-y-2">
@@ -131,19 +137,19 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
       <CardFooter className="flex flex-col gap-4">
         {loginProgress > 0 && (
           <div className="w-full">
-            <Progress value={loginProgress} className="h-2 bg-amber-100">
-              <div 
-                className="h-full bg-gradient-to-r from-amber-400 to-amber-300 transition-all duration-300"
-                style={{ width: `${loginProgress}%` }}
-              />
-            </Progress>
+            <Progress value={loginProgress} className="h-2 bg-amber-100" />
           </div>
         )}
-        <Button type="submit" className="w-full" variant="goldGradient" disabled={loading}>
+        <Button 
+          type="submit" 
+          className="w-full" 
+          variant="goldGradient" 
+          disabled={loading || !email || !password}
+        >
           {loading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Bezig met inloggen...
+              Inloggen...
             </> 
           ) : "Inloggen"}
         </Button>

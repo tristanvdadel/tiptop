@@ -11,27 +11,23 @@ import {
 } from '@/services';
 import { fetchTeamData } from '@/services/teamService';
 
-// Define types
-export type TeamMember = {
+export interface TeamMember {
   id: string;
+  user_id?: string;
   name: string;
+  hasAccount?: boolean;
   hours: number;
   tipAmount?: number;
-  lastPayout?: string; // Date of last payout
-  hourRegistrations?: HourRegistration[]; // Added hour registrations
-  balance?: number; // Added balance field for carrying forward unpaid tips
-  user_id?: string; // Added for Supabase integration
-  role?: string; // Added for Supabase integration
-  permissions?: any; // Added for Supabase integration
-  hasAccount?: boolean; // Added to indicate if team member has a user account
-};
+  balance?: number;
+  hourRegistrations?: any[];
+}
 
-export type HourRegistration = {
-  id: string;
-  hours: number;
-  date: string;
-  processed?: boolean;
-};
+export interface PayoutDistributionItem {
+  memberId: string;
+  amount: number;
+  actualAmount?: number;
+  balance?: number;
+}
 
 export type TipEntry = {
   id: string;
@@ -49,26 +45,21 @@ export type Period = {
   isActive: boolean;
   tips: TipEntry[];
   totalTip?: number;
-  isPaid?: boolean; // Track if the period has been paid out
-  notes?: string; // Added notes field
-  autoCloseDate?: string; // Added auto-close date
-  averageTipPerHour?: number; // Added to store the average tip per hour
-  team_id?: string; // Added for Supabase integration
+  isPaid?: boolean;
+  notes?: string;
+  autoCloseDate?: string;
+  averageTipPerHour?: number;
+  team_id?: string;
 };
 
 export type PayoutData = {
   id: string;
   periodIds: string[];
   date: string;
-  payerName?: string;     // Name of the person who made the payout
-  payoutTime?: string;    // Time when the payout was made
-  totalAmount: number;    // Total amount of the payout
-  distribution: {
-    memberId: string;
-    amount: number;
-    actualAmount?: number;  // Added for tracking what was actually paid
-    balance?: number;       // Added for tracking the balance
-  }[];
+  payerName?: string;
+  payoutTime?: string;
+  totalAmount: number;
+  distribution: PayoutDistributionItem[];
 };
 
 export type PeriodDuration = 'day' | 'week' | 'month';
@@ -97,7 +88,7 @@ type AppContextType = {
   endCurrentPeriod: () => void;
   calculateTipDistribution: (selectedPeriodIds: string[]) => TeamMember[];
   calculateAverageTipPerHour: (periodId?: string, calculationMode?: 'period' | 'day' | 'week' | 'month') => number;
-  markPeriodsAsPaid: (periodIds: string[], distribution: PayoutData['distribution']) => void;
+  markPeriodsAsPaid: (periodIds: string[], distribution: PayoutDistributionItem[]) => void;
   hasReachedLimit: () => boolean;
   hasReachedPeriodLimit: () => boolean;
   getUnpaidPeriodsCount: () => number;
@@ -212,14 +203,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (data) {
         const processedMembers = data.teamMembers.map(member => ({
           id: member.id,
+          user_id: member.user_id,
           name: member.name,
+          hasAccount: member.hasAccount || false,
           hours: member.hours || 0,
           balance: member.balance || 0,
-          hourRegistrations: member.hourRegistrations || [],
-          user_id: member.user_id,
-          role: member.role,
-          permissions: member.permissions,
-          hasAccount: member.hasAccount || false
+          hourRegistrations: member.hourRegistrations || []
         }));
         setTeamMembers(processedMembers);
         
@@ -1040,50 +1029,110 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return totalTips / totalHours;
   };
   
-  const markPeriodsAsPaid = useCallback(async (periodIds: string[], distribution: PayoutData['distribution']) => {
-    const updatedPeriods = periods.map(period => {
-      if (periodIds.includes(period.id)) {
-        // Preserve the period but mark it as paid
-        return {
-          ...period,
-          isPaid: true,
-          // Preserve the averageTipPerHour value so it appears in analytics after being paid out
-          averageTipPerHour: period.averageTipPerHour || calculateAverageTipPerHour(period.id)
-        };
-      }
-      return period;
-    });
-    
-    setPeriods(updatedPeriods);
+  const markPeriodsAsPaid = useCallback(async (periodIds: string[], distribution: PayoutDistributionItem[]) => {
+    if (!teamId) {
+      console.error("No team ID available, cannot mark periods as paid");
+      return;
+    }
 
-    const paidPeriods = periods.filter(period => periodIds.includes(period.id));
-    
-    const totalTips = paidPeriods.reduce((total, period) => 
-      total + period.tips.reduce((sum, tip) => sum + tip.amount, 0), 0);
-    
-    const distributionData = distribution.map(member => ({
-      memberId: member.id,
-      amount: member.tipAmount || 0
-    }));
-    
-    const newPayout: PayoutData = {
-      id: generateId(),
-      periodIds,
-      date: new Date().toISOString(),
-      payerName: 'current-user',
-      payoutTime: new Date().toISOString(),
-      totalAmount: totalTips,
-      distribution: distributionData,
-    };
-    
-    setPayouts(prev => [...prev, newPayout]);
-    setMostRecentPayout(newPayout);
-    
-    toast({
-      title: "Uitbetaling afgerond",
-      description: `${periodIds.length} periode(s) zijn gemarkeerd als uitbetaald.`,
-    });
-  }, [periods, calculateAverageTipPerHour, refreshTeamData]);
+    try {
+      setLoading(true);
+      console.log("Marking periods as paid:", periodIds);
+      console.log("With distribution:", distribution);
+      
+      // Create a new payout
+      const { data: payout, error: payoutError } = await supabase
+        .from('payouts')
+        .insert([{
+          team_id: teamId,
+          date: new Date().toISOString(),
+          payout_time: new Date().toISOString()
+        }])
+        .select()
+        .single();
+
+      if (payoutError) {
+        console.error("Error creating payout:", payoutError);
+        throw payoutError;
+      }
+      
+      console.log("Created payout:", payout);
+      
+      // Insert payout distributions
+      const payoutDistributions = distribution.map(item => ({
+        payout_id: payout.id,
+        team_member_id: item.memberId,
+        amount: item.amount,
+        actual_amount: item.actualAmount || item.amount,
+        balance: item.balance || 0
+      }));
+      
+      const { error: distributionError } = await supabase
+        .from('payout_distributions')
+        .insert(payoutDistributions);
+        
+      if (distributionError) {
+        console.error("Error inserting payout distributions:", distributionError);
+        throw distributionError;
+      }
+      
+      // Link periods to the payout
+      const payoutPeriods = periodIds.map(periodId => ({
+        payout_id: payout.id,
+        period_id: periodId
+      }));
+      
+      const { error: periodsError } = await supabase
+        .from('payout_periods')
+        .insert(payoutPeriods);
+        
+      if (periodsError) {
+        console.error("Error linking periods to payout:", periodsError);
+        throw periodsError;
+      }
+      
+      // Mark periods as paid
+      const { error: updateError } = await supabase
+        .from('periods')
+        .update({ is_paid: true })
+        .in('id', periodIds);
+        
+      if (updateError) {
+        console.error("Error marking periods as paid:", updateError);
+        throw updateError;
+      }
+      
+      // Update team member balances
+      for (const item of distribution) {
+        const { error: balanceError } = await supabase
+          .from('team_members')
+          .update({ balance: item.balance || 0 })
+          .eq('id', item.memberId);
+          
+        if (balanceError) {
+          console.error(`Error updating balance for member ${item.memberId}:`, balanceError);
+        }
+      }
+      
+      // Refresh data
+      await refreshTeamData();
+      
+      toast({
+        title: "Uitbetaling voltooid",
+        description: "De fooi is succesvol uitbetaald en de periodes zijn gemarkeerd als uitbetaald.",
+      });
+
+    } catch (error) {
+      console.error("Error in markPeriodsAsPaid:", error);
+      toast({
+        title: "Fout bij uitbetalen",
+        description: "Er is een fout opgetreden bij het uitbetalen van de fooi.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [teamId, toast, refreshTeamData]);
 
   const deletePaidPeriods = () => {
     const unpaidPeriods = periods.filter(period => !period.isPaid);

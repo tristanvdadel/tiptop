@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { fetchTeamPeriods } from '@/services/periodService';
 import { supabase } from '@/integrations/supabase/client';
-import { getUserTeamsSafe } from '@/services/teamService';
+import useTeamId from '@/hooks/useTeamId';
 
 /**
  * Periods component for managing time periods
@@ -36,8 +35,9 @@ const Periods = () => {
     updatePeriod,
     autoClosePeriods,
     refreshTeamData,
-    teamId
+    teamId: contextTeamId
   } = useApp();
+  const { teamId, loading: teamIdLoading, error: teamIdError } = useTeamId(contextTeamId);
   const navigate = useNavigate();
   const [showLimitDialog, setShowLimitDialog] = useState(false);
   const [showPaidPeriodesDialog, setShowPaidPeriodesDialog] = useState(false);
@@ -55,56 +55,20 @@ const Periods = () => {
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [realtimeSetup, setRealtimeSetup] = useState(false);
-  const [localTeamId, setLocalTeamId] = useState<string | null>(null);
   
   const { toast } = useToast();
 
-  // Fallback mechanism to get team ID if not available from context
-  useEffect(() => {
-    const fetchTeamID = async () => {
-      try {
-        if (teamId) {
-          console.log("Periods.tsx: Team ID from context:", teamId);
-          setLocalTeamId(teamId);
-          return;
-        }
-        
-        console.log("Periods.tsx: Team ID not found in context, fetching manually");
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          console.log("Periods.tsx: No session found");
-          return;
-        }
-        
-        // Use the safe function to fetch teams
-        const teams = await getUserTeamsSafe(session.user.id);
-        if (teams && teams.length > 0) {
-          console.log("Periods.tsx: Found team ID from API:", teams[0].id);
-          setLocalTeamId(teams[0].id);
-        } else {
-          console.log("Periods.tsx: No teams found for user");
-        }
-      } catch (error) {
-        console.error("Error fetching team ID:", error);
-      }
-    };
-    
-    fetchTeamID();
-  }, [teamId]);
-
   // Enhanced load data function with better error handling
   const loadData = useCallback(async () => {
-    const effectiveTeamId = localTeamId || teamId;
-    
-    if (!effectiveTeamId) {
-      console.log("Periods.tsx: No team ID found (neither in context nor fetched), setting error state");
+    if (!teamId) {
+      console.log("Periods.tsx: No team ID found, setting error state");
       setHasError(true);
       setErrorMessage("Geen team ID gevonden. Ga naar het dashboard om een team aan te maken of lid te worden van een team.");
       setIsLoading(false);
       return;
     }
     
-    console.log("Periods.tsx: Loading data for team:", effectiveTeamId);
+    console.log("Periods.tsx: Loading data for team:", teamId);
     setIsLoading(true);
     setHasError(false);
     setErrorMessage(null);
@@ -124,16 +88,18 @@ const Periods = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [localTeamId, teamId, refreshTeamData, toast]);
+  }, [teamId, refreshTeamData, toast]);
   
   // Initial data loading
   useEffect(() => {
-    loadData();
-  }, [loadData, localTeamId]);
+    if (teamId) {
+      loadData();
+    }
+  }, [loadData, teamId]);
   
   // Improved real-time updates with better cleanup and error handling
   useEffect(() => {
-    const effectiveTeamId = localTeamId || teamId;
+    const effectiveTeamId = teamId;
     
     if (!effectiveTeamId) {
       console.log("Periods.tsx: No team ID for real-time updates");
@@ -247,7 +213,7 @@ const Periods = () => {
         );
       }
     };
-  }, [localTeamId, teamId, periods, refreshTeamData, realtimeSetup, toast]);
+  }, [teamId, periods, refreshTeamData, realtimeSetup, toast]);
   
   // Helper functions for date formatting
   const formatPeriodDate = (date: string) => {
@@ -490,7 +456,7 @@ const Periods = () => {
   };
   
   // Enhanced error and loading states rendering
-  if (isLoading) {
+  if (isLoading || teamIdLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#9b87f5]"></div>
@@ -498,9 +464,7 @@ const Periods = () => {
     );
   }
   
-  const effectiveTeamId = localTeamId || teamId;
-  
-  if (hasError) {
+  if (hasError || teamIdError) {
     return (
       <div className="space-y-6">
         <Card className="border-destructive/50">
@@ -509,9 +473,9 @@ const Periods = () => {
               <AlertCircle className="h-10 w-10 text-destructive" />
               <div>
                 <h3 className="text-lg font-medium">Fout bij laden</h3>
-                <p className="text-muted-foreground mt-1">{errorMessage || "Er is een fout opgetreden bij het laden van de periodes."}</p>
+                <p className="text-muted-foreground mt-1">{errorMessage || teamIdError || "Er is een fout opgetreden bij het laden van de periodes."}</p>
               </div>
-              <Button onClick={handleRetryLoading}>
+              <Button onClick={loadData}>
                 Opnieuw proberen
               </Button>
             </div>
@@ -521,7 +485,7 @@ const Periods = () => {
     );
   }
 
-  if (!effectiveTeamId) {
+  if (!teamId) {
     return (
       <div className="space-y-6">
         <Card className="border-amber-300">
@@ -822,85 +786,3 @@ const Periods = () => {
             <AlertDialogAction onClick={confirmDeletePeriod} className="bg-destructive hover:bg-destructive/90">
               Ja, verwijder deze periode
             </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      
-      <Dialog open={showEditPeriodDialog} onOpenChange={setShowEditPeriodDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-center text-xl">Periode bewerken</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="period-name">Naam van periode</Label>
-              <Input
-                id="period-name"
-                placeholder="Bijvoorbeeld: Week 28"
-                value={editPeriodName}
-                onChange={(e) => setEditPeriodName(e.target.value)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="period-notes">Notities (optioneel)</Label>
-              <Textarea
-                id="period-notes"
-                placeholder="Notities over deze periode"
-                value={editPeriodNotes}
-                onChange={(e) => setEditPeriodNotes(e.target.value)}
-                className="min-h-[100px]"
-              />
-            </div>
-          </div>
-          
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setShowEditPeriodDialog(false)}>
-              Annuleren
-            </Button>
-            <Button onClick={confirmEditPeriod}>
-              Periode bijwerken
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      <AlertDialog open={showCloseConfirmDialog} onOpenChange={setShowCloseConfirmDialog}>
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-center text-xl">Periode afronden?</AlertDialogTitle>
-            <AlertDialogDescription>
-              <div className="flex items-center justify-center mb-4">
-                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
-                  <Calendar className="text-amber-500" size={24} />
-                </div>
-              </div>
-              <p className="text-center mb-4">
-                Je hebt automatisch afronden ingeschakeld voor deze periode.
-              </p>
-              <p className="text-center">
-                De periode wordt automatisch afgerond op:
-                <br />
-                <span className="font-medium">
-                  {currentPeriod && currentPeriod.autoCloseDate ? formatPeriodDateTime(currentPeriod.autoCloseDate) : 'Onbekende datum'}
-                </span>
-              </p>
-              <p className="mt-4 text-center">
-                Wil je de periode nu handmatig afronden?
-              </p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel>Annuleren</AlertDialogCancel>
-            <AlertDialogAction onClick={doClosePeriod}>
-              Ja, nu afronden
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-};
-
-export default Periods;

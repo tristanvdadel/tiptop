@@ -45,17 +45,16 @@ const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDe
       // Find the team member by ID to get their name
       const teamMember = teamMembers.find(m => m.id === item.memberId);
       
-      const member = {
+      return {
         id: item.memberId,
-        name: teamMember?.name || 'Onbekend lid', // Use the name from teamMembers if found
+        name: teamMember?.name || 'Onbekend lid',
         hours: 0,
         tipAmount: item.amount,
         balance: item.balance || 0
       } as TeamMember;
-      return member;
     }) || []);
 
-  const showBalance = displayDistribution.some(member => member.balance !== 0);
+  const showBalance = displayDistribution.some(member => (member.balance || 0) !== 0);
 
   return (
     <Card className="mb-4">

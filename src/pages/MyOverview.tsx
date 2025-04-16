@@ -1,190 +1,138 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Clock, UserRound } from 'lucide-react';
-import { useApp } from '@/contexts/AppContext';
-import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
+import { useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CalendarDays, DollarSign, UsersRound, FileText } from 'lucide-react';
+import { format, isSameMonth, isSameYear } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useState, useEffect } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/integrations/supabase/client';
+import { useApp } from '@/contexts/AppContext';
 
 const MyOverview = () => {
-  const {
-    teamMembers,
-    periods,
-    calculateTipDistribution,
-    isLoading,
-    refreshTeamData
-  } = useApp();
-  
   const [loading, setLoading] = useState(true);
-  const [userData, setUserData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  // Fetch current user data and refresh team data on component mount
+  const { teamId, teamMembers, periods, payouts, refreshTeamData } = useApp();
+  
   useEffect(() => {
-    const loadData = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
         
-        if (user) {
-          setUserData(user);
-          // Ensure team data is refreshed when component is mounted
-          await refreshTeamData();
+        if (!teamId) {
+          console.error("No team ID available");
+          setError("Geen team ID beschikbaar");
+          setLoading(false);
+          return;
         }
-      } catch (error) {
-        console.error("Error fetching user or team data:", error);
-      } finally {
+        
+        await refreshTeamData();
+        setLoading(false);
+      } catch (error: any) {
+        console.error("Error fetching data:", error);
+        setError(error.message || "Fout bij het ophalen van gegevens");
         setLoading(false);
       }
     };
     
-    loadData();
-  }, [refreshTeamData]);
+    fetchData();
+  }, [teamId, refreshTeamData]);
   
-  // Find the current user in team members
-  const getCurrentTeamMember = () => {
-    if (!userData || !teamMembers.length) return null;
-    
-    // Try to find the team member by user_id
-    return teamMembers.find(member => member.user_id === userData.id) || teamMembers[0];
-  };
-  
-  const currentUser = getCurrentTeamMember();
-
-  // Show loading skeleton while data is loading
-  if (loading || isLoading) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Mijn Overzicht</h1>
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-full" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-40" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // If no team members, show message
-  if (!currentUser) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Mijn Overzicht</h1>
-        <Card>
-          <CardContent className="p-6 text-center">
-            <UserRound className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <p>Voeg eerst teamleden toe of wacht tot je wordt toegevoegd aan een team</p>
-            <Button className="mt-4" onClick={() => refreshTeamData()}>
-              Gegevens verversen
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Calculate total tips for current user across all periods
-  const totalTip = periods.reduce((total, period) => {
-    const distribution = calculateTipDistribution();
-    const userTip = distribution.find(member => member.id === currentUser.id)?.tipAmount || 0;
-    return total + userTip;
+  const monthlyTips = periods.reduce((sum, period) => {
+    const periodDate = new Date(period.startDate);
+    if (isSameMonth(periodDate, currentMonth) && isSameYear(periodDate, currentMonth)) {
+      return sum + period.tips.reduce((periodSum, tip) => periodSum + tip.amount, 0);
+    }
+    return sum;
   }, 0);
-
-  // Calculate total hours
-  const totalHours = currentUser.hours || 0;
-
-  // Format the registration date
-  const formatDate = (dateString: string): string => {
-    return format(new Date(dateString), 'd MMM yyyy', {
-      locale: nl
-    });
+  
+  const totalTeamMembers = teamMembers.length;
+  const totalPeriods = periods.length;
+  const totalPayouts = payouts.length;
+  
+  const nextMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
   };
+  
+  const prevMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  };
+  
+  if (loading) {
+    return <Card><CardContent className="p-8 text-center">Gegevens laden...</CardContent></Card>;
+  }
+  
+  if (error) {
+    return <Card><CardContent className="p-8 text-center text-red-500">Fout: {error}</CardContent></Card>;
+  }
   
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Mijn Overzicht</h1>
-      
+    <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Mijn gegevens</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">
+            Fooi deze maand
+          </CardTitle>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            className="h-4 w-4 text-muted-foreground"
+          >
+            <path d="M12 2v20M17 5h-5M17 19h-5" />
+          </svg>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Naam</span>
-              <span className="font-medium">{currentUser?.name}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Totaal gewerkte uren</span>
-              <span className="font-medium">{currentUser?.hours || 0} uur</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Totaal ontvangen fooi</span>
-              <span className="font-medium">€{totalTip.toFixed(2)}</span>
-            </div>
-            {currentUser?.balance !== undefined && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Openstaand saldo</span>
-                <span className="font-medium">€{currentUser.balance.toFixed(2)}</span>
-              </div>
-            )}
-          </div>
+          <div className="text-2xl font-bold">€{monthlyTips.toFixed(2)}</div>
+          <p className="text-xs text-muted-foreground">
+            <button onClick={prevMonth}>Vorige</button> | {format(currentMonth, 'MMMM yyyy', { locale: nl })} | <button onClick={nextMonth}>Volgende</button>
+          </p>
         </CardContent>
       </Card>
-      
-      {currentUser?.hourRegistrations && currentUser.hourRegistrations.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <Clock size={16} className="mr-2" />
-              Recente urenregistraties
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="max-h-[200px]">
-              <div className="space-y-2">
-                {currentUser.hourRegistrations.map(registration => (
-                  <div key={registration.id} className="flex justify-between items-center py-2 border-b last:border-0">
-                    <span>{registration.hours} uur</span>
-                    <span className="text-sm text-muted-foreground">{formatDate(registration.date)}</span>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      )}
-      
-      <div className="mt-6">
-        <Link to="/analytics">
-          <Button className="w-full" variant="outline">
-            <BarChart size={16} className="mr-2" />
-            Meer statistieken bekijken
-          </Button>
-        </Link>
-      </div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">
+            Totaal teamleden
+          </CardTitle>
+          <UsersRound className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{totalTeamMembers}</div>
+          <p className="text-xs text-muted-foreground">
+            Alle actieve teamleden
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">
+            Totaal periodes
+          </CardTitle>
+          <CalendarDays className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{totalPeriods}</div>
+          <p className="text-xs text-muted-foreground">
+            Alle aangemaakte periodes
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">
+            Totaal uitbetalingen
+          </CardTitle>
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{totalPayouts}</div>
+          <p className="text-xs text-muted-foreground">
+            Alle geregistreerde uitbetalingen
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 };

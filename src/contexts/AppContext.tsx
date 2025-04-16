@@ -198,15 +198,54 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
   
-  const refreshTeamData = async (tid?: string) => {
+  const refreshTeamData = useCallback(async (tid?: string) => {
     const targetTeamId = tid || teamId;
-    if (!targetTeamId) return;
+    if (!targetTeamId) {
+      console.log('refreshTeamData: No team ID available, skipping refresh');
+      return Promise.resolve({ success: false, reason: 'no-team-id' });
+    }
     
+    console.log(`refreshTeamData: Starting refresh for team ${targetTeamId}`);
     setIsLoading(true);
+    
     try {
-      const data = await fetchTeamData(targetTeamId);
+      // Attempt to fetch team data with retry logic
+      let attempts = 0;
+      const maxAttempts = 2;
+      let data;
       
-      if (data) {
+      while (attempts < maxAttempts) {
+        try {
+          console.log(`refreshTeamData: Attempt ${attempts + 1} to fetch team data`);
+          data = await fetchTeamData(targetTeamId);
+          if (data) break;
+        } catch (error) {
+          console.error(`refreshTeamData: Attempt ${attempts + 1} failed:`, error);
+          attempts++;
+          if (attempts >= maxAttempts) throw error;
+          // Short wait before retry
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      
+      if (!data) {
+        console.error('refreshTeamData: No data returned after all attempts');
+        toast({
+          title: "Synchronisatie mislukt",
+          description: "Kon geen teamgegevens ophalen. Probeer het later opnieuw.",
+          variant: "destructive"
+        });
+        setIsLoading(false);
+        return Promise.resolve({ success: false, reason: 'no-data' });
+      }
+      
+      console.log('refreshTeamData: Successfully fetched team data:', 
+        `${data.teamMembers?.length || 0} team members, `,
+        `${data.periods?.length || 0} periods, `,
+        `${data.payouts?.length || 0} payouts`);
+      
+      // Process team members
+      if (data.teamMembers && Array.isArray(data.teamMembers)) {
         const processedMembers = data.teamMembers.map(member => ({
           id: member.id,
           user_id: member.user_id,
@@ -217,7 +256,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           hourRegistrations: member.hourRegistrations || []
         }));
         setTeamMembers(processedMembers);
-        
+        console.log(`refreshTeamData: Updated ${processedMembers.length} team members`);
+      } else {
+        console.warn('refreshTeamData: No team members data or invalid format');
+      }
+      
+      // Process periods and find active period
+      if (data.periods && Array.isArray(data.periods)) {
         const processedPeriods = data.periods.map(period => ({
           id: period.id,
           name: period.name,
@@ -228,59 +273,108 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           notes: period.notes,
           autoCloseDate: period.auto_close_date,
           averageTipPerHour: period.average_tip_per_hour,
-          tips: period.tips.map((tip: any) => ({
+          tips: Array.isArray(period.tips) ? period.tips.map((tip: any) => ({
             id: tip.id,
             amount: tip.amount,
             date: tip.date,
             note: tip.note,
             addedBy: tip.added_by
-          })),
+          })) : [],
           team_id: period.team_id
         }));
+        
         setPeriods(processedPeriods);
+        console.log(`refreshTeamData: Updated ${processedPeriods.length} periods`);
         
         const activePeriod = processedPeriods.find(p => p.isActive);
-        setCurrentPeriod(activePeriod || null);
+        if (activePeriod) {
+          console.log('refreshTeamData: Found active period:', activePeriod.id);
+          setCurrentPeriod(activePeriod);
+        } else {
+          console.log('refreshTeamData: No active period found');
+          setCurrentPeriod(null);
+        }
+      } else {
+        console.warn('refreshTeamData: No periods data or invalid format');
+      }
+      
+      // Process payouts
+      if (data.payouts && Array.isArray(data.payouts) && data.payouts.length > 0) {
+        setPayouts(data.payouts);
+        setMostRecentPayout(data.payouts[data.payouts.length - 1]);
+        console.log(`refreshTeamData: Updated ${data.payouts.length} payouts`);
+      } else {
+        console.log('refreshTeamData: No payouts found');
+      }
+      
+      // Process settings
+      if (data.settings) {
+        console.log('refreshTeamData: Updating team settings');
         
-        if (data.payouts && data.payouts.length > 0) {
-          setPayouts(data.payouts);
-          setMostRecentPayout(data.payouts[data.payouts.length - 1]);
+        // Handle auto close periods setting
+        if (typeof data.settings.auto_close_periods === 'boolean') {
+          setAutoClosePeriods(data.settings.auto_close_periods);
         }
         
-        if (data.settings) {
-          setAutoClosePeriods(data.settings.auto_close_periods);
-          setPeriodDuration(data.settings.period_duration as PeriodDuration);
-          setAlignWithCalendar(data.settings.align_with_calendar);
-          
-          if (data.settings.closing_time && 
-              typeof data.settings.closing_time === 'object' &&
-              'hour' in data.settings.closing_time &&
-              'minute' in data.settings.closing_time) {
-            setClosingTime({
-              hour: Number(data.settings.closing_time.hour),
-              minute: Number(data.settings.closing_time.minute)
-            });
+        // Handle period duration setting
+        if (data.settings.period_duration) {
+          if (data.settings.period_duration === 'day' || 
+              data.settings.period_duration === 'week' || 
+              data.settings.period_duration === 'month') {
+            setPeriodDuration(data.settings.period_duration as PeriodDuration);
+          } else {
+            console.warn('refreshTeamData: Invalid period_duration:', data.settings.period_duration);
           }
         }
         
-        toast({
-          title: "Gegevens gesynchroniseerd",
-          description: "De teamgegevens zijn succesvol gesynchroniseerd.",
-        });
+        // Handle align with calendar setting
+        if (typeof data.settings.align_with_calendar === 'boolean') {
+          setAlignWithCalendar(data.settings.align_with_calendar);
+        }
+        
+        // Handle closing time setting
+        if (data.settings.closing_time && 
+            typeof data.settings.closing_time === 'object' &&
+            'hour' in data.settings.closing_time &&
+            'minute' in data.settings.closing_time) {
+          setClosingTime({
+            hour: Number(data.settings.closing_time.hour),
+            minute: Number(data.settings.closing_time.minute)
+          });
+        }
+      } else {
+        console.warn('refreshTeamData: No settings data found');
       }
+      
+      toast({
+        title: "Gegevens gesynchroniseerd",
+        description: "De teamgegevens zijn succesvol gesynchroniseerd.",
+      });
+      
+      console.log('refreshTeamData: Successfully completed data refresh');
+      return Promise.resolve({ success: true });
     } catch (error) {
-      console.error("Error refreshing team data:", error);
+      console.error("refreshTeamData: Error refreshing team data:", error);
       toast({
         title: "Synchronisatie mislukt",
         description: "Er is een fout opgetreden bij het synchroniseren van de teamgegevens.",
         variant: "destructive"
       });
-      loadLocalData();
+      
+      // On failure, try to load local data as fallback
+      try {
+        console.log('refreshTeamData: Attempting to load local data as fallback');
+        loadLocalData();
+      } catch (fallbackError) {
+        console.error('refreshTeamData: Error loading local fallback data:', fallbackError);
+      }
+      
+      return Promise.resolve({ success: false, reason: 'error', error });
     } finally {
       setIsLoading(false);
     }
-  };
-  
+  }, [teamId, toast, loadLocalData, setTeamMembers, setPeriods, setCurrentPeriod, setPayouts, setMostRecentPayout, setAutoClosePeriods, setPeriodDuration, setAlignWithCalendar, setClosingTime, setIsLoading]);
+
   const loadLocalData = () => {
     const storedPeriods = localStorage.getItem('periods');
     const storedTeamMembers = localStorage.getItem('teamMembers');

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { calculateTipDistributionTotals } from '@/services/teamDataService';
 import { debounce } from '@/services/payoutService';
 import { fetchTeamPeriods } from '@/services/periodService';
+import { useTeamId } from '@/hooks/useTeamId';
 
 interface TeamContextType {
   selectedPeriods: string[];
@@ -42,9 +43,10 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     calculateTipDistribution,
     markPeriodsAsPaid,
     periods,
-    refreshTeamData,
-    teamId
+    refreshTeamData
   } = useApp();
+  
+  const { teamId } = useTeamId();
   
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
   const [distribution, setDistribution] = useState<TeamMember[]>([]);

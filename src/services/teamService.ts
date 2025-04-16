@@ -355,14 +355,27 @@ export const createTeam = async (name: string, userId: string) => {
 /**
  * Gets all teams for a user using the safe RPC function
  */
-export const getUserTeamsSafe = async (userId: string) => {
+export const getUserTeamsSafe = async (userId?: string) => {
   try {
-    console.log('Fetching teams for user using safe function:', userId);
-    
+    // If no userId is provided, try to use the cached team information
     if (!userId) {
-      console.error('getUserTeamsSafe called with empty userId');
-      return [];
+      const cachedTeams = localStorage.getItem('user_teams');
+      if (cachedTeams) {
+        console.log('Using cached teams data');
+        return JSON.parse(cachedTeams);
+      }
+      
+      // If no cache and no userId, check current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        console.log('No session found and no userId provided');
+        return [];
+      }
+      
+      userId = session.user.id;
     }
+    
+    console.log('Fetching teams for user using safe function:', userId);
     
     // Try the RPC function first
     const { data, error } = await supabase
@@ -382,7 +395,17 @@ export const getUserTeamsSafe = async (userId: string) => {
         throw directError;
       }
       
+      if (directData) {
+        // Cache the result
+        localStorage.setItem('user_teams', JSON.stringify(directData));
+      }
+      
       return directData || [];
+    }
+    
+    if (data) {
+      // Cache the result
+      localStorage.setItem('user_teams', JSON.stringify(data));
     }
     
     console.log('Successfully fetched teams for user:', data ? data.length : 0, 'teams');

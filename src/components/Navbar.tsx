@@ -1,10 +1,9 @@
-
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Calendar, Users, BarChart, Zap, Settings, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useTeamId } from '@/hooks/useTeamId';
 import { getUserTeamsSafe } from '@/services/teamService';
 
 interface NavbarProps {
@@ -15,18 +14,18 @@ interface NavbarProps {
 const Navbar = ({ disabled = false, onDisabledClick }: NavbarProps) => {
   const location = useLocation();
   const [teamName, setTeamName] = useState<string | null>(null);
+  const { teamId } = useTeamId();
   
   useEffect(() => {
     const fetchTeamName = async () => {
+      if (!teamId) return;
+      
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        const teams = await getUserTeamsSafe();
         
-        // Use the safe function to fetch teams
-        const teams = await getUserTeamsSafe(session.user.id);
-        
-        if (teams && teams.length > 0) {
-          setTeamName(teams[0].name);
+        const currentTeam = teams.find(team => team.id === teamId);
+        if (currentTeam) {
+          setTeamName(currentTeam.name);
         }
       } catch (error) {
         console.error('Error fetching team data:', error);
@@ -34,7 +33,7 @@ const Navbar = ({ disabled = false, onDisabledClick }: NavbarProps) => {
     };
     
     fetchTeamName();
-  }, []);
+  }, [teamId]);
   
   const navItems = [
     { to: '/', icon: <Home size={20} className="text-black" />, label: 'Home' },

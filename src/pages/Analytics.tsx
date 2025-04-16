@@ -29,6 +29,14 @@ const Analytics = () => {
   
   const periodData = useMemo(() => {
     return periods.map(period => {
+      // Use stored average tip per hour if available (especially for paid periods)
+      let avgTipPerHour = period.averageTipPerHour;
+      
+      // If not available, calculate it
+      if (avgTipPerHour === undefined || avgTipPerHour === null) {
+        avgTipPerHour = calculateAverageTipPerHour(period.id);
+      }
+      
       const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
       const startDate = format(new Date(period.startDate), 'd MMM', {
         locale: nl
@@ -36,12 +44,12 @@ const Analytics = () => {
       const endDate = period.endDate ? format(new Date(period.endDate), 'd MMM', {
         locale: nl
       }) : 'Actief';
-      const averageTipPerHour = calculateAverageTipPerHour(period.id);
+      
       const timestamp = new Date(period.startDate).getTime();
       return {
         name: `${startDate} - ${endDate}`,
         total: totalTips,
-        average: averageTipPerHour,
+        average: avgTipPerHour || 0,
         id: period.id,
         isPaid: period.isPaid,
         timestamp: timestamp
@@ -50,7 +58,7 @@ const Analytics = () => {
   }, [periods, calculateAverageTipPerHour]);
   
   const lineChartData = useMemo(() => {
-    const filteredData = periodData.filter(period => period.total > 0);
+    const filteredData = periodData.filter(period => period.average > 0 || period.total > 0);
     if (filteredData.length > 10) {
       return filteredData.slice(-10);
     }
@@ -206,7 +214,7 @@ const Analytics = () => {
           {hasAnyPeriodWithTips ? (
             <ScrollArea className="h-64 w-full">
               <div className="space-y-2 pr-2">
-                {periodData.filter(period => period.total > 0).reverse().map(period => (
+                {periodData.filter(period => period.average > 0 || period.total > 0).reverse().map(period => (
                   <div key={period.id} className="flex justify-between p-2 border rounded-md">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">{period.name}</span>

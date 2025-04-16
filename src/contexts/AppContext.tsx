@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth, set, getWeek, format, startOfMonth, nextMonday } from 'date-fns';
@@ -978,3 +979,439 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!newName.trim()) {
       toast({
         title: "Ongeldige naam",
+        description: "De naam mag niet leeg zijn.",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    // Check if name already exists
+    const nameExists = teamMembers.some(
+      member => member.id !== memberId && member.name.trim().toLowerCase() === newName.trim().toLowerCase()
+    );
+    
+    if (nameExists) {
+      toast({
+        title: "Naam bestaat al",
+        description: "Er bestaat al een teamlid met deze naam.",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    setTeamMembers(prev => 
+      prev.map(member => 
+        member.id === memberId ? { ...member, name: newName.trim() } : member
+      )
+    );
+    
+    toast({
+      title: "Naam bijgewerkt",
+      description: "De naam van het teamlid is bijgewerkt.",
+    });
+    
+    return true;
+  };
+  
+  const hasReachedLimit = () => {
+    return periods.length >= appLimits.periods;
+  };
+  
+  const hasReachedPeriodLimit = () => {
+    return periods.length >= appLimits.periods;
+  };
+  
+  const getUnpaidPeriodsCount = () => {
+    return periods.filter(p => !p.isPaid && !p.isActive).length;
+  };
+  
+  const startNewPeriod = () => {
+    if (hasReachedLimit()) {
+      toast({
+        title: "Limiet bereikt",
+        description: "Je hebt het maximale aantal perioden bereikt.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const startDate = new Date();
+    const startDateISO = startDate.toISOString();
+    let autoCloseDate = null;
+    
+    if (autoClosePeriods) {
+      autoCloseDate = calculateAutoCloseDate(startDateISO, periodDuration);
+    }
+    
+    let periodName = "";
+    if (autoClosePeriods) {
+      periodName = generateAutomaticPeriodName(startDate, periodDuration);
+    }
+    
+    const newPeriod: Period = {
+      id: generateId(),
+      startDate: startDateISO,
+      isActive: true,
+      tips: [],
+      isPaid: false,
+      ...(periodName && { name: periodName }),
+      ...(autoCloseDate && { autoCloseDate }),
+      ...(teamId && { team_id: teamId })
+    };
+    
+    setPeriods(prev => [...prev, newPeriod]);
+    setCurrentPeriod(newPeriod);
+    
+    if (autoCloseDate) {
+      toast({
+        title: "Nieuwe periode gestart",
+        description: `Deze periode wordt automatisch afgesloten op ${new Date(autoCloseDate).toLocaleDateString('nl-NL')}.`,
+      });
+    } else {
+      toast({
+        title: "Nieuwe periode gestart",
+        description: "Er is een nieuwe periode gestart.",
+      });
+    }
+  };
+  
+  const endCurrentPeriod = () => {
+    if (!currentPeriod) return;
+    
+    const endDate = new Date().toISOString();
+    
+    const updatedPeriod = {
+      ...currentPeriod,
+      isActive: false,
+      endDate
+    };
+    
+    setCurrentPeriod(null);
+    
+    setPeriods(prev => 
+      prev.map(p => p.id === updatedPeriod.id ? updatedPeriod : p)
+    );
+    
+    toast({
+      title: "Periode afgesloten",
+      description: "De huidige periode is afgesloten.",
+    });
+  };
+  
+  const markPeriodsAsPaid = (periodIds: string[], distribution: PayoutDistributionItem[]) => {
+    const updatedPeriods = periods.map(period => {
+      if (periodIds.includes(period.id)) {
+        return {
+          ...period,
+          isPaid: true
+        };
+      }
+      return period;
+    });
+    
+    setPeriods(updatedPeriods);
+    
+    const totalAmount = distribution.reduce((sum, item) => sum + (item.actualAmount || item.amount), 0);
+    
+    const newPayout: PayoutData = {
+      id: generateId(),
+      periodIds,
+      date: new Date().toISOString(),
+      totalAmount,
+      distribution
+    };
+    
+    setPayouts(prev => [...prev, newPayout]);
+    setMostRecentPayout(newPayout);
+    
+    // Reset team member balances after payout
+    for (const item of distribution) {
+      const teamMember = teamMembers.find(member => member.id === item.memberId);
+      if (teamMember) {
+        clearTeamMemberHours(item.memberId);
+      }
+    }
+    
+    toast({
+      title: "Periodes gemarkeerd als uitbetaald",
+      description: `${periodIds.length} periode(s) gemarkeerd als uitbetaald.`,
+    });
+  };
+  
+  const deletePaidPeriods = () => {
+    const paidPeriods = periods.filter(p => p.isPaid);
+    if (paidPeriods.length === 0) {
+      toast({
+        title: "Geen betaalde periodes",
+        description: "Er zijn geen betaalde periodes om te verwijderen.",
+      });
+      return;
+    }
+    
+    setPeriods(prev => prev.filter(p => !p.isPaid));
+    
+    toast({
+      title: "Betaalde periodes verwijderd",
+      description: `${paidPeriods.length} betaalde periode(s) verwijderd.`,
+    });
+  };
+  
+  const deletePeriod = (periodId: string) => {
+    const period = periods.find(p => p.id === periodId);
+    if (!period) return;
+    
+    if (period.isPaid) {
+      toast({
+        title: "Kan periode niet verwijderen",
+        description: "Je kunt geen periode verwijderen die al is uitbetaald.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setPeriods(prev => prev.filter(p => p.id !== periodId));
+    
+    if (currentPeriod && currentPeriod.id === periodId) {
+      setCurrentPeriod(null);
+    }
+    
+    toast({
+      title: "Periode verwijderd",
+      description: "De periode is verwijderd.",
+    });
+  };
+  
+  const deleteTip = (periodId: string, tipId: string) => {
+    const period = periods.find(p => p.id === periodId);
+    if (!period) return;
+    
+    if (period.isPaid) {
+      toast({
+        title: "Kan fooi niet verwijderen",
+        description: "Je kunt geen fooi verwijderen uit een periode die al is uitbetaald.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const updatedPeriod = {
+      ...period,
+      tips: period.tips.filter(t => t.id !== tipId)
+    };
+    
+    setPeriods(prev => 
+      prev.map(p => p.id === periodId ? updatedPeriod : p)
+    );
+    
+    if (currentPeriod && currentPeriod.id === periodId) {
+      setCurrentPeriod(updatedPeriod);
+    }
+    
+    toast({
+      title: "Fooi verwijderd",
+      description: "De fooi is verwijderd.",
+    });
+  };
+  
+  const updateTip = (periodId: string, tipId: string, amount: number, note?: string, date?: string) => {
+    const period = periods.find(p => p.id === periodId);
+    if (!period) return;
+    
+    if (period.isPaid) {
+      toast({
+        title: "Kan fooi niet bijwerken",
+        description: "Je kunt geen fooi bijwerken in een periode die al is uitbetaald.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const updatedPeriod = {
+      ...period,
+      tips: period.tips.map(t => {
+        if (t.id === tipId) {
+          return {
+            ...t,
+            amount,
+            note: note || t.note,
+            date: date || t.date
+          };
+        }
+        return t;
+      })
+    };
+    
+    setPeriods(prev => 
+      prev.map(p => p.id === periodId ? updatedPeriod : p)
+    );
+    
+    if (currentPeriod && currentPeriod.id === periodId) {
+      setCurrentPeriod(updatedPeriod);
+    }
+    
+    toast({
+      title: "Fooi bijgewerkt",
+      description: "De fooi is bijgewerkt.",
+    });
+  };
+  
+  const updatePeriod = (periodId: string, updates: {name?: string, notes?: string}) => {
+    const period = periods.find(p => p.id === periodId);
+    if (!period) return;
+    
+    const updatedPeriod = {
+      ...period,
+      ...(updates.name !== undefined && { name: updates.name }),
+      ...(updates.notes !== undefined && { notes: updates.notes })
+    };
+    
+    setPeriods(prev => 
+      prev.map(p => p.id === periodId ? updatedPeriod : p)
+    );
+    
+    if (currentPeriod && currentPeriod.id === periodId) {
+      setCurrentPeriod(updatedPeriod);
+    }
+    
+    toast({
+      title: "Periode bijgewerkt",
+      description: "De periode is bijgewerkt.",
+    });
+  };
+  
+  const calculateTipDistribution = (selectedPeriodIds: string[]) => {
+    const selectedPeriods = periods.filter(p => selectedPeriodIds.includes(p.id));
+    const totalTips = selectedPeriods.reduce(
+      (sum, period) => sum + period.tips.reduce((s, tip) => s + tip.amount, 0), 
+      0
+    );
+    
+    const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+    const tipPerHour = totalHours > 0 ? totalTips / totalHours : 0;
+    
+    return teamMembers.map(member => ({
+      ...member,
+      tipAmount: member.hours * tipPerHour
+    }));
+  };
+  
+  const calculateAverageTipPerHour = (periodId?: string, calculationMode?: 'period' | 'day' | 'week' | 'month'): number => {
+    let filteredPeriods = periods;
+    
+    if (periodId) {
+      filteredPeriods = periods.filter(p => p.id === periodId);
+    } else if (calculationMode) {
+      const now = new Date();
+      
+      switch (calculationMode) {
+        case 'day':
+          // Same day
+          filteredPeriods = periods.filter(p => {
+            const periodDate = new Date(p.startDate);
+            return periodDate.getDate() === now.getDate() && 
+                   periodDate.getMonth() === now.getMonth() && 
+                   periodDate.getFullYear() === now.getFullYear();
+          });
+          break;
+        case 'week':
+          // Same week
+          const startOfWeek = new Date(now);
+          startOfWeek.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1));
+          startOfWeek.setHours(0, 0, 0, 0);
+          
+          const endOfWeek = new Date(startOfWeek);
+          endOfWeek.setDate(startOfWeek.getDate() + 6);
+          endOfWeek.setHours(23, 59, 59, 999);
+          
+          filteredPeriods = periods.filter(p => {
+            const periodDate = new Date(p.startDate);
+            return periodDate >= startOfWeek && periodDate <= endOfWeek;
+          });
+          break;
+        case 'month':
+          // Same month
+          filteredPeriods = periods.filter(p => {
+            const periodDate = new Date(p.startDate);
+            return periodDate.getMonth() === now.getMonth() && 
+                   periodDate.getFullYear() === now.getFullYear();
+          });
+          break;
+        default:
+          break;
+      }
+    }
+    
+    const totalTips = filteredPeriods.reduce(
+      (sum, period) => sum + period.tips.reduce((s, tip) => s + tip.amount, 0), 
+      0
+    );
+    
+    const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+    
+    return totalHours > 0 ? totalTips / totalHours : 0;
+  };
+
+  return (
+    <AppContext.Provider
+      value={{
+        currentPeriod,
+        periods,
+        teamMembers,
+        payouts,
+        autoClosePeriods,
+        periodDuration,
+        alignWithCalendar,
+        setAlignWithCalendar,
+        closingTime,
+        setClosingTime,
+        isLoading,
+        teamId,
+        
+        addTip,
+        addTeamMember,
+        removeTeamMember,
+        updateTeamMemberHours,
+        startNewPeriod,
+        endCurrentPeriod,
+        calculateTipDistribution,
+        calculateAverageTipPerHour,
+        markPeriodsAsPaid,
+        hasReachedLimit,
+        hasReachedPeriodLimit,
+        getUnpaidPeriodsCount,
+        deletePaidPeriods,
+        deletePeriod,
+        deleteTip,
+        updateTip,
+        updatePeriod,
+        deleteHourRegistration,
+        updateTeamMemberBalance,
+        clearTeamMemberHours,
+        updateTeamMemberName,
+        mostRecentPayout,
+        setMostRecentPayout,
+        setAutoClosePeriods,
+        setPeriodDuration,
+        scheduleAutoClose,
+        calculateAutoCloseDate,
+        getNextAutoCloseDate,
+        getFormattedClosingTime,
+        refreshTeamData,
+        updateTeamMemberPermissions,
+        updateTeamMemberRole
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = (): AppContextType => {
+  const context = useContext(AppContext);
+  
+  if (context === undefined) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  
+  return context;
+};

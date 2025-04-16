@@ -24,27 +24,31 @@ const Index = () => {
   
   const checkTeamMembership = useCallback(async () => {
     try {
-      console.log('Index: Checking team membership');
+      console.log('Index: Detailed Team Membership Check Starting');
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
+      
       if (!session) {
-        console.log('Index: No session found');
+        console.warn('Index: No active session found');
         setLoading(false);
         return;
       }
       
-      console.log('Index: Getting user teams');
+      console.log('Index: Session found for user:', session.user.id);
       const teams = await getUserTeamsSafe(session.user.id);
       const userHasTeam = teams && teams.length > 0;
+      
+      console.log(`Index: User belongs to ${teams.length} teams`);
       setHasTeam(userHasTeam);
       
       if (userHasTeam) {
-        console.log('Index: User has a team, refreshing team data');
+        console.log('Index: Refreshing team data');
         setPeriodLoading(true);
         try {
-          await refreshTeamData();
+          const refreshResult = await refreshTeamData();
+          console.log('Index: Team data refresh result:', refreshResult);
         } catch (error) {
-          console.error('Index: Error refreshing team data:', error);
+          console.error('Index: Team data refresh failed:', error);
           toast({
             title: "Fout bij laden",
             description: "Kon teamgegevens niet vernieuwen",
@@ -55,7 +59,7 @@ const Index = () => {
         }
       }
     } catch (err) {
-      console.error('Index: Error checking team membership:', err);
+      console.error('Index: Comprehensive team membership check error:', err);
       setHasTeam(false);
       toast({
         title: "Fout",

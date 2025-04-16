@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { fetchTeamPeriods } from '@/services/periodService';
 import { supabase } from '@/integrations/supabase/client';
+import { getUserTeamsSafe } from '@/services/teamService';
 
 /**
  * Periods component for managing time periods
@@ -54,20 +55,56 @@ const Periods = () => {
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [realtimeSetup, setRealtimeSetup] = useState(false);
+  const [localTeamId, setLocalTeamId] = useState<string | null>(null);
   
   const { toast } = useToast();
 
+  // Fallback mechanism to get team ID if not available from context
+  useEffect(() => {
+    const fetchTeamID = async () => {
+      try {
+        if (teamId) {
+          console.log("Periods.tsx: Team ID from context:", teamId);
+          setLocalTeamId(teamId);
+          return;
+        }
+        
+        console.log("Periods.tsx: Team ID not found in context, fetching manually");
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.log("Periods.tsx: No session found");
+          return;
+        }
+        
+        // Use the safe function to fetch teams
+        const teams = await getUserTeamsSafe(session.user.id);
+        if (teams && teams.length > 0) {
+          console.log("Periods.tsx: Found team ID from API:", teams[0].id);
+          setLocalTeamId(teams[0].id);
+        } else {
+          console.log("Periods.tsx: No teams found for user");
+        }
+      } catch (error) {
+        console.error("Error fetching team ID:", error);
+      }
+    };
+    
+    fetchTeamID();
+  }, [teamId]);
+
   // Enhanced load data function with better error handling
   const loadData = useCallback(async () => {
-    if (!teamId) {
-      console.log("Periods.tsx: No team ID found, setting error state");
+    const effectiveTeamId = localTeamId || teamId;
+    
+    if (!effectiveTeamId) {
+      console.log("Periods.tsx: No team ID found (neither in context nor fetched), setting error state");
       setHasError(true);
       setErrorMessage("Geen team ID gevonden. Ga naar het dashboard om een team aan te maken of lid te worden van een team.");
       setIsLoading(false);
       return;
     }
     
-    console.log("Periods.tsx: Loading data for team:", teamId);
+    console.log("Periods.tsx: Loading data for team:", effectiveTeamId);
     setIsLoading(true);
     setHasError(false);
     setErrorMessage(null);
@@ -87,16 +124,18 @@ const Periods = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [teamId, refreshTeamData, toast]);
+  }, [localTeamId, teamId, refreshTeamData, toast]);
   
   // Initial data loading
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [loadData, localTeamId]);
   
   // Improved real-time updates with better cleanup and error handling
   useEffect(() => {
-    if (!teamId) {
+    const effectiveTeamId = localTeamId || teamId;
+    
+    if (!effectiveTeamId) {
       console.log("Periods.tsx: No team ID for real-time updates");
       return;
     }
@@ -121,7 +160,7 @@ const Periods = () => {
             event: '*', // All events
             schema: 'public',
             table: 'periods',
-            filter: `team_id=eq.${teamId}`
+            filter: `team_id=eq.${effectiveTeamId}`
           },
           async (payload) => {
             console.log('Periods.tsx: Real-time period update received:', payload);
@@ -208,7 +247,7 @@ const Periods = () => {
         );
       }
     };
-  }, [teamId, periods, refreshTeamData, realtimeSetup, toast]);
+  }, [localTeamId, teamId, periods, refreshTeamData, realtimeSetup, toast]);
   
   // Helper functions for date formatting
   const formatPeriodDate = (date: string) => {
@@ -459,6 +498,8 @@ const Periods = () => {
     );
   }
   
+  const effectiveTeamId = localTeamId || teamId;
+  
   if (hasError) {
     return (
       <div className="space-y-6">
@@ -480,7 +521,7 @@ const Periods = () => {
     );
   }
 
-  if (!teamId) {
+  if (!effectiveTeamId) {
     return (
       <div className="space-y-6">
         <Card className="border-amber-300">

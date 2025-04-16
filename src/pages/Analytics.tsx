@@ -1,8 +1,7 @@
-
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Info, TrendingUp, ArrowRight } from 'lucide-react';
+import { Info, TrendingUp, ArrowRight, AlertTriangle, AlertCircle } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { format } from 'date-fns';
@@ -12,16 +11,88 @@ import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger }
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { supabase } from '@/integrations/supabase/client';
+import { getUserTeamsSafe } from '@/services/teamService';
+import { useNavigate } from 'react-router-dom';
 
 const Analytics = () => {
   const {
     periods,
     calculateAverageTipPerHour,
     teamMembers,
-    payouts
+    payouts,
+    teamId,
+    refreshTeamData
   } = useApp();
   
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [localTeamId, setLocalTeamId] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const fetchTeamID = async () => {
+      try {
+        if (teamId) {
+          console.log("Analytics.tsx: Team ID from context:", teamId);
+          setLocalTeamId(teamId);
+          return;
+        }
+        
+        console.log("Analytics.tsx: Team ID not found in context, fetching manually");
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.log("Analytics.tsx: No session found");
+          return;
+        }
+        
+        const teams = await getUserTeamsSafe(session.user.id);
+        if (teams && teams.length > 0) {
+          console.log("Analytics.tsx: Found team ID from API:", teams[0].id);
+          setLocalTeamId(teams[0].id);
+        } else {
+          console.log("Analytics.tsx: No teams found for user");
+        }
+      } catch (error) {
+        console.error("Error fetching team ID:", error);
+      }
+    };
+    
+    fetchTeamID();
+  }, [teamId]);
+  
+  useEffect(() => {
+    const loadData = async () => {
+      const effectiveTeamId = localTeamId || teamId;
+      
+      if (!effectiveTeamId) {
+        console.log("Analytics.tsx: No team ID found, can't load data");
+        setHasError(true);
+        setErrorMessage("Geen team ID gevonden. Ga naar het dashboard om een team aan te maken of lid te worden van een team.");
+        setIsLoading(false);
+        return;
+      }
+      
+      setIsLoading(true);
+      setHasError(false);
+      setErrorMessage(null);
+      
+      try {
+        await refreshTeamData();
+        console.log("Analytics.tsx: Data loaded successfully");
+      } catch (error) {
+        console.error("Error loading team data on Analytics page:", error);
+        setHasError(true);
+        setErrorMessage("Er is een fout opgetreden bij het laden van de analysegegevens. Probeer het opnieuw.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [localTeamId, teamId, refreshTeamData]);
   
   const averageTipPerHour = useMemo(() => {
     return calculateAverageTipPerHour();
@@ -29,10 +100,8 @@ const Analytics = () => {
   
   const periodData = useMemo(() => {
     return periods.map(period => {
-      // Use stored average tip per hour if available (especially for paid periods)
       let avgTipPerHour = period.averageTipPerHour;
       
-      // If not available, calculate it
       if (avgTipPerHour === undefined || avgTipPerHour === null) {
         avgTipPerHour = calculateAverageTipPerHour(period.id);
       }
@@ -113,6 +182,75 @@ const Analytics = () => {
           </div>}
       </CardContent>
     </Card>;
+  
+  const handleRetryLoading = () => {
+    setIsLoading(true);
+    refreshTeamData()
+      .then(() => {
+        setHasError(false);
+        setErrorMessage(null);
+      })
+      .catch(error => {
+        console.error("Error retrying data load:", error);
+        setHasError(true);
+        setErrorMessage("Er is een fout opgetreden bij het opnieuw laden van de gegevens.");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  };
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#9b87f5]"></div>
+      </div>
+    );
+  }
+  
+  const effectiveTeamId = localTeamId || teamId;
+  
+  if (hasError) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-destructive/50">
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center justify-center text-center space-y-4">
+              <AlertCircle className="h-10 w-10 text-destructive" />
+              <div>
+                <h3 className="text-lg font-medium">Fout bij laden</h3>
+                <p className="text-muted-foreground mt-1">{errorMessage || "Er is een fout opgetreden bij het laden van de analysegegevens."}</p>
+              </div>
+              <Button onClick={handleRetryLoading}>
+                Opnieuw proberen
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!effectiveTeamId) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-amber-300">
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center justify-center text-center space-y-4">
+              <AlertTriangle className="h-10 w-10 text-amber-500" />
+              <div>
+                <h3 className="text-lg font-medium">Geen team gevonden</h3>
+                <p className="text-muted-foreground mt-1">Je moet eerst een team aanmaken of lid worden van een team voordat je analyses kunt bekijken.</p>
+              </div>
+              <Button onClick={() => navigate('/management')}>
+                Naar Teambeheer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   
   const hasAnyPeriodWithTips = periods.some(period => period.tips.length > 0);
   

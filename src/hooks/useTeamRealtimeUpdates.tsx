@@ -71,7 +71,7 @@ export const useTeamRealtimeUpdates = (
       )
       .subscribe((status) => {
         console.log(`useTeamRealtimeUpdates: Period channel subscription status: ${status}`);
-        if (status === 'SUBSCRIPTION_ERROR') {
+        if (status === 'CHANNEL_ERROR') {
           toast({
             title: "Fout bij realtime updates",
             description: "Er was een probleem met realtime updates. Probeer de pagina te verversen.",

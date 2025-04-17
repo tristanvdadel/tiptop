@@ -271,6 +271,19 @@ export const savePayout = async (teamId: string, payout: PayoutData) => {
         console.error('Error inserting payout periods:', insertPeriodError);
         throw insertPeriodError;
       }
+      
+      // BELANGRIJK: Bewaar de uurregistraties ook na uitbetaling
+      // In plaats van ze te verwijderen, markeer ze als 'processed'
+      const { error: updateHoursError } = await supabase
+        .from('hour_registrations')
+        .update({ processed: true })
+        .in('team_member_id', distribution.map(d => d.memberId));
+      
+      if (updateHoursError) {
+        console.error('Error updating hour registrations:', updateHoursError);
+        // We gooien geen fout omdat dit niet kritiek is voor de uitbetaling
+        console.log('Waarschuwing: Uurregistraties konden niet worden gemarkeerd als verwerkt');
+      }
     }
     
     console.log(`Successfully saved payout ${payout.id} with ${distribution?.length || 0} distributions and ${periodIds?.length || 0} periods`);

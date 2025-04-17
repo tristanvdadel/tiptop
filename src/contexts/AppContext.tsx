@@ -15,6 +15,7 @@ export interface HourRegistration {
   id: string;
   hours: number;
   date: string;
+  processed?: boolean;
 }
 
 export interface TeamMember {
@@ -957,23 +958,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const clearTeamMemberHours = (memberId: string) => {
-    setTeamMembers(prev => 
-      prev.map(member => {
-        if (member.id === memberId) {
-          return { 
-            ...member,
-            hours: 0,
-            hourRegistrations: [] // Clear all hour registrations
-          };
-        }
-        return member;
-      })
-    );
-    
-    toast({
-      title: "Uren gereset",
-      description: "De uren van het teamlid zijn gereset na uitbetaling.",
-    });
+    setTeamMembers(prev => prev.map(member => {
+      if (member.id === memberId) {
+        return {
+          ...member,
+          hours: 0,
+          hourRegistrations: member.hourRegistrations.map(reg => ({
+            ...reg,
+            processed: true
+          }))
+        };
+      }
+      return member;
+    }));
   };
 
   const updateTeamMemberName = (memberId: string, newName: string): boolean => {

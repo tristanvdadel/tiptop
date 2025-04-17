@@ -1,199 +1,139 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 
-export interface HistoricalPeriod {
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { useTeamId } from '@/hooks/useTeamId';
+
+export interface PeriodData {
   id: string;
+  name?: string;
   startDate: string;
-  endDate: string | null;
+  endDate: string;
+  averageTipPerHour?: number;
   isPaid: boolean;
-  averageTipPerHour: number | null;
-  totalTips: number;
-  payoutDate: string | null;
-  totalHours?: number;
 }
 
-export const useHistoricalData = (teamId: string | null) => {
-  const [historicalData, setHistoricalData] = useState<HistoricalPeriod[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+export interface DistributionData {
+  memberId: string;
+  amount: number;
+  actualAmount?: number;
+  balance?: number;
+  hours?: number;
+}
+
+export interface HistoricalPayout {
+  id: string;
+  date: string;
+  payoutTime?: string;
+  payerName?: string;
+  periodIds: string[];
+  totalHours?: number;
+  distribution: DistributionData[];
+}
+
+export function useHistoricalData() {
+  const { teamId } = useTeamId();
+  const { toast } = useToast();
+  const [payoutHistory, setPayoutHistory] = useState<HistoricalPayout[]>([]);
+  const [periodHistory, setPeriodHistory] = useState<PeriodData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchHistoricalData = useCallback(async () => {
+    if (!teamId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Haal uitbetalingsgegevens op
+      const { data: payoutData, error: payoutError } = await supabase
+        .from('payouts')
+        .select('id, date, payout_time, payer_name, total_hours')
+        .eq('team_id', teamId)
+        .order('date', { ascending: false });
+      
+      if (payoutError) throw payoutError;
+      
+      const payouts = await Promise.all(payoutData.map(async (payout) => {
+        // Haal periodes voor elke uitbetaling op
+        const { data: periodLinks, error: periodLinksError } = await supabase
+          .from('payout_periods')
+          .select('period_id')
+          .eq('payout_id', payout.id);
+        
+        if (periodLinksError) throw periodLinksError;
+        
+        // Haal verdelingsinformatie voor elke uitbetaling op
+        const { data: distributionData, error: distributionError } = await supabase
+          .from('payout_distributions')
+          .select('team_member_id, amount, actual_amount, balance, hours')
+          .eq('payout_id', payout.id);
+        
+        if (distributionError) throw distributionError;
+        
+        return {
+          id: payout.id,
+          date: payout.date,
+          payoutTime: payout.payout_time,
+          payerName: payout.payer_name,
+          totalHours: payout.total_hours || 0,
+          periodIds: periodLinks.map(p => p.period_id),
+          distribution: distributionData.map(d => ({
+            memberId: d.team_member_id,
+            amount: d.amount,
+            actualAmount: d.actual_amount,
+            balance: d.balance,
+            hours: d.hours || 0
+          }))
+        };
+      }));
+      
+      // Haal periodegegevens op
+      const { data: periodData, error: periodError } = await supabase
+        .from('periods')
+        .select('id, name, start_date, end_date, is_paid, average_tip_per_hour')
+        .eq('team_id', teamId)
+        .order('start_date', { ascending: false });
+      
+      if (periodError) throw periodError;
+      
+      const periods = periodData.map(period => ({
+        id: period.id,
+        name: period.name,
+        startDate: period.start_date,
+        endDate: period.end_date,
+        isPaid: period.is_paid,
+        averageTipPerHour: period.average_tip_per_hour
+      }));
+      
+      setPayoutHistory(payouts);
+      setPeriodHistory(periods);
+      setLoading(false);
+    } catch (err: any) {
+      console.error('Error fetching historical data:', err);
+      setError('Er is een fout opgetreden bij het ophalen van historische gegevens.');
+      setLoading(false);
+      
+      toast({
+        title: 'Fout bij het laden van gegevens',
+        description: err.message || 'Er is een fout opgetreden bij het ophalen van historische gegevens.',
+        variant: 'destructive'
+      });
+    }
+  }, [teamId, toast]);
 
   useEffect(() => {
-    const fetchHistoricalData = async () => {
-      if (!teamId) return;
-      
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        console.log("useHistoricalData: Fetching historical payout data");
-        
-        // Fetch payouts with total_hours column
-        const { data: payoutsData, error: payoutsError } = await supabase
-          .from('payouts')
-          .select(`
-            id,
-            date,
-            payout_time,
-            total_hours
-          `)
-          .eq('team_id', teamId);
-          
-        if (payoutsError) {
-          console.error("useHistoricalData: Error fetching historical payout data:", payoutsError);
-          throw payoutsError;
-        }
-        
-        if (!payoutsData || payoutsData.length === 0) {
-          console.log("useHistoricalData: No historical payout data found");
-          setHistoricalData([]);
-          setIsLoading(false);
-          return;
-        }
-        
-        console.log("useHistoricalData: Found historical payout data:", payoutsData.length, "payouts");
-        
-        const payoutIds = payoutsData.map(p => p.id);
-        const { data: payoutPeriodsData, error: payoutPeriodsError } = await supabase
-          .from('payout_periods')
-          .select('payout_id, period_id')
-          .in('payout_id', payoutIds);
-          
-        if (payoutPeriodsError) {
-          console.error("useHistoricalData: Error fetching payout periods:", payoutPeriodsError);
-          throw payoutPeriodsError;
-        }
-        
-        // Fetch payout distributions with hours column
-        const { data: payoutDistributionsData, error: distributionsError } = await supabase
-          .from('payout_distributions')
-          .select('payout_id, team_member_id, amount, actual_amount, balance, hours')
-          .in('payout_id', payoutIds);
-          
-        if (distributionsError) {
-          console.error("useHistoricalData: Error fetching payout distributions:", distributionsError);
-          throw distributionsError;
-        }
-        
-        const payoutPeriods = {};
-        const payoutDistributions = {};
-        const payoutTotalHours = {};
-        
-        if (payoutPeriodsData) {
-          payoutPeriodsData.forEach(item => {
-            if (!payoutPeriods[item.payout_id]) {
-              payoutPeriods[item.payout_id] = [];
-            }
-            payoutPeriods[item.payout_id].push(item.period_id);
-          });
-        }
-        
-        if (payoutDistributionsData) {
-          payoutDistributionsData.forEach(item => {
-            if (!payoutDistributions[item.payout_id]) {
-              payoutDistributions[item.payout_id] = [];
-            }
-            payoutDistributions[item.payout_id].push(item);
-          });
-        }
-        
-        // Calculate total hours for each payout from distribution data
-        payoutsData.forEach(payout => {
-          // Try to use the stored total_hours if available
-          if (payout.total_hours && payout.total_hours > 0) {
-            payoutTotalHours[payout.id] = payout.total_hours;
-          } else {
-            // Otherwise calculate from distributions
-            const distributions = payoutDistributions[payout.id] || [];
-            const totalHours = distributions.reduce((sum, dist) => {
-              return sum + (dist.hours || 0);
-            }, 0);
-            
-            payoutTotalHours[payout.id] = totalHours;
-          }
-        });
-        
-        const enhancedPayouts = payoutsData.map(payout => ({
-          ...payout,
-          payout_periods: payoutPeriods[payout.id] || [],
-          payout_distributions: payoutDistributions[payout.id] || [],
-          total_hours: payoutTotalHours[payout.id] || payout.total_hours || 0
-        }));
-        
-        const periodIds = enhancedPayouts
-          .flatMap(payout => payout.payout_periods || [])
-          .filter(id => id);
-          
-        if (periodIds.length === 0) {
-          console.log("useHistoricalData: No period IDs found in payouts");
-          setHistoricalData([]);
-          setIsLoading(false);
-          return;
-        }
-        
-        const { data: periodsData, error: periodsError } = await supabase
-          .from('periods')
-          .select(`
-            id,
-            start_date,
-            end_date,
-            is_paid,
-            average_tip_per_hour,
-            tips (
-              id,
-              amount,
-              date
-            )
-          `)
-          .in('id', periodIds);
-          
-        if (periodsError) {
-          console.error("useHistoricalData: Error fetching historical period data:", periodsError);
-          throw periodsError;
-        }
-        
-        if (!periodsData || periodsData.length === 0) {
-          console.log("useHistoricalData: No historical period data found");
-          setHistoricalData([]);
-          setIsLoading(false);
-          return;
-        }
-        
-        console.log("useHistoricalData: Found historical period data:", periodsData.length, "periods");
-        
-        const historicalPeriods = periodsData.map(period => {
-          const relatedPayout = enhancedPayouts.find(p => 
-            p.payout_periods.includes(period.id)
-          );
-          
-          const totalTips = period.tips?.reduce((sum, tip) => sum + tip.amount, 0) || 0;
-          
-          let totalHours = relatedPayout?.total_hours || 0;
-          
-          return {
-            id: period.id,
-            startDate: period.start_date,
-            endDate: period.end_date,
-            isPaid: period.is_paid,
-            averageTipPerHour: period.average_tip_per_hour || (totalHours > 0 ? totalTips / totalHours : 0),
-            totalTips,
-            payoutDate: relatedPayout?.date,
-            totalHours
-          };
-        });
-        
-        setHistoricalData(historicalPeriods);
-        console.log("useHistoricalData: Historical data prepared:", historicalPeriods.length, "items");
-      } catch (error) {
-        console.error("useHistoricalData: Error in fetchHistoricalData:", error);
-        setError(error instanceof Error ? error : new Error('Unknown error occurred'));
-        setHistoricalData([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchHistoricalData();
-  }, [teamId]);
+    if (teamId) {
+      fetchHistoricalData();
+    }
+  }, [teamId, fetchHistoricalData]);
 
-  return { historicalData, isLoading, error };
-};
+  return {
+    payoutHistory,
+    periodHistory,
+    loading,
+    error,
+    refreshData: fetchHistoricalData
+  };
+}

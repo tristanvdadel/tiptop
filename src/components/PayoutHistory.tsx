@@ -56,10 +56,11 @@ const PayoutHistory = () => {
   const downloadCSV = () => {
     if (!selectedPayout) return;
     
-    const headers = "Naam,Berekend bedrag,Daadwerkelijk uitbetaald,Saldo,Uitgevoerd door,Datum\n";
+    const headers = "Naam,Berekend bedrag,Daadwerkelijk uitbetaald,Saldo,Uren,Uitgevoerd door,Datum\n";
     const rows = selectedPayout.distribution.map(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
-      return `${member?.name || 'Onbekend lid'},${item.amount.toFixed(2)},${(item.actualAmount || item.amount).toFixed(2)},${(item.balance || 0).toFixed(2)},${selectedPayout.payerName || 'Onbekend'},${formatDate(selectedPayout.payoutTime || selectedPayout.date)}`;
+      const hours = item.hours || 0;
+      return `${member?.name || 'Onbekend lid'},${item.amount.toFixed(2)},${(item.actualAmount || item.amount).toFixed(2)},${(item.balance || 0).toFixed(2)},${hours.toFixed(1)},${selectedPayout.payerName || 'Onbekend'},${formatDate(selectedPayout.payoutTime || selectedPayout.date)}`;
     }).join('\n');
     
     const csv = headers + rows;
@@ -87,22 +88,24 @@ const PayoutHistory = () => {
     
     const payoutDateTime = selectedPayout.payoutTime || selectedPayout.date;
     const payer = selectedPayout.payerName || 'Onbekend';
+    const totalHours = selectedPayout.totalHours || selectedPayout.distribution.reduce((sum, item) => sum + (item.hours || 0), 0);
     
     const headers = `TipTop Uitbetaling Overzicht\n\n`;
-    const subHeaders = `Datum: ${formatDate(payoutDateTime)}\nUitgevoerd door: ${payer}\n\n`;
-    const tableHeaders = "Naam,Berekend bedrag,Balans,Uitbetaald bedrag,Nieuw saldo\n";
+    const subHeaders = `Datum: ${formatDate(payoutDateTime)}\nUitgevoerd door: ${payer}\nTotaal aantal uren: ${totalHours.toFixed(1)}\n\n`;
+    const tableHeaders = "Naam,Berekend bedrag,Balans,Uitbetaald bedrag,Uren,Nieuw saldo\n";
     
     const rows = selectedPayout.distribution.map(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
       const originalAmount = item.amount;
       const originalBalance = item.balance || 0;
       const actualAmount = item.actualAmount || item.amount;
+      const hours = item.hours || 0;
       const newBalance = originalBalance + (originalAmount - actualAmount);
       
-      return `${member?.name || 'Onbekend lid'},${originalAmount.toFixed(2)},${originalBalance.toFixed(2)},${actualAmount.toFixed(2)},${newBalance.toFixed(2)}`;
+      return `${member?.name || 'Onbekend lid'},${originalAmount.toFixed(2)},${originalBalance.toFixed(2)},${actualAmount.toFixed(2)},${hours.toFixed(1)},${newBalance.toFixed(2)}`;
     }).join('\n');
     
-    const totalRow = `\nTotaal,,${selectedPayout.distribution.reduce((sum, item) => sum + (item.actualAmount || item.amount), 0).toFixed(2)}`;
+    const totalRow = `\nTotaal,,${selectedPayout.distribution.reduce((sum, item) => sum + (item.actualAmount || item.amount), 0).toFixed(2)},${totalHours.toFixed(1)}`;
     
     const excel = headers + subHeaders + tableHeaders + rows + totalRow;
     const blob = new Blob([excel], { type: 'application/vnd.ms-excel' });
@@ -132,6 +135,9 @@ const PayoutHistory = () => {
       const payoutDate = formatDate(selectedPayout.payoutTime || selectedPayout.date);
       const payer = selectedPayout.payerName || 'Onbekend';
       
+      // Get total hours from payout or calculate it
+      const totalHours = selectedPayout.totalHours || selectedPayout.distribution.reduce((sum, item) => sum + (item.hours || 0), 0);
+      
       doc.setFontSize(22);
       doc.text("TipTop Uitbetaling Overzicht", 105, 20, { align: "center" });
       
@@ -143,6 +149,7 @@ const PayoutHistory = () => {
       doc.text(`Overzichtnummer: TP-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`, 150, 40, { align: "right" });
       doc.text(`Datum: ${payoutDate}`, 150, 45, { align: "right" });
       doc.text(`Uitgevoerd door: ${payer}`, 150, 50, { align: "right" });
+      doc.text(`Totaal aantal uren: ${totalHours.toFixed(1)}`, 150, 55, { align: "right" });
       
       doc.setFontSize(11);
       doc.setTextColor(100, 100, 100);
@@ -150,12 +157,14 @@ const PayoutHistory = () => {
       doc.text("Berekend bedrag", 75, 80);
       doc.text("Balans", 115, 80);
       doc.text("Uitbetaald", 155, 80);
+      doc.text("Uren", 185, 80);
       
       doc.setDrawColor(200, 200, 200);
       doc.line(20, 83, 190, 83);
       
       let y = 90;
       let total = 0;
+      let totalHoursFromDetails = 0;
       
       selectedPayout.distribution.forEach((item, index) => {
         const member = teamMembers.find(m => m.id === item.memberId);
@@ -163,13 +172,16 @@ const PayoutHistory = () => {
         const amount = item.amount;
         const balance = item.balance || 0;
         const actualAmount = item.actualAmount || item.amount;
+        const hours = item.hours || 0;
         
         doc.text(name, 20, y);
         doc.text(`€ ${amount.toFixed(2)}`, 75, y);
         doc.text(`€ ${balance.toFixed(2)}`, 115, y);
         doc.text(`€ ${actualAmount.toFixed(2)}`, 155, y);
+        doc.text(`${hours.toFixed(1)}`, 185, y);
         
         total += actualAmount;
+        totalHoursFromDetails += hours;
         y += 10;
         
         if (y > 270 && index < selectedPayout.distribution.length - 1) {
@@ -183,6 +195,7 @@ const PayoutHistory = () => {
       doc.setFont(undefined, 'bold');
       doc.text("Totaal", 115, y);
       doc.text(`€ ${total.toFixed(2)}`, 155, y);
+      doc.text(`${totalHoursFromDetails.toFixed(1)}`, 185, y);
       
       doc.setFontSize(9);
       doc.setTextColor(100, 100, 100);

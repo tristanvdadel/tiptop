@@ -5,11 +5,13 @@ export { saveTeamSettings as saveTeamSettingsService } from './teamService';
 
 export * from './periodService';
 export { savePeriod as savePeriodService } from './periodService';
+export { fetchTeamPeriods } from './periodService';
 
 export * from './teamMemberService';
 export { saveTeamMember as saveTeamMemberService } from './teamMemberService';
 export { updateTeamMember as updateTeamMemberService } from './teamMemberService';
 export { deleteTeamMember as deleteTeamMemberService } from './teamMemberService';
+export { fetchAllTeamMembers } from './teamMemberService';
 
 export * from './payoutService';
 export { createPayout, updatePayout, deletePayout, fetchAllPayouts } from './payoutService';

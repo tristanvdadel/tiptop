@@ -1,93 +1,132 @@
 
-import { supabase } from "@/integrations/supabase/client";
-import { Period } from '@/contexts/AppContext';
-import { savePeriod as saveSupabasePeriod } from './supabase/periodService';
+import { supabase } from '@/integrations/supabase/client';
+import { Period } from '@/types';
 
-/**
- * Saves a period and its associated tips to the database
- */
-export const savePeriod = async (teamId: string, period: Period) => {
-  return saveSupabasePeriod(teamId, period);
-};
-
-/**
- * Fetches all periods for a team from the database
- */
-export const fetchTeamPeriods = async (teamId: string) => {
+export const fetchTeamPeriods = async (teamId: string): Promise<Period[]> => {
   try {
-    console.log(`periodService: Fetching periods for team ${teamId}`);
-    
-    // Get periods for the team
-    const { data: periods, error: periodsError } = await supabase
+    const { data, error } = await supabase
       .from('periods')
       .select('*')
       .eq('team_id', teamId)
       .order('start_date', { ascending: false });
-    
-    if (periodsError) {
-      console.error('periodService: Error fetching periods:', periodsError);
-      throw periodsError;
+
+    if (error) {
+      console.error('Error fetching periods:', error);
+      return [];
     }
-    
-    console.log(`periodService: Fetched ${periods.length} periods for team ${teamId}`);
-    
-    // For each period, get the associated tips
-    const periodsWithTips = await Promise.all(periods.map(async (period) => {
-      try {
-        const { data: tips, error: tipsError } = await supabase
-          .from('tips')
-          .select('*')
-          .eq('period_id', period.id);
-        
-        if (tipsError) {
-          console.error(`periodService: Error fetching tips for period ${period.id}:`, tipsError);
-          throw tipsError;
-        }
-        
-        console.log(`periodService: Fetched ${tips.length} tips for period ${period.id}`);
-        
-        return {
-          id: period.id,
-          teamId: period.team_id,
-          startDate: period.start_date,
-          endDate: period.end_date,
-          isActive: period.is_active,
-          isPaid: period.is_paid,
-          notes: period.notes,
-          name: period.name,
-          autoCloseDate: period.auto_close_date,
-          averageTipPerHour: period.average_tip_per_hour,
-          tips: tips.map(tip => ({
-            id: tip.id,
-            amount: tip.amount,
-            date: tip.date,
-            note: tip.note,
-            addedBy: tip.added_by
-          }))
-        };
-      } catch (error) {
-        console.error(`periodService: Error processing period ${period.id}:`, error);
-        // Return period without tips in case of error, so we don't lose all periods
-        return {
-          id: period.id,
-          teamId: period.team_id,
-          startDate: period.start_date,
-          endDate: period.end_date,
-          isActive: period.is_active,
-          isPaid: period.is_paid,
-          notes: period.notes,
-          name: period.name,
-          autoCloseDate: period.auto_close_date,
-          averageTipPerHour: period.average_tip_per_hour,
-          tips: []
-        };
-      }
+
+    return data.map(p => ({
+      id: p.id,
+      name: p.name || `Period ${p.id.slice(0, 4)}`,
+      startDate: p.start_date,
+      endDate: p.end_date || undefined,
+      isCurrent: p.is_active === true,
+      isPaid: p.is_paid === true,
+      tips: [],
+      autoCloseDate: p.auto_close_date,
+      averageTipPerHour: p.average_tip_per_hour || 0,
+      isActive: p.is_active
     }));
-    
-    console.log(`periodService: Successfully processed ${periodsWithTips.length} periods with their tips`);
-    return periodsWithTips;
   } catch (error) {
-    console.error('periodService: Error fetching team periods:', error);
+    console.error('Error in fetchTeamPeriods:', error);
+    return [];
+  }
+};
+
+export const savePeriod = async (teamId: string, periodData: Partial<Period>): Promise<Period> => {
+  try {
+    const { data, error } = await supabase
+      .from('periods')
+      .insert([
+        {
+          team_id: teamId,
+          start_date: periodData.startDate,
+          name: periodData.name,
+          is_active: periodData.isCurrent || false,
+          is_paid: periodData.isPaid || false,
+          auto_close_date: periodData.autoCloseDate
+        }
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error saving period:', error);
+      throw error;
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      startDate: data.start_date,
+      endDate: data.end_date || undefined,
+      isCurrent: data.is_active,
+      isPaid: data.is_paid,
+      tips: [],
+      autoCloseDate: data.auto_close_date,
+      averageTipPerHour: data.average_tip_per_hour || 0,
+      isActive: data.is_active
+    };
+  } catch (error) {
+    console.error('Error in savePeriod:', error);
+    throw error;
+  }
+};
+
+export const updatePeriod = async (periodId: string, updates: Partial<Period>): Promise<Period> => {
+  try {
+    const { data, error } = await supabase
+      .from('periods')
+      .update({
+        name: updates.name,
+        end_date: updates.endDate,
+        is_active: updates.isCurrent,
+        is_paid: updates.isPaid,
+        auto_close_date: updates.autoCloseDate
+      })
+      .eq('id', periodId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating period:', error);
+      throw error;
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      startDate: data.start_date,
+      endDate: data.end_date || undefined,
+      isCurrent: data.is_active,
+      isPaid: data.is_paid,
+      tips: [],
+      autoCloseDate: data.auto_close_date,
+      averageTipPerHour: data.average_tip_per_hour || 0,
+      isActive: data.is_active
+    };
+  } catch (error) {
+    console.error('Error in updatePeriod:', error);
+    throw error;
+  }
+};
+
+export const endPeriod = async (periodId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('periods')
+      .update({
+        is_active: false,
+        end_date: new Date().toISOString()
+      })
+      .eq('id', periodId);
+
+    if (error) {
+      console.error('Error ending period:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error in endPeriod:', error);
     throw error;
   }
 };

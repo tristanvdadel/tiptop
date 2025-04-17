@@ -1,10 +1,12 @@
+
 import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2 } from 'lucide-react';
-import { useApp, TipEntry } from '@/contexts/AppContext';
+import { useApp } from '@/contexts/AppContext';
+import { TipEntry } from '@/types';
 import {
   AlertDialog,
   AlertDialogAction,

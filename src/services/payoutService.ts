@@ -1,117 +1,136 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { savePayout } from './supabase/payoutService';
+import { Payout, PayoutData } from '@/types';
 
-// Add debounce utility to prevent rapid state changes
-export const debounce = <F extends (...args: any[]) => any>(
-  func: F,
-  waitFor: number
-): ((...args: Parameters<F>) => void) => {
-  let timeout: ReturnType<typeof setTimeout> | null = null;
-
-  return (...args: Parameters<F>): void => {
-    if (timeout !== null) {
-      clearTimeout(timeout);
-    }
-
-    timeout = setTimeout(() => func(...args), waitFor);
-  };
-};
-
-/**
- * Fetch all payouts for a team
- */
-export const fetchAllPayouts = async (teamId: string) => {
+export const fetchAllPayouts = async (teamId: string): Promise<Payout[]> => {
   try {
-    console.log(`Fetching all payouts for team ${teamId}`);
-    
     const { data, error } = await supabase
       .from('payouts')
-      .select(`
-        id, 
-        date, 
-        payout_time,
-        payer_name,
-        total_hours,
-        payout_distributions (
-          id,
-          team_member_id,
-          amount,
-          actual_amount,
-          balance,
-          hours
-        ),
-        payout_periods (
-          period_id
-        )
-      `)
+      .select('*')
       .eq('team_id', teamId)
-      .order('date', { ascending: false });
-    
+      .order('created_at', { ascending: false });
+
     if (error) {
       console.error('Error fetching payouts:', error);
-      throw error;
+      return [];
     }
-    
-    // Transform the data to match the expected format
-    const transformedPayouts = data.map(payout => {
-      return {
-        id: payout.id,
-        date: payout.date,
-        payoutTime: payout.payout_time,
-        payerName: payout.payer_name,
-        totalHours: payout.total_hours || 0,
-        distribution: payout.payout_distributions.map(dist => ({
-          memberId: dist.team_member_id,
-          amount: dist.amount,
-          actualAmount: dist.actual_amount,
-          balance: dist.balance,
-          hours: dist.hours || 0
-        })),
-        periodIds: payout.payout_periods.map(p => p.period_id)
-      };
-    });
-    
-    return transformedPayouts;
+
+    return data.map(p => ({
+      id: p.id,
+      teamId: p.team_id,
+      periodId: p.period_id,
+      teamMemberId: p.team_member_id,
+      amount: p.amount,
+      timestamp: p.created_at,
+      date: p.date,
+      payerName: p.payer_name,
+      totalHours: p.total_hours,
+      distribution: p.distribution,
+      periodIds: p.period_ids
+    }));
   } catch (error) {
     console.error('Error in fetchAllPayouts:', error);
-    // Return an empty array instead of throwing to improve UX
     return [];
   }
 };
 
-/**
- * Create a new payout
- */
-export const createPayout = async (teamId: string, payoutData: any) => {
-  // Implementation would go here
-  console.log('Creating payout:', payoutData);
-  return {
-    id: 'temp-id',
-    ...payoutData
-  };
+export const createPayout = async (teamId: string, payoutData: Partial<Payout>): Promise<Payout> => {
+  try {
+    const { data, error } = await supabase
+      .from('payouts')
+      .insert([
+        {
+          team_id: teamId,
+          period_id: payoutData.periodId,
+          team_member_id: payoutData.teamMemberId,
+          amount: payoutData.amount,
+          date: payoutData.date || new Date().toISOString(),
+          payer_name: payoutData.payerName,
+          total_hours: payoutData.totalHours,
+          distribution: payoutData.distribution,
+          period_ids: payoutData.periodIds
+        }
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating payout:', error);
+      throw error;
+    }
+
+    return {
+      id: data.id,
+      teamId: data.team_id,
+      periodId: data.period_id,
+      teamMemberId: data.team_member_id,
+      amount: data.amount,
+      timestamp: data.created_at,
+      date: data.date,
+      payerName: data.payer_name,
+      totalHours: data.total_hours,
+      distribution: data.distribution,
+      periodIds: data.period_ids
+    };
+  } catch (error) {
+    console.error('Error in createPayout:', error);
+    throw error;
+  }
 };
 
-/**
- * Update an existing payout
- */
-export const updatePayout = async (payoutId: string, updates: any) => {
-  // Implementation would go here
-  console.log('Updating payout:', payoutId, updates);
-  return {
-    id: payoutId,
-    ...updates
-  };
+export const updatePayout = async (payoutId: string, updates: Partial<Payout>): Promise<Payout> => {
+  try {
+    const { data, error } = await supabase
+      .from('payouts')
+      .update({
+        amount: updates.amount,
+        date: updates.date,
+        payer_name: updates.payerName,
+        total_hours: updates.totalHours,
+        distribution: updates.distribution,
+        period_ids: updates.periodIds
+      })
+      .eq('id', payoutId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating payout:', error);
+      throw error;
+    }
+
+    return {
+      id: data.id,
+      teamId: data.team_id,
+      periodId: data.period_id,
+      teamMemberId: data.team_member_id,
+      amount: data.amount,
+      timestamp: data.created_at,
+      date: data.date,
+      payerName: data.payer_name,
+      totalHours: data.total_hours,
+      distribution: data.distribution,
+      periodIds: data.period_ids
+    };
+  } catch (error) {
+    console.error('Error in updatePayout:', error);
+    throw error;
+  }
 };
 
-/**
- * Delete a payout
- */
-export const deletePayout = async (payoutId: string) => {
-  // Implementation would go here
-  console.log('Deleting payout:', payoutId);
-  return true;
-};
+export const deletePayout = async (payoutId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('payouts')
+      .delete()
+      .eq('id', payoutId);
 
-// Re-export the savePayout function with a more specific name
-export const savePayoutToSupabase = savePayout;
+    if (error) {
+      console.error('Error deleting payout:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error in deletePayout:', error);
+    throw error;
+  }
+};

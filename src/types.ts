@@ -9,7 +9,7 @@ export interface Period {
   tips: Tip[];
   averageTipPerHour?: number;
   autoCloseDate?: string;
-  isActive?: boolean; // Adding this field to resolve compatibility issues
+  isActive?: boolean; // Added for compatibility with API responses
 }
 
 export interface TeamMember {
@@ -33,7 +33,7 @@ export interface Tip {
   note?: string; // Added for notes in tip cards
 }
 
-// Define TipEntry explicitly to resolve the export error
+// Explicitly define TipEntry interface
 export interface TipEntry {
   id: string;
   amount: number;

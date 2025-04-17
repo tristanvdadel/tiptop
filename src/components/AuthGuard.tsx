@@ -10,11 +10,11 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const authCheckTimeout = useRef<number | null>(null);
-  // Reduced from 200ms to 150ms for even faster initial response
-  const maxAuthCheckTime = 150;
+  // Gereduceerd naar 100ms voor snellere respons
+  const maxAuthCheckTime = 100;
 
   useEffect(() => {
-    // For quick initial render, check if we have a cached token
+    // Voor snelle initiële render, controleer of we een gecachte token hebben
     const cachedToken = localStorage.getItem('sb-auth-token-cached');
     const isCachedSessionLikely = !!cachedToken;
     const loginAttemptTime = localStorage.getItem('login_attempt_time');
@@ -22,13 +22,13 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     
     let mounted = true;
     
-    // Set a shorter timeout for better user experience
+    // Stel een kortere timeout in voor betere gebruikerservaring
     authCheckTimeout.current = window.setTimeout(() => {
       if (mounted && isLoading) {
         console.log('Session check timeout - forcing completion');
-        // If we have a cached token, assume user is logged in for now
+        // Als we een gecachte token hebben, nemen we aan dat de gebruiker is ingelogd
         if (isCachedSessionLikely) {
-          setSession({ dummy: 'temporary' }); // Temporary session object
+          setSession({ dummy: 'temporary' }); // Tijdelijk sessie-object
         } else {
           setSession(null);
         }
@@ -36,22 +36,26 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       }
     }, maxAuthCheckTime);
     
-    // Fast session check with priority on cached data
+    // Snelle sessiecontrole met prioriteit voor gecachte gegevens
     const checkSession = async () => {
       try {
-        // If we have a recent login attempt, prioritize cache first
+        // Bij een recente inlogpoging gebruiken we eerst de cache
         if (recentLoginAttempt && isCachedSessionLikely && mounted) {
           console.log('Recent login detected, using cached session first');
-          setSession({ dummy: 'temporary' }); // Temporary session from cache
+          setSession({ dummy: 'temporary' }); // Tijdelijke sessie uit cache
           setIsLoading(false);
         }
         
-        // Still do the full check in background
+        // Toch nog de volledige controle op de achtergrond uitvoeren
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('Error getting session:', error);
-          if (mounted) setIsLoading(false);
+          if (mounted) {
+            setIsLoading(false);
+            // Als er een error is bij het ophalen van de sessie, verwijder dan de gecachte token
+            localStorage.removeItem('sb-auth-token-cached');
+          }
           return;
         }
         
@@ -59,7 +63,12 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
           setSession(data.session);
           setIsLoading(false);
           
-          // Clear login attempt timestamp after successful auth
+          // Sla token op in cache voor snellere laden volgende keer
+          if (data.session?.access_token) {
+            localStorage.setItem('sb-auth-token-cached', data.session.access_token);
+          }
+          
+          // Verwijder de login-pogingtijd na succesvolle authenticatie
           if (data.session) {
             localStorage.removeItem('login_attempt_time');
           }
@@ -70,7 +79,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       }
     };
     
-    // Setup auth state listener for ALL auth events
+    // Setup auth state listener voor ALLE auth-events
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       console.log('Auth state changed:', event, newSession ? 'User logged in' : 'No session');
       
@@ -78,13 +87,19 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
         setSession(newSession);
         setIsLoading(false);
         
-        // If user logs out, clear the cached token
+        // Als de gebruiker uitlogt, verwijder dan de gecachte token
         if (event === 'SIGNED_OUT') {
           localStorage.removeItem('sb-auth-token-cached');
           localStorage.removeItem('login_attempt_time');
+          // Ook team-specifieke gegevens wissen
+          localStorage.removeItem('last_team_id');
+          localStorage.removeItem('analytics_last_refresh');
+          
+          const teamIds = Object.keys(localStorage).filter(key => key.startsWith('team_data_refresh_'));
+          teamIds.forEach(key => localStorage.removeItem(key));
         }
         
-        // If user logs in, set the cached token
+        // Als de gebruiker inlogt, sla de token op in de cache
         if (event === 'SIGNED_IN' && newSession?.access_token) {
           localStorage.setItem('sb-auth-token-cached', newSession.access_token);
           localStorage.removeItem('login_attempt_time');
@@ -92,7 +107,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       }
     });
 
-    // Start session check immediately
+    // Start sessiecontrole onmiddellijk
     checkSession();
 
     return () => {
@@ -104,24 +119,39 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  // Define public routes that don't require authentication
+  // Definieer openbare routes die geen authenticatie vereisen
   const isPublicRoute = location.pathname === '/splash' || 
                         location.pathname === '/login' || 
                         location.pathname.startsWith('/fast-tip');
                         
-  // Determine if redirect is needed
+  // Controleer of redirect nodig is
   const needsRedirect = !isLoading && !session && !isPublicRoute;
 
-  // Handle redirect if needed - separate effect for redirects
+  // Handle redirect indien nodig - aparte effect voor redirects
   useEffect(() => {
     if (needsRedirect) {
       console.log('No session, redirecting to login from:', location.pathname);
-      // Use replace instead of push for better history management
-      navigate('/login', { replace: true });
+      
+      // Check of er een recursie-error was
+      const urlParams = new URLSearchParams(location.search);
+      const hasRecursionError = urlParams.get('error') === 'recursion';
+      
+      // Bij een recursie-error tonen we een bericht
+      if (hasRecursionError) {
+        navigate('/login', { 
+          replace: true, 
+          state: { 
+            message: "Je bent uitgelogd vanwege een database synchronisatie probleem. Inloggen zou dit probleem moeten oplossen."
+          } 
+        });
+      } else {
+        // Gebruik replace in plaats van push voor betere geschiedenisbeheer
+        navigate('/login', { replace: true });
+      }
     }
-  }, [needsRedirect, navigate, location.pathname]);
+  }, [needsRedirect, navigate, location.pathname, location.search]);
 
-  // Show minimal loading state
+  // Toon minimale laadstatus
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -130,7 +160,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  // Don't render children during redirect
+  // Render geen children tijdens redirect
   if (needsRedirect) {
     return null;
   }

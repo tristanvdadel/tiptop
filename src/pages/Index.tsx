@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import TipInput from '@/components/TipInput';
 import TipCard from '@/components/TipCard';
@@ -13,40 +14,44 @@ import { useNavigate } from 'react-router-dom';
 import { getUserTeamsSafe } from '@/services/teamService';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from "@/hooks/use-toast";
+import LoadingIndicator from '@/components/team/LoadingIndicator';
 
 const Index = () => {
   const { currentPeriod, refreshTeamData, addTip, updatePeriod } = useApp();
   const [hasTeam, setHasTeam] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [checkingTeam, setCheckingTeam] = useState(true);
   const [periodLoading, setPeriodLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   
+  // Check team membership optimized with useCallback for reuse 
   const checkTeamMembership = useCallback(async () => {
     try {
-      console.log('Index: Detailed Team Membership Check Starting');
-      setLoading(true);
+      console.log('Index: Team Membership Check Starting');
+      setCheckingTeam(true);
+      
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
         console.warn('Index: No active session found');
-        setLoading(false);
+        setCheckingTeam(false);
         return;
       }
       
-      console.log('Index: Session found for user:', session.user.id);
+      console.log('Index: Session found, checking teams');
       const teams = await getUserTeamsSafe(session.user.id);
       const userHasTeam = teams && teams.length > 0;
       
-      console.log(`Index: User belongs to ${teams.length} teams`);
+      console.log(`Index: User belongs to ${teams?.length || 0} teams`);
       setHasTeam(userHasTeam);
       
       if (userHasTeam) {
         console.log('Index: Refreshing team data');
         setPeriodLoading(true);
         try {
-          const refreshResult = await refreshTeamData();
-          console.log('Index: Team data refresh result:', refreshResult);
+          await refreshTeamData();
+          console.log('Index: Team data refreshed successfully');
         } catch (error) {
           console.error('Index: Team data refresh failed:', error);
           toast({
@@ -59,7 +64,7 @@ const Index = () => {
         }
       }
     } catch (err) {
-      console.error('Index: Comprehensive team membership check error:', err);
+      console.error('Index: Team membership check error:', err);
       setHasTeam(false);
       toast({
         title: "Fout",
@@ -67,40 +72,48 @@ const Index = () => {
         variant: "destructive"
       });
     } finally {
+      setCheckingTeam(false);
       setLoading(false);
     }
   }, [refreshTeamData, toast]);
   
+  // Initial data loading on mount
   useEffect(() => {
+    console.log('Index: Component mounted, checking team membership');
     checkTeamMembership();
   }, [checkTeamMembership]);
 
+  // Real-time updates setup with memoized channel refs
   useEffect(() => {
     if (!currentPeriod || !currentPeriod.id) {
       console.log('Index: No current period for real-time updates');
       return;
     }
 
-    console.log('Index: Setting up real-time tip updates for period:', currentPeriod.id);
+    console.log('Index: Setting up real-time updates for period:', currentPeriod.id);
     
+    // Create real-time subscription channels
     const tipChannel = supabase
-      .channel('real-time-tips')
+      .channel('real-time-tips-home')
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
+          event: '*',
           schema: 'public',
           table: 'tips',
           filter: `period_id=eq.${currentPeriod.id}`
         },
         (payload) => {
-          console.log('Real-time tip update received:', payload);
+          console.log('Index: Real-time tip update received');
           (async () => {
             try {
+              setPeriodLoading(true);
               await refreshTeamData();
               console.log('Index: Team data refreshed after real-time tip update');
             } catch (error) {
               console.error('Index: Error refreshing data after real-time tip update:', error);
+            } finally {
+              setPeriodLoading(false);
             }
           })();
         }
@@ -108,7 +121,7 @@ const Index = () => {
       .subscribe();
 
     const periodChannel = supabase
-      .channel('real-time-period')
+      .channel('real-time-period-home')
       .on(
         'postgres_changes',
         {
@@ -118,19 +131,23 @@ const Index = () => {
           filter: `id=eq.${currentPeriod.id}`
         },
         (payload) => {
-          console.log('Real-time period update received:', payload);
+          console.log('Index: Real-time period update received');
           (async () => {
             try {
+              setPeriodLoading(true);
               await refreshTeamData();
               console.log('Index: Team data refreshed after real-time period update');
             } catch (error) {
               console.error('Index: Error refreshing data after real-time period update:', error);
+            } finally {
+              setPeriodLoading(false);
             }
           })();
         }
       )
       .subscribe();
     
+    // Cleanup function to remove subscriptions
     return () => {
       console.log('Index: Cleaning up real-time subscriptions');
       supabase.removeChannel(tipChannel);
@@ -142,14 +159,12 @@ const Index = () => {
     return format(new Date(date), 'd MMMM yyyy', { locale: nl });
   };
   
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#9b87f5]"></div>
-      </div>
-    );
+  // Show main loading indicator while initial loading is in progress
+  if (checkingTeam) {
+    return <LoadingIndicator message="Gegevens laden..." description="We bereiden je dashboard voor" />;
   }
   
+  // Show empty state when user has no team
   if (!hasTeam) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] p-4">
@@ -171,7 +186,7 @@ const Index = () => {
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 gap-6">
         <div>
-          {periodLoading ? (
+          {loading || periodLoading ? (
             <div className="space-y-4">
               <Skeleton className="h-[220px] w-full rounded-md" />
               <Skeleton className="h-[180px] w-full rounded-md" />
@@ -190,7 +205,7 @@ const Index = () => {
           <h2 className="text-lg font-medium mb-4 flex items-center justify-between">
             <div>
               Recente fooi
-              {currentPeriod && !periodLoading && (
+              {currentPeriod && !loading && !periodLoading && (
                 <span className="text-sm font-normal text-muted-foreground ml-2">
                   {currentPeriod.name ? currentPeriod.name : `Periode ${formatPeriodDate(currentPeriod.startDate)}`}
                 </span>
@@ -198,7 +213,7 @@ const Index = () => {
             </div>
           </h2>
           
-          {periodLoading ? (
+          {loading || periodLoading ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
                 <Skeleton key={i} className="h-[80px] w-full rounded-md" />

@@ -14,6 +14,9 @@ import {
   TeamSettings,
   PeriodDuration,
   ClosingTime,
+  TipEntry,
+  HourRegistration,
+  PayoutData
 } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -22,15 +25,15 @@ import {
   saveTeamSettings
 } from '@/services/teamService';
 import {
-  fetchAllPeriods,
-  createPeriod,
+  fetchTeamPeriods as fetchAllPeriods,
+  savePeriod as createPeriod,
   updatePeriod as updatePeriodService,
   endPeriod as endPeriodService,
 } from '@/services/periodService';
 import {
   fetchAllTeamMembers,
-  createTeamMember,
-  updateTeamMember as updateTeamMemberService,
+  saveTeamMember as createTeamMember,
+  saveTeamMember as updateTeamMemberService,
   deleteTeamMember as deleteTeamMemberService,
 } from '@/services/teamMemberService';
 import {
@@ -43,6 +46,27 @@ import { useToast } from '@/hooks/use-toast';
 import { format, add, isWithinInterval, endOfWeek, endOfMonth } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { useTeamId } from '@/hooks/useTeamId';
+
+const fetchAllTeamMembers = async (teamId: string) => {
+  try {
+    console.log(`Fetching team members for team ${teamId}`);
+    
+    const data = await getTeamMembersSafe(teamId);
+    
+    const transformedMembers = data.map(member => ({
+      id: member.id,
+      name: member.profile?.first_name || `Member ${member.id.slice(0, 4)}`,
+      hourlyRate: 10, // Default hourly rate
+      balance: member.balance || 0,
+      hours: member.hours || 0,
+    }));
+    
+    return transformedMembers;
+  } catch (error) {
+    console.error('Error in fetchAllTeamMembers:', error);
+    return [];
+  }
+};
 
 interface AppContextType {
   periods: Period[];
@@ -83,10 +107,10 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export const useAppContext = () => {
+export const useApp = () => {
   const context = useContext(AppContext);
   if (!context) {
-    throw new Error('useAppContext must be used within an AppProvider');
+    throw new Error('useApp must be used within an AppProvider');
   }
   return context;
 };
@@ -138,7 +162,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       const payoutsData = await fetchAllPayouts(teamId);
       setPayouts(payoutsData);
 
-      // Fetch team settings
       const { data: teamSettingsData, error: teamSettingsError } = await supabase
         .from('team_settings')
         .select('*')
@@ -150,14 +173,26 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       } else {
         setTeamSettings(teamSettingsData || null);
 
-        // Initialize context state with settings from database
         if (teamSettingsData) {
           setPeriodDuration(teamSettingsData.period_duration);
           setAutoClosePeriods(teamSettingsData.auto_close_periods);
           setAlignWithCalendar(teamSettingsData.align_with_calendar);
+
+          let hourValue = 0;
+          let minuteValue = 0;
+
+          if (typeof teamSettingsData.closing_time === 'string') {
+            const [hour, minute] = teamSettingsData.closing_time.split(':');
+            hourValue = parseInt(hour);
+            minuteValue = parseInt(minute);
+          } else if (typeof teamSettingsData.closing_time === 'object') {
+            hourValue = teamSettingsData.closing_time.hour || 0;
+            minuteValue = teamSettingsData.closing_time.minute || 0;
+          }
+
           setClosingTime({
-            hour: parseInt(teamSettingsData.closing_time.split(':')[0]),
-            minute: parseInt(teamSettingsData.closing_time.split(':')[1]),
+            hour: hourValue,
+            minute: minuteValue,
           });
         }
       }
@@ -234,7 +269,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       timestamp: new Date().toISOString(),
     };
 
-    // Optimistically update the UI
     setCurrentPeriod((prevPeriod) => {
       if (!prevPeriod) return prevPeriod;
 
@@ -269,10 +303,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
 
     try {
-      const newTeamMember = await createTeamMember(teamId, {
-        name,
-        hourlyRate,
-      });
+      const newTeamMember = await createTeamMember(teamId, name, hourlyRate);
 
       setTeamMembers((prevTeamMembers) => [...prevTeamMembers, newTeamMember]);
     } catch (error) {
@@ -367,7 +398,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
 
     try {
-      // Save settings to the database
       const updatedSettings = await saveTeamSettings(teamId, {
         autoClosePeriods: settings.autoClosePeriods ?? autoClosePeriods,
         periodDuration: settings.periodDuration ?? periodDuration,
@@ -375,13 +405,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         closingTime: `${closingTime.hour}:${closingTime.minute}`,
       });
 
-      // Update local state
       setTeamSettings((prevSettings) => ({
         ...prevSettings,
         ...settings,
       }));
 
-      // Update context state if settings are being changed via UI
       if (settings.periodDuration) {
         setPeriodDuration(settings.periodDuration);
       }
@@ -436,13 +464,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         break;
     }
 
-    // Apply closing time
     autoCloseDate.setHours(closingTime.hour);
     autoCloseDate.setMinutes(closingTime.minute);
     autoCloseDate.setSeconds(0);
     autoCloseDate.setMilliseconds(0);
 
-    // If closing time is before 12:00, add one day
     if (closingTime.hour < 12) {
       autoCloseDate = add(autoCloseDate, { days: 1 });
     }
@@ -472,7 +498,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         const periodTotalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
         totalTips += periodTotalTips;
 
-        // Calculate hours for each team member in the period
         teamMembers.forEach((member) => {
           const hoursWorked = 8; // Aanname: 8 uur per dag
           totalHours += hoursWorked;
@@ -522,4 +547,17 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+};
+
+export {
+  Period,
+  TeamMember,
+  Tip,
+  Payout,
+  TeamSettings,
+  PeriodDuration,
+  ClosingTime,
+  TipEntry,
+  HourRegistration,
+  PayoutData,
 };

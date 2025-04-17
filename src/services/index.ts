@@ -10,6 +10,7 @@ export * from './teamMemberService';
 export { saveTeamMember as saveTeamMemberService } from './teamMemberService';
 
 export * from './payoutService';
+export { createPayout, updatePayout, deletePayout, fetchAllPayouts } from './payoutService';
 export * from './excelService';
 export * from './teamDataService';
 

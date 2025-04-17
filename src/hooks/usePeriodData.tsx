@@ -7,7 +7,7 @@ import { HistoricalPeriod } from './useHistoricalData';
 interface Period {
   id: string;
   startDate: string;
-  endDate: string | null;
+  endDate: string;
   isActive: boolean;
   isPaid: boolean;
   tips: Array<{ id: string; amount: number }>;

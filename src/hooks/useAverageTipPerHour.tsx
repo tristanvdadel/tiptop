@@ -54,7 +54,7 @@ export const useAverageTipPerHour = (
 
 export const getEmptyStateMessage = (periods: any[], teamMembers: TeamMember[]) => {
   const allPeriods = periods;
-  const periodsWithTips = allPeriods.some(period => period.tips.length > 0);
+  const periodsWithTips = allPeriods.some(period => period.tips && period.tips.length > 0);
   const teamHasHours = teamMembers.some(member => member.hours > 0 || member.hourRegistrations && member.hourRegistrations.length > 0);
   
   if (!periodsWithTips && !teamHasHours) {

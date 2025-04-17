@@ -13,6 +13,16 @@ export interface PeriodData {
   isPaid: boolean;
 }
 
+export interface HistoricalPeriod {
+  id: string;
+  startDate: string;
+  endDate: string;
+  isPaid: boolean;
+  averageTipPerHour?: number;
+  totalTips?: number;
+  totalHours?: number;
+}
+
 export interface DistributionData {
   memberId: string;
   amount: number;
@@ -129,9 +139,19 @@ export function useHistoricalData() {
     }
   }, [teamId, fetchHistoricalData]);
 
+  // Transform periodHistory to HistoricalPeriod format
+  const historicalData: HistoricalPeriod[] = periodHistory.map(period => ({
+    id: period.id,
+    startDate: period.startDate,
+    endDate: period.endDate,
+    isPaid: period.isPaid,
+    averageTipPerHour: period.averageTipPerHour
+  }));
+
   return {
     payoutHistory,
     periodHistory,
+    historicalData,
     loading,
     error,
     refreshData: fetchHistoricalData

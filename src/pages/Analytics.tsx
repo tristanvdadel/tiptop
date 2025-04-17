@@ -18,6 +18,17 @@ import { useHistoricalData } from '@/hooks/useHistoricalData';
 import { usePeriodData, useLineChartData, useChartConfig } from '@/hooks/usePeriodData';
 import { useAverageTipPerHour, getEmptyStateMessage } from '@/hooks/useAverageTipPerHour';
 
+// Need to create an adapter interface to match AppContext Period type with our Period type
+interface AdaptedPeriod {
+  id: string;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  isPaid: boolean;
+  tips: Array<{ id: string; amount: number }>;
+  averageTipPerHour?: number | null;
+}
+
 const Analytics = () => {
   const {
     periods,
@@ -68,7 +79,7 @@ const Analytics = () => {
   }, [teamId]);
   
   // Fetch historical data using custom hook
-  const { historicalData } = useHistoricalData(localTeamId || teamId);
+  const { historicalData, periodHistory, payoutHistory, loading, error, refreshData } = useHistoricalData();
   
   // Load team data
   useEffect(() => {
@@ -102,9 +113,20 @@ const Analytics = () => {
     loadData();
   }, [localTeamId, teamId, refreshTeamData]);
   
+  // Adapt periods from AppContext to match our expected format
+  const adaptedPeriods: AdaptedPeriod[] = periods.map(period => ({
+    id: period.id,
+    startDate: period.startDate,
+    endDate: period.endDate || '', // Ensure endDate is never null or undefined
+    isActive: period.isActive,
+    isPaid: period.isPaid,
+    tips: period.tips,
+    averageTipPerHour: period.averageTipPerHour
+  }));
+  
   // Process period data and averages
-  const averageTipPerHour = useAverageTipPerHour(calculateAverageTipPerHour, historicalData, teamMembers);
-  const periodData = usePeriodData(periods, historicalData, calculateAverageTipPerHour);
+  const averageTipPerHour = useAverageTipPerHour(calculateAverageTipPerHour, historicalData || [], teamMembers);
+  const periodData = usePeriodData(adaptedPeriods, historicalData || [], calculateAverageTipPerHour);
   const lineChartData = useLineChartData(periodData);
   const chartConfig = useChartConfig();
   
@@ -125,14 +147,14 @@ const Analytics = () => {
       });
   };
   
-  if (isLoading) {
+  if (isLoading || loading) {
     return <Loading />;
   }
   
   const effectiveTeamId = localTeamId || teamId;
   
-  if (hasError) {
-    return <ErrorCard type="error" message={errorMessage} onRetry={handleRetryLoading} />;
+  if (hasError || error) {
+    return <ErrorCard type="error" message={errorMessage || error || null} onRetry={handleRetryLoading} />;
   }
 
   if (!effectiveTeamId) {

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useTeamId } from '@/hooks/useTeamId';
 import { useToast } from '@/hooks/use-toast';
@@ -60,7 +59,7 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
     }
   }, [teamId]);
 
-  // Load team data with optimized caching
+  // Load team data with persistent caching
   const loadData = useCallback(async (forceRefresh = false) => {
     if (!teamId) {
       console.log("useCachedTeamData: No team ID found");
@@ -70,14 +69,16 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
     }
 
     const now = Date.now();
-    const cachedTimestamp = localStorage.getItem(`team_data_refresh_${teamId}`);
+    // Get the actual cached timestamp for this specific team
+    const cacheKey = `team_data_refresh_${teamId}`;
+    const cachedTimestamp = localStorage.getItem(cacheKey);
     const timeSinceLastRefresh = cachedTimestamp ? now - parseInt(cachedTimestamp) : Infinity;
     
-    // Always use cache if it's less than 10 seconds old, unless force refresh
-    const useCache = !forceRefresh && cachedTimestamp && timeSinceLastRefresh < 10000 && isInitialized;
+    // Only use cache if it's less than 1 minute old, unless force refresh
+    const useCache = !forceRefresh && cachedTimestamp && timeSinceLastRefresh < 60000 && isInitialized;
     
     if (useCache) {
-      console.log("useCachedTeamData: Using cached data (less than 10 seconds old)");
+      console.log(`useCachedTeamData: Using cached data for team ${teamId} (${Math.round(timeSinceLastRefresh/1000)}s old)`);
       return;
     }
     
@@ -97,21 +98,24 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
       
       if (teamChanged) {
         console.log("useCachedTeamData: Team ID changed, forcing full refresh");
-        localStorage.removeItem(`team_data_refresh_${lastTeamId}`);
+        localStorage.setItem('last_team_id', teamId);
       }
       
       // Add timeout to prevent hanging requests
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Data refresh timeout")), 10000);
+        setTimeout(() => reject(new Error("Data refresh timeout")), 15000);
       });
       
       try {
         // Race against timeout
         await Promise.race([refreshTeamData(), timeoutPromise]);
         
-        // Update cache timestamp and team ID
-        localStorage.setItem(`team_data_refresh_${teamId}`, now.toString());
+        // Successfully loaded data - update cache timestamp and team ID
+        localStorage.setItem(cacheKey, now.toString());
         localStorage.setItem('last_team_id', teamId);
+        
+        // Cache recent success to help with page refreshes
+        localStorage.setItem('recent_team_data_success', 'true');
         
         setLastRefreshTime(now);
         setIsInitialized(true);
@@ -139,12 +143,26 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
             setIsInitialized(true);
             resetErrors();
             console.log("useCachedTeamData: RPC fallback succeeded");
+            
+            // Save cache time even for RPC success
+            localStorage.setItem(cacheKey, now.toString());
             return;
           } else {
             // Both methods failed, show recursion alert
             setHasError(true);
             setErrorMessage("Database security probleem gedetecteerd. Klik op 'Beveiligingsprobleem Oplossen' om het probleem op te lossen.");
             setShowRecursionAlert(true);
+            
+            // Try one more time with a different method if we have a cached success
+            if (localStorage.getItem('recent_team_data_success') === 'true') {
+              setTimeout(() => {
+                console.log("useCachedTeamData: Trying one more recovery attempt using cached data");
+                localStorage.removeItem('recent_team_data_success');
+                
+                // Force reload of page with a special flag to try auto-recovery
+                window.location.href = `/team?recover=true&t=${Date.now()}`;
+              }, 3000);
+            }
           }
         } else {
           // Handle other errors
@@ -179,6 +197,7 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
     localStorage.removeItem('sb-auth-token-cached');
     localStorage.removeItem('last_team_id');
     localStorage.removeItem('login_attempt_time');
+    localStorage.removeItem('recent_team_data_success');
     
     // Clear team-specific cached data
     const teamDataKeys = Object.keys(localStorage).filter(
@@ -206,6 +225,24 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
     if (window.location.pathname === '/login' || 
         window.location.pathname === '/splash') {
       return;
+    }
+    
+    // Check URL for recovery attempt
+    const urlParams = new URLSearchParams(window.location.search);
+    const isRecoveryAttempt = urlParams.get('recover') === 'true';
+    
+    if (isRecoveryAttempt) {
+      console.log("useCachedTeamData: Recovery attempt detected, clearing problematic caches");
+      // Clear potential problematic cache but keep last_team_id
+      const teamId = localStorage.getItem('last_team_id');
+      localStorage.removeItem('sb-auth-token-cached');
+      
+      if (teamId) {
+        localStorage.removeItem(`team_data_refresh_${teamId}`);
+      }
+      
+      // Redirect to clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
     
     if (teamId && mounted && !isInitialized) {

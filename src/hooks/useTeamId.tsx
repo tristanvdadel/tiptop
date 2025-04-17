@@ -24,7 +24,7 @@ export const TeamIdProvider = ({ children }: { children: ReactNode }) => {
 
   // Fetch team ID if not available
   const fetchTeamId = useCallback(async () => {
-    // Check local storage first for immediate UI response
+    // Always check local storage first for immediate UI response
     const cachedTeamId = localStorage.getItem('last_team_id');
     if (cachedTeamId && !localTeamId) {
       console.log("TeamIdProvider: Using cached team ID:", cachedTeamId);
@@ -41,6 +41,7 @@ export const TeamIdProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       setError(null);
+      setLoading(true);
       
       console.log("TeamIdProvider: Fetching team ID from API");
       const { data: { session } } = await supabase.auth.getSession();
@@ -61,15 +62,38 @@ export const TeamIdProvider = ({ children }: { children: ReactNode }) => {
         // Cache the team ID for future use
         localStorage.setItem('last_team_id', teams[0].id);
         
+        // Additionally cache teams to save on future API calls
+        localStorage.setItem('user_teams', JSON.stringify(teams));
+        
         return teams[0].id;
       } else {
         console.log("TeamIdProvider: No teams found for user");
+        
+        // Try fallback to cached teams
+        const cachedTeams = localStorage.getItem('user_teams');
+        if (cachedTeams) {
+          const parsedTeams = JSON.parse(cachedTeams);
+          if (parsedTeams && parsedTeams.length > 0) {
+            console.log("TeamIdProvider: Using cached teams as fallback");
+            setLocalTeamId(parsedTeams[0].id);
+            localStorage.setItem('last_team_id', parsedTeams[0].id);
+            return parsedTeams[0].id;
+          }
+        }
+        
         setError("Geen teams gevonden");
         return null;
       }
     } catch (error) {
       console.error("Error fetching team ID:", error);
       setError("Fout bij ophalen team");
+      
+      // Try fallback to cached teams if API fails
+      if (cachedTeamId) {
+        console.log("TeamIdProvider: Using cached team ID despite API error");
+        return cachedTeamId;
+      }
+      
       return null;
     } finally {
       setLoading(false);

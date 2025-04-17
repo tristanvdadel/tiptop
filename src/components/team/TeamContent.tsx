@@ -12,6 +12,8 @@ import TipDistributionSection from '@/components/team/TipDistributionSection';
 import LoadingIndicator from '@/components/team/LoadingIndicator';
 import { useTeamRealtimeUpdates } from '@/hooks/useTeamRealtimeUpdates';
 import ErrorCard from '@/components/analytics/ErrorCard';
+import { useTeamId } from '@/hooks/useTeamId';
+import { useToast } from '@/hooks/use-toast';
 
 const TeamContent: React.FC = () => {
   const {
@@ -23,7 +25,7 @@ const TeamContent: React.FC = () => {
     refreshTeamData,
     updateTeamMemberName,
     periods,
-    teamId
+    teamId: contextTeamId
   } = useApp();
   
   const { 
@@ -39,24 +41,42 @@ const TeamContent: React.FC = () => {
     handleDatabaseRecursionError
   } = useTeam();
   
+  const { teamId, fetchTeamId } = useTeamId();
+  const { toast } = useToast();
   const navigate = useNavigate();
 
   // Set up real-time updates for periods and team members
-  useTeamRealtimeUpdates(teamId, periods, teamMembers, refreshTeamData);
+  useTeamRealtimeUpdates(teamId || contextTeamId, periods, teamMembers, refreshTeamData);
 
-  // Load team data on initial mount with optimizations and more robust error handling
+  // Load team data on initial mount with better team ID handling
   useEffect(() => {
     let isMounted = true;
     let checkTimer: ReturnType<typeof setTimeout>;
     
     const loadInitialData = async () => {
-      if (!teamId) {
-        console.error("TeamContent: No team ID found, cannot load data");
-        return;
+      const effectiveTeamId = teamId || contextTeamId;
+      
+      if (!effectiveTeamId) {
+        console.error("TeamContent: No team ID found, attempting to fetch it");
+        try {
+          const fetchedTeamId = await fetchTeamId();
+          if (!fetchedTeamId && isMounted) {
+            console.error("TeamContent: Could not fetch team ID");
+            toast({
+              title: "Geen team gevonden",
+              description: "Probeer opnieuw in te loggen of maak een nieuw team aan",
+              variant: "destructive"
+            });
+            return;
+          }
+        } catch (error) {
+          console.error("TeamContent: Error fetching team ID:", error);
+          return;
+        }
       }
       
       try {
-        console.log("TeamContent: Loading data for team:", teamId);
+        console.log("TeamContent: Loading data for team:", effectiveTeamId);
         await handleRefresh();
         if (isMounted) {
           console.log("TeamContent: Data loaded successfully");
@@ -85,7 +105,7 @@ const TeamContent: React.FC = () => {
     // Add automatic retry mechanism for data loading
     if (!dataInitialized && !loading) {
       const retryTimer = setTimeout(() => {
-        if (isMounted && !dataInitialized && teamId) {
+        if (isMounted && !dataInitialized) {
           console.log("TeamContent: Auto-retrying data load");
           loadInitialData();
         }
@@ -100,7 +120,7 @@ const TeamContent: React.FC = () => {
       isMounted = false;
       if (checkTimer) clearTimeout(checkTimer);
     };
-  }, [dataInitialized, handleRefresh, teamId, teamMembers, loading]);
+  }, [dataInitialized, handleRefresh, teamId, contextTeamId, teamMembers, loading, fetchTeamId, toast]);
 
   // Display appropriate loading or error states
   if (loading && !dataInitialized) {

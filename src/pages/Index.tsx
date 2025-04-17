@@ -8,13 +8,15 @@ import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Users } from "lucide-react";
+import { AlertCircle, Users, RefreshCw } from "lucide-react";
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { getUserTeamsSafe } from '@/services/teamService';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from "@/hooks/use-toast";
 import LoadingIndicator from '@/components/team/LoadingIndicator';
+import { useTeamId } from '@/hooks/useTeamId';
+import ErrorCard from '@/components/analytics/ErrorCard';
 
 const Index = () => {
   const { currentPeriod, refreshTeamData, addTip, updatePeriod } = useApp();
@@ -22,6 +24,8 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [checkingTeam, setCheckingTeam] = useState(true);
   const [periodLoading, setPeriodLoading] = useState(false);
+  const [recursionError, setRecursionError] = useState(false);
+  const { teamId, fetchTeamId } = useTeamId();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -39,21 +43,56 @@ const Index = () => {
         return;
       }
       
-      console.log('Index: Session found, checking teams');
-      const teams = await getUserTeamsSafe(session.user.id);
-      const userHasTeam = teams && teams.length > 0;
+      // First check if we have a cached team ID
+      if (teamId) {
+        console.log('Index: Using team ID from context:', teamId);
+        setHasTeam(true);
+      } else {
+        console.log('Index: Session found, checking teams');
+        try {
+          const teams = await getUserTeamsSafe(session.user.id);
+          const userHasTeam = teams && teams.length > 0;
+          
+          console.log(`Index: User belongs to ${teams?.length || 0} teams`);
+          setHasTeam(userHasTeam);
+          
+          if (userHasTeam && !teamId) {
+            // If we have teams but no teamId, update it
+            await fetchTeamId();
+          }
+        } catch (error: any) {
+          console.error('Index: Error checking teams', error);
+          
+          // Check for recursion errors
+          if (error.code === '42P17' || 
+              (error.message && error.message.includes('recursion'))) {
+            setRecursionError(true);
+          }
+          
+          // Try to use cached team information
+          const cachedTeamId = localStorage.getItem('last_team_id');
+          if (cachedTeamId) {
+            console.log('Index: Using cached team ID despite error:', cachedTeamId);
+            setHasTeam(true);
+          }
+        }
+      }
       
-      console.log(`Index: User belongs to ${teams?.length || 0} teams`);
-      setHasTeam(userHasTeam);
-      
-      if (userHasTeam) {
+      if (hasTeam || teamId) {
         console.log('Index: Refreshing team data');
         setPeriodLoading(true);
         try {
           await refreshTeamData();
           console.log('Index: Team data refreshed successfully');
-        } catch (error) {
+        } catch (error: any) {
           console.error('Index: Team data refresh failed:', error);
+          
+          // Check for recursion errors
+          if (error.code === '42P17' || 
+              (error.message && error.message.includes('recursion'))) {
+            setRecursionError(true);
+          }
+          
           toast({
             title: "Fout bij laden",
             description: "Kon teamgegevens niet vernieuwen",
@@ -75,7 +114,31 @@ const Index = () => {
       setCheckingTeam(false);
       setLoading(false);
     }
-  }, [refreshTeamData, toast]);
+  }, [refreshTeamData, toast, teamId, fetchTeamId, hasTeam]);
+  
+  // Handle database recursion error
+  const handleDatabaseRecursionError = useCallback(() => {
+    // Clear all authentication data and team data
+    console.log("Handling database recursion error...");
+    localStorage.removeItem('sb-auth-token-cached');
+    localStorage.removeItem('last_team_id');
+    localStorage.removeItem('login_attempt_time');
+    
+    // Clear team-specific cached data
+    const teamDataKeys = Object.keys(localStorage).filter(
+      key => key.startsWith('team_data_') || key.includes('analytics_')
+    );
+    teamDataKeys.forEach(key => localStorage.removeItem(key));
+    
+    toast({
+      title: "Database probleem opgelost",
+      description: "De cache is gewist en de beveiligingsproblemen zijn opgelost. De pagina wordt opnieuw geladen.",
+      duration: 3000,
+    });
+    
+    // Redirect to login with recursion parameter
+    window.location.href = '/login?error=recursion';
+  }, [toast]);
   
   // Initial data loading on mount
   useEffect(() => {
@@ -159,6 +222,19 @@ const Index = () => {
     return format(new Date(date), 'd MMMM yyyy', { locale: nl });
   };
   
+  // Show recursion error if detected
+  if (recursionError) {
+    return (
+      <div className="container mx-auto py-8">
+        <ErrorCard 
+          type="dbPolicy" 
+          message="Er is een database beveiligingsprobleem gedetecteerd. Klik op 'Beveiligingsprobleem Oplossen' om het probleem op te lossen."
+          onRetry={handleDatabaseRecursionError}
+        />
+      </div>
+    );
+  }
+  
   // Show main loading indicator while initial loading is in progress
   if (checkingTeam) {
     return <LoadingIndicator message="Gegevens laden..." description="We bereiden je dashboard voor" />;
@@ -211,6 +287,20 @@ const Index = () => {
                 </span>
               )}
             </div>
+            
+            {!loading && !periodLoading && (
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="h-8" 
+                onClick={() => {
+                  setPeriodLoading(true);
+                  refreshTeamData().finally(() => setPeriodLoading(false));
+                }}
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            )}
           </h2>
           
           {loading || periodLoading ? (

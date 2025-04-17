@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { TeamMember } from '@/contexts/AppContext';
+import { saveTeamMember as saveSupabaseTeamMember } from './supabase/teamMemberService';
 
 /**
  * Saves a team member and their hour registrations to the database
@@ -78,8 +79,13 @@ export const saveTeamMember = async (teamId: string, member: TeamMember) => {
       return newMember;
     }
     
-    // For existing members, update details
-    console.log(`Updating existing team member ${name} (ID: ${id})`);
+    // For existing members with user_id, use the supabase service
+    if (existingMember.user_id) {
+      return saveSupabaseTeamMember(teamId, member);
+    }
+    
+    // For existing members without user_id (local members), update directly
+    console.log(`Updating existing local team member ${name} (ID: ${id})`);
     const { data: updatedMember, error: memberError } = await supabase
       .from('team_members')
       .update({

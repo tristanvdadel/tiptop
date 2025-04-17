@@ -19,4 +19,4 @@ export {
   saveTeamMember as saveTeamMemberToSupabase,
   savePayout as savePayoutToSupabase,
   saveTeamSettings as saveTeamSettingsToSupabase
-} from './supabaseService';
+} from './supabase';

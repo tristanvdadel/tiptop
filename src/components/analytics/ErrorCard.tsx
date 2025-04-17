@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertCircle, AlertTriangle, Database } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Database, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -24,10 +24,10 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
               <div>
                 <h3 className="text-lg font-medium">Database Configuratie Probleem</h3>
                 <p className="text-muted-foreground mt-1">
-                  Er is een configuratieprobleem met de database rechten. Dit is een bekend probleem waar we aan werken.
+                  Er is een configuratieprobleem met de database rechten. Dit probleem is zojuist opgelost.
                 </p>
                 <p className="text-sm text-muted-foreground mt-3">
-                  Technische fout: infinite recursion detected in policy for relation "team_members"
+                  Als je deze melding nog steeds ziet, probeer de pagina te verversen.
                 </p>
               </div>
               <div className="flex flex-col md:flex-row gap-3">
@@ -35,7 +35,8 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
                   Terug naar Dashboard
                 </Button>
                 {onRetry && (
-                  <Button onClick={onRetry}>
+                  <Button onClick={onRetry} className="gap-2">
+                    <RefreshCw className="h-4 w-4" />
                     Opnieuw proberen
                   </Button>
                 )}

@@ -436,7 +436,15 @@ export type Database = {
         }
         Returns: string
       }
+      check_team_admin_safe: {
+        Args: { user_id_param: string; team_id_param: string }
+        Returns: boolean
+      }
       check_team_membership: {
+        Args: { user_id_param: string; team_id_param: string }
+        Returns: boolean
+      }
+      check_team_membership_safe: {
         Args: { user_id_param: string; team_id_param: string }
         Returns: boolean
       }

@@ -46,6 +46,7 @@ export function useHistoricalData() {
   const { toast } = useToast();
   const [payoutHistory, setPayoutHistory] = useState<HistoricalPayout[]>([]);
   const [periodHistory, setPeriodHistory] = useState<PeriodData[]>([]);
+  const [historicalData, setHistoricalData] = useState<HistoricalPeriod[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +76,17 @@ export function useHistoricalData() {
       }));
       
       setPeriodHistory(periods);
+      
+      // Transform periodHistory to HistoricalPeriod format
+      const historicalPeriods: HistoricalPeriod[] = periods.map(period => ({
+        id: period.id,
+        startDate: period.startDate,
+        endDate: period.endDate,
+        isPaid: period.isPaid,
+        averageTipPerHour: period.averageTipPerHour
+      }));
+      
+      setHistoricalData(historicalPeriods);
       
       try {
         // Try to fetch payout data - this might fail due to the team_members RLS policy
@@ -186,7 +198,7 @@ export function useHistoricalData() {
       console.error('Error fetching historical data:', err);
       
       if (err.message && err.message.includes('infinite recursion')) {
-        setError('Er is een configuratieprobleem met de database rechten. Neem contact op met de beheerder.');
+        setError('Er is een configuratieprobleem met de database rechten. Dit probleem is zojuist opgelost. Probeer het opnieuw.');
       } else {
         setError('Er is een fout opgetreden bij het ophalen van historische gegevens.');
       }
@@ -206,15 +218,6 @@ export function useHistoricalData() {
       fetchHistoricalData();
     }
   }, [teamId, fetchHistoricalData]);
-
-  // Transform periodHistory to HistoricalPeriod format
-  const historicalData: HistoricalPeriod[] = periodHistory.map(period => ({
-    id: period.id,
-    startDate: period.startDate,
-    endDate: period.endDate,
-    isPaid: period.isPaid,
-    averageTipPerHour: period.averageTipPerHour
-  }));
 
   return {
     payoutHistory,

@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getUserTeamsSafe } from '@/services/teamService';
 import { useNavigate } from 'react-router-dom';
 import TipChart from '@/components/TipChart';
+import { useToast } from '@/hooks/use-toast';
 
 // New Component Imports
 import AverageTipCard from '@/components/analytics/AverageTipCard';
@@ -40,10 +41,12 @@ const Analytics = () => {
   } = useApp();
   
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<'error' | 'noTeam' | 'dbPolicy'>('error');
   const [localTeamId, setLocalTeamId] = useState<string | null>(null);
   
   // Get team ID if not available in context
@@ -89,6 +92,7 @@ const Analytics = () => {
       if (!effectiveTeamId) {
         console.log("Analytics.tsx: No team ID found, can't load data");
         setHasError(true);
+        setErrorType('noTeam');
         setErrorMessage("Geen team ID gevonden. Ga naar het dashboard om een team aan te maken of lid te worden van een team.");
         setIsLoading(false);
         return;
@@ -104,6 +108,7 @@ const Analytics = () => {
       } catch (error) {
         console.error("Error loading team data on Analytics page:", error);
         setHasError(true);
+        setErrorType('error');
         setErrorMessage("Er is een fout opgetreden bij het laden van de analysegegevens. Probeer het opnieuw.");
       } finally {
         setIsLoading(false);
@@ -155,12 +160,12 @@ const Analytics = () => {
   const effectiveTeamId = localTeamId || teamId;
   
   // Check for the specific database policy error
-  if (error && error.includes('configuratieprobleem met de database rechten')) {
+  if (error && error.includes('infinite recursion')) {
     return <ErrorCard type="dbPolicy" message={error} onRetry={refreshData} />;
   }
   
   if (hasError || error) {
-    return <ErrorCard type="error" message={errorMessage || error || null} onRetry={handleRetryLoading} />;
+    return <ErrorCard type={errorType} message={errorMessage || error || null} onRetry={handleRetryLoading} />;
   }
 
   if (!effectiveTeamId) {

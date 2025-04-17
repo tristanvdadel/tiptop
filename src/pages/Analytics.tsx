@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -125,9 +126,10 @@ const Analytics = () => {
           return;
         }
         
+        // Fetch payout distributions, but don't try to get 'hours' column that doesn't exist
         const { data: payoutDistributionsData, error: distributionsError } = await supabase
           .from('payout_distributions')
-          .select('payout_id, team_member_id, amount, actual_amount, balance, hours')
+          .select('payout_id, team_member_id, amount, actual_amount, balance')
           .in('payout_id', payoutIds);
           
         if (distributionsError) {
@@ -152,12 +154,41 @@ const Analytics = () => {
           payoutDistributionsData.forEach(item => {
             if (!payoutDistributions[item.payout_id]) {
               payoutDistributions[item.payout_id] = [];
-              payoutTotalHours[item.payout_id] = 0;
             }
             payoutDistributions[item.payout_id].push(item);
-            if (item.hours) {
-              payoutTotalHours[item.payout_id] += Number(item.hours);
+          });
+        }
+        
+        // Get hour registrations to calculate total hours
+        const { data: hourRegistrationsData, error: hoursError } = await supabase
+          .from('hour_registrations')
+          .select('team_member_id, hours')
+          .in('team_member_id', payoutDistributionsData.map(d => d.team_member_id).filter((id, idx, arr) => arr.indexOf(id) === idx));
+        
+        if (hoursError) {
+          console.error("Analytics.tsx: Error fetching hour registrations:", hoursError);
+        }
+        
+        // Calculate total hours for each payout from hour registrations
+        if (hourRegistrationsData && hourRegistrationsData.length > 0) {
+          const memberHours = {};
+          
+          // Sum up hours by team member
+          hourRegistrationsData.forEach(reg => {
+            if (!memberHours[reg.team_member_id]) {
+              memberHours[reg.team_member_id] = 0;
             }
+            memberHours[reg.team_member_id] += Number(reg.hours || 0);
+          });
+          
+          // Calculate total hours for each payout
+          Object.keys(payoutDistributions).forEach(payoutId => {
+            const distributions = payoutDistributions[payoutId];
+            const totalHours = distributions.reduce((sum, dist) => {
+              return sum + (memberHours[dist.team_member_id] || 0);
+            }, 0);
+            
+            payoutTotalHours[payoutId] = totalHours;
           });
         }
         

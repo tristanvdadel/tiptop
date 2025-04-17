@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
@@ -198,7 +199,7 @@ const TeamContent: React.FC = () => {
       <div className="pb-16">
         <TeamHeader />
         {lastError && lastError.includes('recursion') && (
-          <Alert variant="warning" className="mb-4">
+          <Alert variant="destructive" className="mb-4">
             <AlertTriangle className="h-4 w-4 mr-2" />
             <AlertDescription>
               Er is een probleem met de database beveiliging gedetecteerd. Dit is opgelost, maar als je nog steeds problemen ervaart,
@@ -235,7 +236,7 @@ const TeamContent: React.FC = () => {
       <TeamHeader />
       
       {lastError && lastError.includes('recursion') && (
-        <Alert variant="warning" className="mb-4">
+        <Alert variant="destructive" className="mb-4">
           <AlertTriangle className="h-4 w-4 mr-2" />
           <AlertDescription>
             Er is een probleem met de database beveiliging gedetecteerd. Dit is opgelost, maar als je nog steeds problemen ervaart,

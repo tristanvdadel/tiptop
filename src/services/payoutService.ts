@@ -2,6 +2,26 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Payout, PayoutData } from '@/types';
 
+export const debounce = <F extends (...args: any[]) => any>(
+  func: F,
+  waitFor: number
+) => {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
+  return (...args: Parameters<F>): Promise<ReturnType<F>> => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+
+    return new Promise(resolve => {
+      timeout = setTimeout(() => {
+        const result = func(...args);
+        resolve(result);
+      }, waitFor);
+    });
+  };
+};
+
 export const fetchAllPayouts = async (teamId: string): Promise<Payout[]> => {
   try {
     const { data, error } = await supabase

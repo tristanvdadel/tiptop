@@ -10,6 +10,7 @@ export interface Period {
   averageTipPerHour?: number;
   autoCloseDate?: string;
   isActive?: boolean; // Added for compatibility with API responses
+  notes?: string; // Add notes property to the Period interface
 }
 
 export interface TeamMember {
@@ -64,7 +65,7 @@ export interface TeamSettings {
   autoClosePeriods: boolean;
   periodDuration: PeriodDuration;
   alignWithCalendar: boolean;
-  closingTime: string;
+  closingTime: ClosingTime;
 }
 
 export type PeriodDuration = 'day' | 'week' | 'month';
@@ -98,4 +99,62 @@ export interface HourRegistration {
   teamMemberId: string;
   hours: number;
   processed: boolean;
+}
+
+// Additional types needed for App Context
+export interface AppContextType {
+  periods: Period[];
+  currentPeriod: Period | null;
+  teamMembers: TeamMember[];
+  payouts: Payout[];
+  teamSettings: TeamSettings | null;
+  periodDuration: PeriodDuration;
+  setPeriodDuration: (duration: PeriodDuration) => void;
+  autoClosePeriods: boolean;
+  setAutoClosePeriods: (autoClose: boolean) => void;
+  alignWithCalendar: boolean;
+  setAlignWithCalendar: (align: boolean) => void;
+  closingTime: ClosingTime;
+  setClosingTime: (time: ClosingTime) => void;
+  getFormattedClosingTime: () => string;
+  fetchData: () => Promise<void>;
+  startNewPeriod: () => Promise<void>;
+  endCurrentPeriod: () => Promise<void>;
+  createTip: (amount: number, teamMemberId: string) => Promise<void>;
+  updatePeriod: (periodId: string, updates: Partial<Period>) => Promise<void>;
+  createTeamMember: (name: string, hourlyRate: number) => Promise<void>;
+  updateTeamMember: (teamMemberId: string, updates: Partial<TeamMember>) => Promise<void>;
+  deleteTeamMember: (teamMemberId: string) => Promise<void>;
+  createPayout: (periodId: string, teamMemberId: string, amount: number) => Promise<void>;
+  updatePayout: (payoutId: string, updates: Partial<Payout>) => Promise<void>;
+  deletePayout: (payoutId: string) => Promise<void>;
+  saveTeamSettings: (settings: Partial<TeamSettings>) => Promise<void>;
+  hasReachedPeriodLimit: () => boolean;
+  calculateAutoCloseDate: (startDate: string, duration: PeriodDuration) => string;
+  getNextAutoCloseDate: () => string | null;
+  scheduleAutoClose: (autoCloseDate: string) => void;
+  calculateAverageTipPerHour: () => number;
+  addTip: (amount: number, note?: string, date?: string) => void;
+  updateTip: (periodId: string, tipId: string, amount: number, note?: string, date?: string) => void;
+  deleteTip: (periodId: string, tipId: string) => void;
+  
+  // Additional properties used in components
+  isLoading?: boolean;
+  error?: Error | null;
+  teamId?: string;
+  refreshTeamData?: () => Promise<void>;
+  addTeamMember?: (name: string) => void;
+  removeTeamMember?: (id: string) => void;
+  updateTeamMemberHours?: (id: string, hours: number) => void;
+  deleteHourRegistration?: (memberId: string, registrationId: string) => void;
+  updateTeamMemberName?: (id: string, name: string) => boolean;
+  calculateTipDistribution?: (periodIds: string[]) => TeamMember[];
+  markPeriodsAsPaid?: (periodIds: string[], distribution: DistributionData[], totalHours: number) => void;
+  getUnpaidPeriodsCount?: () => number;
+  deletePaidPeriods?: () => Promise<void>;
+  deletePeriod?: (periodId: string) => Promise<void>;
+  mostRecentPayout?: Payout | null;
+  updateTeamMemberBalance?: (teamMemberId: string, balance: number) => void;
+  clearTeamMemberHours?: (teamMemberId: string) => void;
+  setMostRecentPayout?: (payout: Payout) => void;
 }

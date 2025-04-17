@@ -116,6 +116,29 @@ const PayoutSummary = ({
 
   const saveChanges = () => {
     if (!latestPayout || !editedDistribution.length) return;
+    
+    const memberHoursMap = {};
+    let totalHours = 0;
+    
+    teamMembers.forEach(member => {
+      if (member.hours > 0) {
+        memberHoursMap[member.id] = member.hours;
+        totalHours += member.hours;
+      }
+    });
+    
+    const updatedDistribution = editedDistribution.map(item => {
+      const memberHours = memberHoursMap[item.memberId] || 0;
+      
+      return {
+        memberId: item.memberId,
+        amount: item.amount,
+        actualAmount: item.actualAmount,
+        balance: item.balance,
+        hours: memberHours
+      };
+    });
+    
     editedDistribution.forEach(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
       if (member) {
@@ -123,24 +146,23 @@ const PayoutSummary = ({
         clearTeamMemberHours(item.memberId);
       }
     });
-    const updatedDistribution = editedDistribution.map(item => ({
-      memberId: item.memberId,
-      amount: item.amount,
-      actualAmount: item.actualAmount,
-      balance: latestPayout.distribution.find(d => d.memberId === item.memberId)?.balance || 0
-    }));
+    
     const updatedPayout = {
       ...latestPayout,
-      distribution: updatedDistribution
+      distribution: updatedDistribution,
+      totalHours: totalHours
     };
+    
     setMostRecentPayout(updatedPayout);
     setIsEditing(false);
     setBalancesUpdated(true);
+    
     toast({
       title: "Gefeliciteerd!",
       description: "De uitbetaling is voltooid. De saldo's zijn opgeslagen. Je kan de uitbetaling terugvinden in de geschiedenis.",
       variant: "default"
     });
+    
     setTimeout(() => {
       navigate('/');
     }, 1500);

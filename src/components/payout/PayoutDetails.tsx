@@ -11,14 +11,14 @@ interface PayoutDetailItem {
   amount: number;
   actualAmount?: number;
   balance?: number;
-  hours?: number; // Nieuwe eigenschap om uren op te slaan
+  hours?: number; // Property to store hours
 }
 
 export interface PayoutData {
   id: string;
   date: string;
   totalAmount: number;
-  totalHours?: number; // Nieuwe eigenschap om totale uren op te slaan
+  totalHours?: number; // Property to store total hours
   distribution: PayoutDetailItem[];
 }
 
@@ -34,11 +34,11 @@ const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDe
   const { teamMembers } = useApp();
   
   useEffect(() => {
-    // Bereken het gemiddelde fooi per uur
+    // Calculate the average tip per hour
     if (totalHours && totalHours > 0 && totalTips && totalTips > 0) {
       setHourlyRate(totalTips / totalHours);
     } else if (payout?.totalHours && payout.totalHours > 0 && payout?.totalAmount) {
-      // Als we een payout gebruiken en het heeft uren, bereken dan ook
+      // If we're using a payout and it has hours, calculate from that
       setHourlyRate(payout.totalAmount / payout.totalHours);
     } else {
       setHourlyRate(0);
@@ -54,7 +54,7 @@ const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDe
       return {
         id: item.memberId,
         name: teamMember?.name || 'Onbekend lid',
-        hours: item.hours || 0, // Gebruik uren uit de uitbetaling als beschikbaar
+        hours: item.hours || 0, // Use hours from the payout if available
         tipAmount: item.amount,
         balance: item.balance || 0
       } as TeamMember;

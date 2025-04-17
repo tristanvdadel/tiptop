@@ -194,7 +194,7 @@ export const saveTeamMember = async (teamId: string, member: TeamMember) => {
 export const savePayout = async (teamId: string, payout: PayoutData) => {
   try {
     console.log(`Saving payout ${payout.id} for team ${teamId}`);
-    const { id, date, payerName, payoutTime, distribution, periodIds } = payout;
+    const { id, date, payerName, payoutTime, distribution, periodIds, totalHours } = payout;
     
     // First insert or update the payout
     const { data: updatedPayout, error: payoutError } = await supabase
@@ -204,7 +204,8 @@ export const savePayout = async (teamId: string, payout: PayoutData) => {
         team_id: teamId,
         date,
         payer_name: payerName,
-        payout_time: payoutTime
+        payout_time: payoutTime,
+        total_hours: totalHours // Save the total hours in the payout
       })
       .select()
       .single();
@@ -227,7 +228,7 @@ export const savePayout = async (teamId: string, payout: PayoutData) => {
         throw deleteDistError;
       }
       
-      // Insert new distributions
+      // Insert new distributions with hours data
       const { error: insertDistError } = await supabase
         .from('payout_distributions')
         .insert(distribution.map(dist => ({
@@ -235,7 +236,8 @@ export const savePayout = async (teamId: string, payout: PayoutData) => {
           team_member_id: dist.memberId,
           amount: dist.amount,
           actual_amount: dist.actualAmount,
-          balance: dist.balance
+          balance: dist.balance,
+          hours: dist.hours // Save the hours for each team member
         })));
       
       if (insertDistError) {

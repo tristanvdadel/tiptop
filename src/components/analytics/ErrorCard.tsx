@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertCircle, AlertTriangle, Database, RefreshCw, Home } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Database, RefreshCw, Home, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -22,12 +22,12 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
             <div className="flex flex-col items-center justify-center text-center space-y-4">
               <Database className="h-10 w-10 text-amber-500" />
               <div>
-                <h3 className="text-lg font-medium">Database Configuratie Probleem</h3>
+                <h3 className="text-lg font-medium">Database Synchronisatie Probleem</h3>
                 <p className="text-muted-foreground mt-1">
-                  {message || "Er is een tijdelijk probleem met de database rechten. Probeer het later opnieuw."}
+                  {message || "Er is een tijdelijk probleem met de database synchronisatie. Probeer de pagina te verversen."}
                 </p>
                 <p className="text-sm text-muted-foreground mt-3">
-                  We werken aan een oplossing. Probeer de pagina na een paar minuten te verversen.
+                  Dit kan worden veroorzaakt door recente wijzigingen. De app zal automatisch proberen te herstellen.
                 </p>
               </div>
               <div className="flex flex-col md:flex-row gap-3">
@@ -38,7 +38,7 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
                 {onRetry && (
                   <Button onClick={onRetry} className="gap-2 bg-amber-500 hover:bg-amber-600">
                     <RefreshCw className="h-4 w-4" />
-                    Opnieuw proberen
+                    Gegevens Verversen
                   </Button>
                 )}
               </div>
@@ -59,17 +59,22 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
               <div>
                 <h3 className="text-lg font-medium">Fout bij laden</h3>
                 <p className="text-muted-foreground mt-1">{message || "Er is een fout opgetreden bij het laden van de analysegegevens."}</p>
+                <p className="text-sm text-muted-foreground mt-3">
+                  Als dit probleem blijft optreden, probeer dan uit te loggen en opnieuw in te loggen.
+                </p>
               </div>
-              {onRetry && (
-                <Button onClick={onRetry} className="gap-2">
-                  <RefreshCw className="h-4 w-4" />
-                  Opnieuw proberen
+              <div className="flex flex-col sm:flex-row gap-3">
+                {onRetry && (
+                  <Button onClick={onRetry} className="gap-2">
+                    <RefreshCw className="h-4 w-4" />
+                    Opnieuw proberen
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => navigate('/')}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Terug naar Dashboard
                 </Button>
-              )}
-              <Button variant="outline" onClick={() => navigate('/')}>
-                <Home className="h-4 w-4 mr-2" />
-                Terug naar Dashboard
-              </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -86,6 +91,9 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
             <div>
               <h3 className="text-lg font-medium">Geen team gevonden</h3>
               <p className="text-muted-foreground mt-1">{message || "Je moet eerst een team aanmaken of lid worden van een team voordat je analyses kunt bekijken."}</p>
+              <p className="text-sm text-muted-foreground mt-3">
+                Ga naar Teambeheer om een team aan te maken of lid te worden van een bestaand team.
+              </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <Button onClick={() => navigate('/management')} className="bg-amber-500 hover:bg-amber-600">
@@ -94,7 +102,7 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
               {onRetry && (
                 <Button variant="outline" onClick={onRetry} className="gap-2">
                   <RefreshCw className="h-4 w-4" />
-                  Verversen
+                  Gegevens Verversen
                 </Button>
               )}
             </div>

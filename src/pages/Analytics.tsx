@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Skeleton } from "@/components/ui/skeleton"
@@ -16,6 +17,7 @@ import { Bar } from 'react-chartjs-2';
 import PeriodList from '@/components/analytics/PeriodList';
 import ErrorCard from '@/components/ErrorCard';
 
+// Register ChartJS components
 ChartJS.register(
   CategoryScale,
   LinearScale,

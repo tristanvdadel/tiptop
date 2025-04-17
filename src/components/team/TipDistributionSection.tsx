@@ -14,8 +14,8 @@ const TipDistributionSection: React.FC = () => {
     return selectedPeriods.some(periodId => {
       // Find if any period is among the paid periods in the team context
       const isPaid = distribution.some(member => {
-        // Check if this member has this period marked as paid through another property
-        return member.paidPeriodsIds?.includes(periodId);
+        // Check if this member has this period marked as paid
+        return member.paidPeriods?.includes(periodId);
       });
       return isPaid;
     });

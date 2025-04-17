@@ -56,50 +56,7 @@ export function useHistoricalData() {
     setError(null);
     
     try {
-      // Haal uitbetalingsgegevens op
-      const { data: payoutData, error: payoutError } = await supabase
-        .from('payouts')
-        .select('id, date, payout_time, payer_name, total_hours')
-        .eq('team_id', teamId)
-        .order('date', { ascending: false });
-      
-      if (payoutError) throw payoutError;
-      
-      const payouts = await Promise.all(payoutData.map(async (payout) => {
-        // Haal periodes voor elke uitbetaling op
-        const { data: periodLinks, error: periodLinksError } = await supabase
-          .from('payout_periods')
-          .select('period_id')
-          .eq('payout_id', payout.id);
-        
-        if (periodLinksError) throw periodLinksError;
-        
-        // Haal verdelingsinformatie voor elke uitbetaling op
-        const { data: distributionData, error: distributionError } = await supabase
-          .from('payout_distributions')
-          .select('team_member_id, amount, actual_amount, balance, hours')
-          .eq('payout_id', payout.id);
-        
-        if (distributionError) throw distributionError;
-        
-        return {
-          id: payout.id,
-          date: payout.date,
-          payoutTime: payout.payout_time,
-          payerName: payout.payer_name,
-          totalHours: payout.total_hours || 0,
-          periodIds: periodLinks.map(p => p.period_id),
-          distribution: distributionData.map(d => ({
-            memberId: d.team_member_id,
-            amount: d.amount,
-            actualAmount: d.actual_amount,
-            balance: d.balance,
-            hours: d.hours || 0
-          }))
-        };
-      }));
-      
-      // Haal periodegegevens op
+      // Fetch period data first since it's less likely to have permission issues
       const { data: periodData, error: periodError } = await supabase
         .from('periods')
         .select('id, name, start_date, end_date, is_paid, average_tip_per_hour')
@@ -117,12 +74,123 @@ export function useHistoricalData() {
         averageTipPerHour: period.average_tip_per_hour
       }));
       
-      setPayoutHistory(payouts);
       setPeriodHistory(periods);
+      
+      try {
+        // Try to fetch payout data - this might fail due to the team_members RLS policy
+        const { data: payoutData, error: payoutError } = await supabase
+          .from('payouts')
+          .select('id, date, payout_time, payer_name, total_hours')
+          .eq('team_id', teamId)
+          .order('date', { ascending: false });
+        
+        if (payoutError) {
+          console.error('Error fetching payouts:', payoutError);
+          // Don't throw the error here, just handle it gracefully
+          setPayoutHistory([]);
+        } else {
+          const payouts = await Promise.all(payoutData.map(async (payout) => {
+            try {
+              // Try to fetch period links for each payout
+              const { data: periodLinks, error: periodLinksError } = await supabase
+                .from('payout_periods')
+                .select('period_id')
+                .eq('payout_id', payout.id);
+              
+              if (periodLinksError) {
+                console.error('Error fetching period links:', periodLinksError);
+                return {
+                  id: payout.id,
+                  date: payout.date,
+                  payoutTime: payout.payout_time,
+                  payerName: payout.payer_name,
+                  totalHours: payout.total_hours || 0,
+                  periodIds: [],
+                  distribution: []
+                };
+              }
+              
+              try {
+                // Try to fetch distribution data for each payout
+                const { data: distributionData, error: distributionError } = await supabase
+                  .from('payout_distributions')
+                  .select('team_member_id, amount, actual_amount, balance, hours')
+                  .eq('payout_id', payout.id);
+                
+                if (distributionError) {
+                  console.error('Error fetching distributions:', distributionError);
+                  return {
+                    id: payout.id,
+                    date: payout.date,
+                    payoutTime: payout.payout_time,
+                    payerName: payout.payer_name,
+                    totalHours: payout.total_hours || 0,
+                    periodIds: periodLinks.map(p => p.period_id),
+                    distribution: []
+                  };
+                }
+                
+                return {
+                  id: payout.id,
+                  date: payout.date,
+                  payoutTime: payout.payout_time,
+                  payerName: payout.payer_name,
+                  totalHours: payout.total_hours || 0,
+                  periodIds: periodLinks.map(p => p.period_id),
+                  distribution: distributionData.map(d => ({
+                    memberId: d.team_member_id,
+                    amount: d.amount,
+                    actualAmount: d.actual_amount,
+                    balance: d.balance,
+                    hours: d.hours || 0
+                  }))
+                };
+              } catch (error) {
+                // Handle any unexpected errors in distribution data fetching
+                console.error('Unexpected error fetching distributions:', error);
+                return {
+                  id: payout.id,
+                  date: payout.date,
+                  payoutTime: payout.payout_time,
+                  payerName: payout.payer_name,
+                  totalHours: payout.total_hours || 0,
+                  periodIds: periodLinks.map(p => p.period_id),
+                  distribution: []
+                };
+              }
+            } catch (error) {
+              // Handle any unexpected errors in period links fetching
+              console.error('Unexpected error fetching period links:', error);
+              return {
+                id: payout.id,
+                date: payout.date,
+                payoutTime: payout.payout_time,
+                payerName: payout.payer_name,
+                totalHours: payout.total_hours || 0,
+                periodIds: [],
+                distribution: []
+              };
+            }
+          }));
+          
+          setPayoutHistory(payouts);
+        }
+      } catch (payoutsError) {
+        console.error('Error processing payouts:', payoutsError);
+        // Just set empty payouts and continue
+        setPayoutHistory([]);
+      }
+      
       setLoading(false);
     } catch (err: any) {
       console.error('Error fetching historical data:', err);
-      setError('Er is een fout opgetreden bij het ophalen van historische gegevens.');
+      
+      if (err.message && err.message.includes('infinite recursion')) {
+        setError('Er is een configuratieprobleem met de database rechten. Neem contact op met de beheerder.');
+      } else {
+        setError('Er is een fout opgetreden bij het ophalen van historische gegevens.');
+      }
+      
       setLoading(false);
       
       toast({

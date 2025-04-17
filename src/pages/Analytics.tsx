@@ -136,6 +136,7 @@ const Analytics = () => {
       .then(() => {
         setHasError(false);
         setErrorMessage(null);
+        refreshData(); // Also refresh historical data
       })
       .catch(error => {
         console.error("Error retrying data load:", error);
@@ -152,6 +153,11 @@ const Analytics = () => {
   }
   
   const effectiveTeamId = localTeamId || teamId;
+  
+  // Check for the specific database policy error
+  if (error && error.includes('configuratieprobleem met de database rechten')) {
+    return <ErrorCard type="dbPolicy" message={error} onRetry={refreshData} />;
+  }
   
   if (hasError || error) {
     return <ErrorCard type="error" message={errorMessage || error || null} onRetry={handleRetryLoading} />;

@@ -33,7 +33,7 @@ import {
 import {
   fetchAllTeamMembers,
   saveTeamMember as createTeamMember,
-  saveTeamMember as updateTeamMemberService,
+  updateTeamMember as updateTeamMemberService,
   deleteTeamMember as deleteTeamMemberService,
 } from '@/services/teamMemberService';
 import {
@@ -46,27 +46,6 @@ import { useToast } from '@/hooks/use-toast';
 import { format, add, isWithinInterval, endOfWeek, endOfMonth } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { useTeamId } from '@/hooks/useTeamId';
-
-const fetchAllTeamMembers = async (teamId: string) => {
-  try {
-    console.log(`Fetching team members for team ${teamId}`);
-    
-    const data = await getTeamMembersSafe(teamId);
-    
-    const transformedMembers = data.map(member => ({
-      id: member.id,
-      name: member.profile?.first_name || `Member ${member.id.slice(0, 4)}`,
-      hourlyRate: 10, // Default hourly rate
-      balance: member.balance || 0,
-      hours: member.hours || 0,
-    }));
-    
-    return transformedMembers;
-  } catch (error) {
-    console.error('Error in fetchAllTeamMembers:', error);
-    return [];
-  }
-};
 
 interface AppContextType {
   periods: Period[];
@@ -304,7 +283,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
     try {
       const newTeamMember = await createTeamMember(teamId, name, hourlyRate);
-
       setTeamMembers((prevTeamMembers) => [...prevTeamMembers, newTeamMember]);
     } catch (error) {
       console.error('Error creating team member:', error);

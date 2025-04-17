@@ -8,6 +8,8 @@ export { savePeriod as savePeriodService } from './periodService';
 
 export * from './teamMemberService';
 export { saveTeamMember as saveTeamMemberService } from './teamMemberService';
+export { updateTeamMember as updateTeamMemberService } from './teamMemberService';
+export { deleteTeamMember as deleteTeamMemberService } from './teamMemberService';
 
 export * from './payoutService';
 export { createPayout, updatePayout, deletePayout, fetchAllPayouts } from './payoutService';

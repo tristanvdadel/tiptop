@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -105,11 +104,18 @@ const Analytics = () => {
       try {
         await refreshTeamData();
         console.log("Analytics.tsx: Data loaded successfully");
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error loading team data on Analytics page:", error);
         setHasError(true);
-        setErrorType('error');
-        setErrorMessage("Er is een fout opgetreden bij het laden van de analysegegevens. Probeer het opnieuw.");
+        
+        // Detect specific error types
+        if (error.message && error.message.includes('infinite recursion')) {
+          setErrorType('dbPolicy');
+          setErrorMessage("Er is een tijdelijk probleem met de database rechten. Als dit probleem blijft bestaan, probeer de pagina te verversen.");
+        } else {
+          setErrorType('error');
+          setErrorMessage("Er is een fout opgetreden bij het laden van de analysegegevens. Probeer het opnieuw.");
+        }
       } finally {
         setIsLoading(false);
       }
@@ -146,7 +152,13 @@ const Analytics = () => {
       .catch(error => {
         console.error("Error retrying data load:", error);
         setHasError(true);
-        setErrorMessage("Er is een fout opgetreden bij het opnieuw laden van de gegevens.");
+        if (error.message && error.message.includes('infinite recursion')) {
+          setErrorType('dbPolicy');
+          setErrorMessage("Er is een tijdelijk probleem met de database rechten. Als dit probleem blijft bestaan, probeer de pagina te verversen.");
+        } else {
+          setErrorType('error');
+          setErrorMessage("Er is een fout opgetreden bij het opnieuw laden van de gegevens.");
+        }
       })
       .finally(() => {
         setIsLoading(false);

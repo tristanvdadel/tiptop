@@ -24,10 +24,10 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
               <div>
                 <h3 className="text-lg font-medium">Database Configuratie Probleem</h3>
                 <p className="text-muted-foreground mt-1">
-                  Er is een configuratieprobleem met de database rechten. Dit probleem is zojuist opgelost.
+                  {message || "Er is een tijdelijk probleem met de database rechten. Probeer het later opnieuw."}
                 </p>
                 <p className="text-sm text-muted-foreground mt-3">
-                  Als je deze melding nog steeds ziet, probeer de pagina te verversen.
+                  We werken aan een oplossing. Probeer de pagina na een paar minuten te verversen.
                 </p>
               </div>
               <div className="flex flex-col md:flex-row gap-3">

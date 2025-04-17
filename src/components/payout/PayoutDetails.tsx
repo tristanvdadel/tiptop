@@ -11,12 +11,14 @@ interface PayoutDetailItem {
   amount: number;
   actualAmount?: number;
   balance?: number;
+  hours?: number; // Nieuwe eigenschap om uren op te slaan
 }
 
 export interface PayoutData {
   id: string;
   date: string;
   totalAmount: number;
+  totalHours?: number; // Nieuwe eigenschap om totale uren op te slaan
   distribution: PayoutDetailItem[];
 }
 
@@ -32,12 +34,16 @@ const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDe
   const { teamMembers } = useApp();
   
   useEffect(() => {
+    // Bereken het gemiddelde fooi per uur
     if (totalHours && totalHours > 0 && totalTips && totalTips > 0) {
       setHourlyRate(totalTips / totalHours);
+    } else if (payout?.totalHours && payout.totalHours > 0 && payout?.totalAmount) {
+      // Als we een payout gebruiken en het heeft uren, bereken dan ook
+      setHourlyRate(payout.totalAmount / payout.totalHours);
     } else {
       setHourlyRate(0);
     }
-  }, [totalTips, totalHours]);
+  }, [totalTips, totalHours, payout]);
 
   // Convert payout data to the format needed for rendering if payout is provided
   const displayDistribution = distribution || 
@@ -48,13 +54,14 @@ const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDe
       return {
         id: item.memberId,
         name: teamMember?.name || 'Onbekend lid',
-        hours: 0,
+        hours: item.hours || 0, // Gebruik uren uit de uitbetaling als beschikbaar
         tipAmount: item.amount,
         balance: item.balance || 0
       } as TeamMember;
     }) || []);
 
   const showBalance = displayDistribution.some(member => (member.balance || 0) !== 0);
+  const effectiveTotalHours = totalHours || payout?.totalHours || 0;
 
   return (
     <Card className="mb-4">
@@ -67,10 +74,10 @@ const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDe
             {formatCurrency(totalTips || payout?.totalAmount || 0)}
           </div>
           
-          {(totalHours !== undefined) && (
+          {(effectiveTotalHours > 0) && (
             <>
               <div>Totale uren:</div>
-              <div className="text-right font-medium">{totalHours.toFixed(1)}</div>
+              <div className="text-right font-medium">{effectiveTotalHours.toFixed(1)}</div>
               
               <div>Fooi per uur:</div>
               <div className="text-right font-medium">{formatCurrency(hourlyRate)}</div>
@@ -82,7 +89,7 @@ const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDe
           <TableHeader>
             <TableRow>
               <TableHead>Naam</TableHead>
-              {totalHours !== undefined && (
+              {effectiveTotalHours > 0 && (
                 <TableHead className="text-right">Uren</TableHead>
               )}
               <TableHead className="text-right">Fooi</TableHead>
@@ -98,7 +105,7 @@ const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDe
             {displayDistribution.map((member) => (
               <TableRow key={member.id}>
                 <TableCell>{member.name}</TableCell>
-                {totalHours !== undefined && (
+                {effectiveTotalHours > 0 && (
                   <TableCell className="text-right">{member.hours.toFixed(1)}</TableCell>
                 )}
                 <TableCell className="text-right">{formatCurrency(member.tipAmount || 0)}</TableCell>

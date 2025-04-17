@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { addDays, addWeeks, addMonths, endOfWeek, endOfMonth, set, getWeek, format, startOfMonth, nextMonday } from 'date-fns';
@@ -34,6 +33,7 @@ export interface PayoutDistributionItem {
   amount: number;
   actualAmount?: number;
   balance?: number;
+  hours?: number;
 }
 
 export type TipEntry = {
@@ -66,6 +66,7 @@ export type PayoutData = {
   payerName?: string;
   payoutTime?: string;
   totalAmount: number;
+  totalHours?: number;
   distribution: PayoutDistributionItem[];
 };
 
@@ -95,7 +96,7 @@ type AppContextType = {
   endCurrentPeriod: () => void;
   calculateTipDistribution: (selectedPeriodIds: string[]) => TeamMember[];
   calculateAverageTipPerHour: (periodId?: string, calculationMode?: 'period' | 'day' | 'week' | 'month') => number;
-  markPeriodsAsPaid: (periodIds: string[], distribution: PayoutDistributionItem[]) => void;
+  markPeriodsAsPaid: (periodIds: string[], distribution: PayoutDistributionItem[], totalHours?: number) => void;
   hasReachedLimit: () => boolean;
   hasReachedPeriodLimit: () => boolean;
   getUnpaidPeriodsCount: () => number;
@@ -1098,7 +1099,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
   
-  const markPeriodsAsPaid = (periodIds: string[], distribution: PayoutDistributionItem[]) => {
+  const markPeriodsAsPaid = (periodIds: string[], distribution: PayoutDistributionItem[], totalHours?: number) => {
     const updatedPeriods = periods.map(period => {
       if (periodIds.includes(period.id)) {
         return {
@@ -1118,13 +1119,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       periodIds,
       date: new Date().toISOString(),
       totalAmount,
+      totalHours,
       distribution
     };
     
     setPayouts(prev => [...prev, newPayout]);
     setMostRecentPayout(newPayout);
     
-    // Reset team member balances after payout
+    // Reset team member balances after payout but preserve historical data
     for (const item of distribution) {
       const teamMember = teamMembers.find(member => member.id === item.memberId);
       if (teamMember) {
@@ -1137,7 +1139,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       description: `${periodIds.length} periode(s) gemarkeerd als uitbetaald.`,
     });
   };
-  
+
   const deletePaidPeriods = () => {
     const paidPeriods = periods.filter(p => p.isPaid);
     if (paidPeriods.length === 0) {

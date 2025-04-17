@@ -23,6 +23,7 @@ interface HistoricalPeriod {
   averageTipPerHour: number | null;
   totalTips: number;
   payoutDate: string | null;
+  totalHours?: number;
 }
 
 interface PeriodChartData {
@@ -98,6 +99,7 @@ const Analytics = () => {
             id,
             date,
             payout_time,
+            total_hours,
             payout_periods (
               period_id
             ),
@@ -105,7 +107,8 @@ const Analytics = () => {
               team_member_id,
               amount,
               actual_amount,
-              balance
+              balance,
+              hours
             )
           `)
           .eq('team_id', effectiveTeamId);
@@ -166,6 +169,11 @@ const Analytics = () => {
           
           const totalTips = period.tips?.reduce((sum, tip) => sum + tip.amount, 0) || 0;
           
+          let totalHours = relatedPayout?.total_hours;
+          if (!totalHours && relatedPayout) {
+            totalHours = relatedPayout.payout_distributions?.reduce((sum, dist) => sum + (dist.hours || 0), 0) || 0;
+          }
+          
           return {
             id: period.id,
             startDate: period.start_date,
@@ -173,7 +181,8 @@ const Analytics = () => {
             isPaid: period.is_paid,
             averageTipPerHour: period.average_tip_per_hour,
             totalTips,
-            payoutDate: relatedPayout?.date
+            payoutDate: relatedPayout?.date,
+            totalHours
           };
         });
         
@@ -225,27 +234,34 @@ const Analytics = () => {
       return currentAverage;
     }
     
-    const historicalTips = historicalData.reduce((sum, period) => {
-      return sum + (period.totalTips || 0);
-    }, 0);
+    let totalHistoricalTips = 0;
+    let totalHistoricalHours = 0;
     
-    const historicalAverages = historicalData
-      .filter(period => period.averageTipPerHour !== null && period.averageTipPerHour !== undefined)
-      .map(period => period.averageTipPerHour);
+    historicalData.forEach(period => {
+      if (period.totalTips && period.totalHours && period.totalHours > 0) {
+        totalHistoricalTips += period.totalTips;
+        totalHistoricalHours += period.totalHours;
+      }
+    });
     
-    if (historicalAverages.length === 0) {
-      return currentAverage;
+    if (totalHistoricalHours === 0) {
+      return currentAverage || 0;
     }
+    
+    const historicalAverage = totalHistoricalTips / totalHistoricalHours;
     
     if (!currentAverage || currentAverage === 0) {
-      const avgSum = historicalAverages.reduce((sum, avg) => sum + avg, 0);
-      return avgSum / historicalAverages.length;
+      return historicalAverage;
     }
     
-    const allAverages = [...historicalAverages, currentAverage];
-    const avgSum = allAverages.reduce((sum, avg) => sum + avg, 0);
-    return avgSum / allAverages.length;
-  }, [calculateAverageTipPerHour, historicalData]);
+    const currentTotalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+    
+    const combinedAverage = 
+      (currentAverage * currentTotalHours + historicalAverage * totalHistoricalHours) / 
+      (currentTotalHours + totalHistoricalHours);
+    
+    return combinedAverage;
+  }, [calculateAverageTipPerHour, historicalData, teamMembers]);
   
   const periodData = useMemo(() => {
     const currentPeriodsData: PeriodChartData[] = periods.map(period => {

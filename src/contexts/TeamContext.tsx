@@ -89,7 +89,6 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [debouncedTogglePeriod]);
 
-  // Optimize distribution calculation with improved dependencies and memoization
   React.useEffect(() => {
     if (selectedPeriods.length === 0 || teamMembers.length === 0) {
       setDistribution([]);
@@ -100,7 +99,6 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setDistribution(calculatedDistribution);
   }, [selectedPeriods, calculateTipDistribution, teamMembers.length]);
 
-  // Optimize team members sorting with memoization
   React.useEffect(() => {
     if (teamMembers.length === 0) return;
     
@@ -125,12 +123,13 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       memberId: member.id,
       amount: member.tipAmount || 0,
       actualAmount: (member.tipAmount || 0) + (member.balance || 0),
-      balance: member.balance
+      balance: member.balance,
+      hours: member.hours
     }));
     
     console.log('Formatted distribution for payout:', customDistribution);
     
-    markPeriodsAsPaid(selectedPeriods, customDistribution);
+    markPeriodsAsPaid(selectedPeriods, customDistribution, totalHours);
     navigate('/team?payoutSummary=true');
   };
 
@@ -193,12 +192,10 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setShowImportDialog(false);
   };
 
-  // Optimize refresh function with throttling to prevent excessive database calls
   const handleRefresh = useCallback(async () => {
     try {
-      // Throttle refreshes to avoid hammering the database
       const now = Date.now();
-      if (now - lastRefreshTime < 5000) { // 5-second minimum between refreshes
+      if (now - lastRefreshTime < 5000) {
         console.log('TeamContext: Refresh throttled, last refresh was less than 5 seconds ago');
         if (dataInitialized) {
           return Promise.resolve();
@@ -217,7 +214,6 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       console.log("TeamContext: Data wordt opgehaald voor team:", teamId);
       
-      // Use a more optimized implementation
       await refreshTeamData();
       
       console.log("TeamContext: Data succesvol opgehaald");

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertCircle, AlertTriangle, Database, RefreshCw } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Database, RefreshCw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -32,10 +32,11 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
               </div>
               <div className="flex flex-col md:flex-row gap-3">
                 <Button variant="outline" onClick={() => navigate('/')}>
+                  <Home className="h-4 w-4 mr-2" />
                   Terug naar Dashboard
                 </Button>
                 {onRetry && (
-                  <Button onClick={onRetry} className="gap-2">
+                  <Button onClick={onRetry} className="gap-2 bg-amber-500 hover:bg-amber-600">
                     <RefreshCw className="h-4 w-4" />
                     Opnieuw proberen
                   </Button>
@@ -59,8 +60,15 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
                 <h3 className="text-lg font-medium">Fout bij laden</h3>
                 <p className="text-muted-foreground mt-1">{message || "Er is een fout opgetreden bij het laden van de analysegegevens."}</p>
               </div>
-              <Button onClick={onRetry}>
-                Opnieuw proberen
+              {onRetry && (
+                <Button onClick={onRetry} className="gap-2">
+                  <RefreshCw className="h-4 w-4" />
+                  Opnieuw proberen
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => navigate('/')}>
+                <Home className="h-4 w-4 mr-2" />
+                Terug naar Dashboard
               </Button>
             </div>
           </CardContent>
@@ -77,11 +85,19 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
             <AlertTriangle className="h-10 w-10 text-amber-500" />
             <div>
               <h3 className="text-lg font-medium">Geen team gevonden</h3>
-              <p className="text-muted-foreground mt-1">Je moet eerst een team aanmaken of lid worden van een team voordat je analyses kunt bekijken.</p>
+              <p className="text-muted-foreground mt-1">{message || "Je moet eerst een team aanmaken of lid worden van een team voordat je analyses kunt bekijken."}</p>
             </div>
-            <Button onClick={() => navigate('/management')}>
-              Naar Teambeheer
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button onClick={() => navigate('/management')} className="bg-amber-500 hover:bg-amber-600">
+                Naar Teambeheer
+              </Button>
+              {onRetry && (
+                <Button variant="outline" onClick={onRetry} className="gap-2">
+                  <RefreshCw className="h-4 w-4" />
+                  Verversen
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

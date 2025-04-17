@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,6 +18,7 @@ import Loading from '@/components/analytics/Loading';
 import { useHistoricalData } from '@/hooks/useHistoricalData';
 import { usePeriodData, useLineChartData, useChartConfig } from '@/hooks/usePeriodData';
 import { useAverageTipPerHour, getEmptyStateMessage } from '@/hooks/useAverageTipPerHour';
+import { useTeamId } from '@/hooks/useTeamId';
 
 // Need to create an adapter interface to match AppContext Period type with our Period type
 interface AdaptedPeriod {
@@ -35,60 +37,32 @@ const Analytics = () => {
     calculateAverageTipPerHour,
     teamMembers,
     payouts,
-    teamId,
     refreshTeamData
   } = useApp();
   
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { teamId, loading: teamIdLoading, error: teamIdError } = useTeamId();
   
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<'error' | 'noTeam' | 'dbPolicy'>('error');
-  const [localTeamId, setLocalTeamId] = useState<string | null>(null);
-  
-  // Get team ID if not available in context
-  useEffect(() => {
-    const fetchTeamID = async () => {
-      try {
-        if (teamId) {
-          console.log("Analytics.tsx: Team ID from context:", teamId);
-          setLocalTeamId(teamId);
-          return;
-        }
-        
-        console.log("Analytics.tsx: Team ID not found in context, fetching manually");
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          console.log("Analytics.tsx: No session found");
-          return;
-        }
-        
-        const teams = await getUserTeamsSafe(session.user.id);
-        if (teams && teams.length > 0) {
-          console.log("Analytics.tsx: Found team ID from API:", teams[0].id);
-          setLocalTeamId(teams[0].id);
-        } else {
-          console.log("Analytics.tsx: No teams found for user");
-        }
-      } catch (error) {
-        console.error("Error fetching team ID:", error);
-      }
-    };
-    
-    fetchTeamID();
-  }, [teamId]);
   
   // Fetch historical data using custom hook
-  const { historicalData, periodHistory, payoutHistory, loading, error, refreshData } = useHistoricalData();
+  const { 
+    historicalData, 
+    periodHistory, 
+    payoutHistory, 
+    loading: historicalDataLoading, 
+    error: historicalDataError, 
+    refreshData 
+  } = useHistoricalData();
   
   // Load team data
   useEffect(() => {
     const loadData = async () => {
-      const effectiveTeamId = localTeamId || teamId;
-      
-      if (!effectiveTeamId) {
+      if (!teamId) {
         console.log("Analytics.tsx: No team ID found, can't load data");
         setHasError(true);
         setErrorType('noTeam');
@@ -122,7 +96,7 @@ const Analytics = () => {
     };
     
     loadData();
-  }, [localTeamId, teamId, refreshTeamData]);
+  }, [teamId, refreshTeamData]);
   
   // Adapt periods from AppContext to match our expected format
   const adaptedPeriods: AdaptedPeriod[] = periods.map(period => ({
@@ -165,23 +139,35 @@ const Analytics = () => {
       });
   };
   
-  if (isLoading || loading) {
+  // Check loading states
+  if (isLoading || historicalDataLoading || teamIdLoading) {
     return <Loading />;
   }
-  
-  const effectiveTeamId = localTeamId || teamId;
+
+  // Handle team ID errors first, since they're most critical
+  if (teamIdError || !teamId) {
+    return <ErrorCard 
+      type="noTeam" 
+      message={teamIdError || "Je moet eerst een team aanmaken of lid worden van een team voordat je analyses kunt bekijken."} 
+      onRetry={() => window.location.reload()}
+    />;
+  }
   
   // Check for the specific database policy error
-  if (error && error.includes('infinite recursion')) {
-    return <ErrorCard type="dbPolicy" message={error} onRetry={refreshData} />;
+  if (historicalDataError && historicalDataError.includes('infinite recursion')) {
+    return <ErrorCard 
+      type="dbPolicy" 
+      message={historicalDataError} 
+      onRetry={refreshData} 
+    />;
   }
   
-  if (hasError || error) {
-    return <ErrorCard type={errorType} message={errorMessage || error || null} onRetry={handleRetryLoading} />;
-  }
-
-  if (!effectiveTeamId) {
-    return <ErrorCard type="noTeam" message={null} />;
+  if (hasError || historicalDataError) {
+    return <ErrorCard 
+      type={errorType} 
+      message={errorMessage || historicalDataError || null} 
+      onRetry={handleRetryLoading} 
+    />;
   }
   
   return (

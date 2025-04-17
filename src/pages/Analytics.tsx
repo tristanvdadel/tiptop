@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -85,7 +84,6 @@ const Analytics = () => {
     fetchTeamID();
   }, [teamId]);
   
-  // Fetch historical payout data to supplement current data
   useEffect(() => {
     const fetchHistoricalData = async () => {
       const effectiveTeamId = localTeamId || teamId;
@@ -94,7 +92,6 @@ const Analytics = () => {
       try {
         console.log("Analytics.tsx: Fetching historical payout data");
         
-        // Get all payouts for this team
         const { data: payoutsData, error: payoutsError } = await supabase
           .from('payouts')
           .select(`
@@ -125,7 +122,6 @@ const Analytics = () => {
         
         console.log("Analytics.tsx: Found historical payout data:", payoutsData.length, "payouts");
         
-        // Extract all period IDs from payouts
         const periodIds = payoutsData
           .flatMap(payout => payout.payout_periods?.map(pp => pp.period_id) || [])
           .filter(id => id);
@@ -135,7 +131,6 @@ const Analytics = () => {
           return;
         }
         
-        // Get period data for these periods
         const { data: periodsData, error: periodsError } = await supabase
           .from('periods')
           .select(`
@@ -164,7 +159,6 @@ const Analytics = () => {
         
         console.log("Analytics.tsx: Found historical period data:", periodsData.length, "periods");
         
-        // Combine this data
         const historicalPeriods = periodsData.map(period => {
           const relatedPayout = payoutsData.find(p => 
             p.payout_periods?.some(pp => pp.period_id === period.id)
@@ -224,47 +218,36 @@ const Analytics = () => {
     loadData();
   }, [localTeamId, teamId, refreshTeamData]);
   
-  // Combined average tip calculation using both current and historical data
   const averageTipPerHour = useMemo(() => {
-    // First calculate from current data
     const currentAverage = calculateAverageTipPerHour();
     
-    // If we have no historical data, return current calculation
     if (historicalData.length === 0) {
       return currentAverage;
     }
     
-    // Calculate total tips and hours from historical data
     const historicalTips = historicalData.reduce((sum, period) => {
       return sum + (period.totalTips || 0);
     }, 0);
     
-    // Get historical averages where we have values
     const historicalAverages = historicalData
       .filter(period => period.averageTipPerHour !== null && period.averageTipPerHour !== undefined)
       .map(period => period.averageTipPerHour);
     
     if (historicalAverages.length === 0) {
-      // No historical averages available
       return currentAverage;
     }
     
-    // Return weighted average
-    // If current average is 0 or not available, return historical average
     if (!currentAverage || currentAverage === 0) {
       const avgSum = historicalAverages.reduce((sum, avg) => sum + avg, 0);
       return avgSum / historicalAverages.length;
     }
     
-    // Return weighted average between current and historical
     const allAverages = [...historicalAverages, currentAverage];
     const avgSum = allAverages.reduce((sum, avg) => sum + avg, 0);
     return avgSum / allAverages.length;
   }, [calculateAverageTipPerHour, historicalData]);
   
-  // Combined data for charts that includes both current and historical periods
   const periodData = useMemo(() => {
-    // Process current periods
     const currentPeriodsData: PeriodChartData[] = periods.map(period => {
       let avgTipPerHour = period.averageTipPerHour;
       
@@ -292,7 +275,6 @@ const Analytics = () => {
       };
     });
     
-    // Process historical periods that are not in current periods
     const currentPeriodIds = periods.map(p => p.id);
     
     const historicalPeriodsData: PeriodChartData[] = historicalData
@@ -317,7 +299,6 @@ const Analytics = () => {
         };
       });
     
-    // Combine and sort by timestamp
     return [...currentPeriodsData, ...historicalPeriodsData]
       .sort((a, b) => a.timestamp - b.timestamp);
   }, [periods, calculateAverageTipPerHour, historicalData]);
@@ -350,7 +331,7 @@ const Analytics = () => {
     } else if (!teamHasHours) {
       return "Er ontbreken uur gegevens. Voeg ze toe om een gemiddelde te zien.";
     }
-    return ""; // Fallback, should not happen
+    return "";
   };
   
   const AverageTipCard = () => <Card className="mb-4 w-full">

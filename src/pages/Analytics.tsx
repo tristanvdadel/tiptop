@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ const Analytics = () => {
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [localTeamId, setLocalTeamId] = useState<string | null>(null);
+  const [historicalData, setHistoricalData] = useState<any[]>([]);
   
   useEffect(() => {
     const fetchTeamID = async () => {
@@ -63,6 +65,114 @@ const Analytics = () => {
     fetchTeamID();
   }, [teamId]);
   
+  // Fetch historical payout data to supplement current data
+  useEffect(() => {
+    const fetchHistoricalData = async () => {
+      const effectiveTeamId = localTeamId || teamId;
+      if (!effectiveTeamId) return;
+      
+      try {
+        console.log("Analytics.tsx: Fetching historical payout data");
+        
+        // Get all payouts for this team
+        const { data: payoutsData, error: payoutsError } = await supabase
+          .from('payouts')
+          .select(`
+            id,
+            date,
+            payout_time,
+            payout_periods (
+              period_id
+            ),
+            payout_distributions (
+              team_member_id,
+              amount,
+              actual_amount,
+              balance
+            )
+          `)
+          .eq('team_id', effectiveTeamId);
+          
+        if (payoutsError) {
+          console.error("Analytics.tsx: Error fetching historical payout data:", payoutsError);
+          return;
+        }
+        
+        if (!payoutsData || payoutsData.length === 0) {
+          console.log("Analytics.tsx: No historical payout data found");
+          return;
+        }
+        
+        console.log("Analytics.tsx: Found historical payout data:", payoutsData.length, "payouts");
+        
+        // Extract all period IDs from payouts
+        const periodIds = payoutsData
+          .flatMap(payout => payout.payout_periods?.map(pp => pp.period_id) || [])
+          .filter(id => id);
+          
+        if (periodIds.length === 0) {
+          console.log("Analytics.tsx: No period IDs found in payouts");
+          return;
+        }
+        
+        // Get period data for these periods
+        const { data: periodsData, error: periodsError } = await supabase
+          .from('periods')
+          .select(`
+            id,
+            start_date,
+            end_date,
+            is_paid,
+            average_tip_per_hour,
+            tips (
+              id,
+              amount,
+              date
+            )
+          `)
+          .in('id', periodIds);
+          
+        if (periodsError) {
+          console.error("Analytics.tsx: Error fetching historical period data:", periodsError);
+          return;
+        }
+        
+        if (!periodsData || periodsData.length === 0) {
+          console.log("Analytics.tsx: No historical period data found");
+          return;
+        }
+        
+        console.log("Analytics.tsx: Found historical period data:", periodsData.length, "periods");
+        
+        // Combine this data
+        const historicalPeriods = periodsData.map(period => {
+          const relatedPayout = payoutsData.find(p => 
+            p.payout_periods?.some(pp => pp.period_id === period.id)
+          );
+          
+          const totalTips = period.tips?.reduce((sum, tip) => sum + tip.amount, 0) || 0;
+          
+          return {
+            id: period.id,
+            startDate: period.start_date,
+            endDate: period.end_date,
+            isPaid: period.is_paid,
+            averageTipPerHour: period.average_tip_per_hour,
+            totalTips,
+            payoutDate: relatedPayout?.date
+          };
+        });
+        
+        setHistoricalData(historicalPeriods);
+        console.log("Analytics.tsx: Historical data prepared:", historicalPeriods.length, "items");
+      } catch (error) {
+        console.error("Analytics.tsx: Error in fetchHistoricalData:", error);
+      }
+    };
+    
+    fetchHistoricalData();
+  }, [localTeamId, teamId, payouts]);
+  
   useEffect(() => {
     const loadData = async () => {
       const effectiveTeamId = localTeamId || teamId;
@@ -94,12 +204,48 @@ const Analytics = () => {
     loadData();
   }, [localTeamId, teamId, refreshTeamData]);
   
+  // Combined average tip calculation using both current and historical data
   const averageTipPerHour = useMemo(() => {
-    return calculateAverageTipPerHour();
-  }, [calculateAverageTipPerHour]);
+    // First calculate from current data
+    const currentAverage = calculateAverageTipPerHour();
+    
+    // If we have no historical data, return current calculation
+    if (historicalData.length === 0) {
+      return currentAverage;
+    }
+    
+    // Calculate total tips and hours from historical data
+    const historicalTips = historicalData.reduce((sum, period) => {
+      return sum + (period.totalTips || 0);
+    }, 0);
+    
+    // Get historical averages where we have values
+    const historicalAverages = historicalData
+      .filter(period => period.averageTipPerHour !== null && period.averageTipPerHour !== undefined)
+      .map(period => period.averageTipPerHour);
+    
+    if (historicalAverages.length === 0) {
+      // No historical averages available
+      return currentAverage;
+    }
+    
+    // Return weighted average
+    // If current average is 0 or not available, return historical average
+    if (!currentAverage || currentAverage === 0) {
+      const avgSum = historicalAverages.reduce((sum, avg) => sum + avg, 0);
+      return avgSum / historicalAverages.length;
+    }
+    
+    // Return weighted average between current and historical
+    const allAverages = [...historicalAverages, currentAverage];
+    const avgSum = allAverages.reduce((sum, avg) => sum + avg, 0);
+    return avgSum / allAverages.length;
+  }, [calculateAverageTipPerHour, historicalData]);
   
+  // Combined data for charts that includes both current and historical periods
   const periodData = useMemo(() => {
-    return periods.map(period => {
+    // Process current periods
+    const currentPeriodsData = periods.map(period => {
       let avgTipPerHour = period.averageTipPerHour;
       
       if (avgTipPerHour === undefined || avgTipPerHour === null) {
@@ -123,8 +269,37 @@ const Analytics = () => {
         isPaid: period.isPaid,
         timestamp: timestamp
       };
-    }).sort((a, b) => a.timestamp - b.timestamp);
-  }, [periods, calculateAverageTipPerHour]);
+    });
+    
+    // Process historical periods that are not in current periods
+    const currentPeriodIds = periods.map(p => p.id);
+    
+    const historicalPeriodsData = historicalData
+      .filter(hp => !currentPeriodIds.includes(hp.id))
+      .map(hp => {
+        const startDate = format(new Date(hp.startDate), 'd MMM', {
+          locale: nl
+        });
+        const endDate = hp.endDate ? format(new Date(hp.endDate), 'd MMM', {
+          locale: nl
+        }) : '';
+        
+        const timestamp = new Date(hp.startDate).getTime();
+        return {
+          name: `${startDate} - ${endDate}`,
+          total: hp.totalTips || 0,
+          average: hp.averageTipPerHour || 0,
+          id: hp.id,
+          isPaid: true,
+          timestamp: timestamp,
+          isHistorical: true
+        };
+      });
+    
+    // Combine and sort by timestamp
+    return [...currentPeriodsData, ...historicalPeriodsData]
+      .sort((a, b) => a.timestamp - b.timestamp);
+  }, [periods, calculateAverageTipPerHour, historicalData]);
   
   const lineChartData = useMemo(() => {
     const filteredData = periodData.filter(period => period.average > 0 || period.total > 0);
@@ -167,10 +342,10 @@ const Analytics = () => {
                 <TooltipProvider>
                   <UITooltip>
                     <TooltipTrigger asChild>
-                      <span className="text-xs text-muted-foreground">Gemiddelde over alle periodes</span>
+                      <span className="text-xs text-muted-foreground">Gemiddelde over alle periodes (incl. uitbetaald)</span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Gemiddelde berekend over alle periodes (incl. uitbetaald)</p>
+                      <p>Gemiddelde berekend over alle periodes (inclusief uitbetaalde periodes)</p>
                     </TooltipContent>
                   </UITooltip>
                 </TooltipProvider>
@@ -252,7 +427,7 @@ const Analytics = () => {
     );
   }
   
-  const hasAnyPeriodWithTips = periods.some(period => period.tips.length > 0);
+  const hasAnyPeriodWithTips = periodData.some(period => period.total > 0);
   
   return <div className="space-y-4 w-full max-w-full px-1 sm:px-4">
       <h1 className="text-xl font-bold">Analyse</h1>
@@ -348,6 +523,7 @@ const Analytics = () => {
         <CardContent className="pb-4">
           <p className="text-muted-foreground mb-2 text-sm">
             Het gemiddelde fooi per uur wordt berekend op basis van de totale fooi en de gewerkte uren van het team.
+            <span className="font-medium ml-1">Inclusief uitbetaalde periodes.</span>
           </p>
           {hasAnyPeriodWithTips ? (
             <ScrollArea className="h-64 w-full">
@@ -359,6 +535,11 @@ const Analytics = () => {
                       {period.isPaid && (
                         <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
                           Uitbetaald
+                        </span>
+                      )}
+                      {period.isHistorical && (
+                        <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full">
+                          Historisch
                         </span>
                       )}
                     </div>

@@ -16,6 +16,26 @@ import { supabase } from '@/integrations/supabase/client';
 import { getUserTeamsSafe } from '@/services/teamService';
 import { useNavigate } from 'react-router-dom';
 
+interface HistoricalPeriod {
+  id: string;
+  startDate: string;
+  endDate: string | null;
+  isPaid: boolean;
+  averageTipPerHour: number | null;
+  totalTips: number;
+  payoutDate: string | null;
+}
+
+interface PeriodChartData {
+  name: string;
+  total: number;
+  average: number;
+  id: string;
+  isPaid: boolean;
+  timestamp: number;
+  isHistorical?: boolean;
+}
+
 const Analytics = () => {
   const {
     periods,
@@ -32,7 +52,7 @@ const Analytics = () => {
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [localTeamId, setLocalTeamId] = useState<string | null>(null);
-  const [historicalData, setHistoricalData] = useState<any[]>([]);
+  const [historicalData, setHistoricalData] = useState<HistoricalPeriod[]>([]);
   
   useEffect(() => {
     const fetchTeamID = async () => {
@@ -245,7 +265,7 @@ const Analytics = () => {
   // Combined data for charts that includes both current and historical periods
   const periodData = useMemo(() => {
     // Process current periods
-    const currentPeriodsData = periods.map(period => {
+    const currentPeriodsData: PeriodChartData[] = periods.map(period => {
       let avgTipPerHour = period.averageTipPerHour;
       
       if (avgTipPerHour === undefined || avgTipPerHour === null) {
@@ -267,14 +287,15 @@ const Analytics = () => {
         average: avgTipPerHour || 0,
         id: period.id,
         isPaid: period.isPaid,
-        timestamp: timestamp
+        timestamp: timestamp,
+        isHistorical: false
       };
     });
     
     // Process historical periods that are not in current periods
     const currentPeriodIds = periods.map(p => p.id);
     
-    const historicalPeriodsData = historicalData
+    const historicalPeriodsData: PeriodChartData[] = historicalData
       .filter(hp => !currentPeriodIds.includes(hp.id))
       .map(hp => {
         const startDate = format(new Date(hp.startDate), 'd MMM', {

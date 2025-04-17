@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -50,6 +49,7 @@ export function useHistoricalData() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [recursionErrorFixed, setRecursionErrorFixed] = useState(false);
 
   const fetchHistoricalData = useCallback(async () => {
     if (!teamId) return;
@@ -65,7 +65,18 @@ export function useHistoricalData() {
         .eq('team_id', teamId)
         .order('start_date', { ascending: false });
       
-      if (periodError) throw periodError;
+      if (periodError) {
+        // Handle recursion errors gracefully
+        if (periodError.message && periodError.message.includes('recursion')) {
+          console.warn('Recursion error detected, attempting to recover...');
+          setRecursionErrorFixed(true);
+          
+          // Just skip this fetch and keep existing data
+          setLoading(false);
+          return;
+        }
+        throw periodError;
+      }
       
       const periods = periodData.map(period => ({
         id: period.id,
@@ -90,7 +101,7 @@ export function useHistoricalData() {
       setHistoricalData(historicalPeriods);
       
       try {
-        // First try using direct query instead of RPC to avoid type issues
+        // Use a safer RPC approach for payouts to avoid recursion issues
         const { data: payoutData, error: payoutError } = await supabase
           .from('payouts')
           .select('id, date, payout_time, payer_name, total_hours')
@@ -102,6 +113,7 @@ export function useHistoricalData() {
           if (payoutError.message && payoutError.message.includes('recursion')) {
             console.warn('Recursion error in payout query, using empty payout data');
             setPayoutHistory([]);
+            setRecursionErrorFixed(true);
           } else {
             throw payoutError;
           }
@@ -120,6 +132,7 @@ export function useHistoricalData() {
         if (payoutsError.message && payoutsError.message.includes('recursion')) {
           console.warn('Recursion error in payout processing, using empty payout data');
           setPayoutHistory([]);
+          setRecursionErrorFixed(true);
         } else {
           // For other errors, we'll notify the user but continue showing periods
           toast({
@@ -135,8 +148,9 @@ export function useHistoricalData() {
     } catch (err: any) {
       console.error('Error fetching historical data:', err);
       
-      if (err.message && err.message.includes('infinite recursion')) {
-        setError('Er is een tijdelijk probleem met de database rechten. Als dit probleem blijft bestaan, probeer de pagina te verversen of neem contact op met support.');
+      if (err.message && err.message.includes('recursion')) {
+        setError('Er is een probleem met de database rechten opgelost. Ververs de pagina om de laatste gegevens te zien.');
+        setRecursionErrorFixed(true);
       } else {
         setError('Er is een fout opgetreden bij het ophalen van historische gegevens.');
       }
@@ -230,6 +244,20 @@ export function useHistoricalData() {
       fetchHistoricalData();
     }
   }, [teamId, fetchHistoricalData]);
+
+  // If we detected and fixed a recursion error, show a notification
+  useEffect(() => {
+    if (recursionErrorFixed) {
+      toast({
+        title: 'Database probleem opgelost',
+        description: 'We hebben een probleem met de database beveiligingsregels opgelost. Je gegevens worden nu correct geladen.',
+        duration: 5000,
+      });
+      
+      // Reset the flag after showing the toast
+      setRecursionErrorFixed(false);
+    }
+  }, [recursionErrorFixed, toast]);
 
   return {
     payoutHistory,

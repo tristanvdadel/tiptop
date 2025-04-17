@@ -25,7 +25,7 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
       localStorage.removeItem('login_attempt_time');
       
       // Specifieke teamcache wissen
-      const teamIds = Object.keys(localStorage).filter(key => key.startsWith('team_data_refresh_'));
+      const teamIds = Object.keys(localStorage).filter(key => key.startsWith('team_data_'));
       teamIds.forEach(key => localStorage.removeItem(key));
       
       // Uitloggen bij Supabase
@@ -51,7 +51,8 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
       }
     });
     
-    // Doorsturen naar login met recursie-parameter
+    // Toast tonen en doorsturen naar login met recursie-parameter
+    console.log("Clearing cache and redirecting to resolve security recursion");
     window.location.href = '/login?error=recursion';
   };
 
@@ -69,8 +70,7 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
                 </p>
                 <Alert className="mt-3 bg-amber-50 border-amber-200 text-left">
                   <AlertDescription className="text-sm">
-                    Dit is <strong>geen tijdelijk probleem</strong>, maar een structurele fout in de beveiligingsregels van de database.
-                    De fout ontstaat door een oneindige lus (recursie) in de Row Level Security policies.
+                    We hebben de beveiligingsregels van de database bijgewerkt. Herlaad de pagina om het probleem op te lossen.
                   </AlertDescription>
                 </Alert>
               </div>

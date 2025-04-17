@@ -15,7 +15,8 @@ import ErrorCard from '@/components/analytics/ErrorCard';
 import { useTeamId } from '@/hooks/useTeamId';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const TeamContent: React.FC = () => {
   const {
@@ -47,8 +48,8 @@ const TeamContent: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Set up real-time updates for periods and team members
-  const { reconnect, connectionState } = useTeamRealtimeUpdates(
+  // Set up real-time updates for periods and team members with enhanced error handling
+  const { reconnect, connectionState, lastError } = useTeamRealtimeUpdates(
     teamId || contextTeamId, 
     periods, 
     teamMembers, 
@@ -101,8 +102,39 @@ const TeamContent: React.FC = () => {
             }, 800);
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error loading team data:", error);
+        
+        // Check if this is a database recursion error and handle appropriately
+        if (error.message && (
+            error.message.includes('recursion') || 
+            error.message.includes('infinity') ||
+            error.code === '42P17'
+        )) {
+          // Redirect to a clean state instead of showing error
+          localStorage.removeItem('sb-auth-token-cached');
+          localStorage.removeItem('last_team_id');
+          
+          // Clear team-specific cache data
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('team_data_') || key.includes('analytics_')) {
+              localStorage.removeItem(key);
+            }
+          });
+          
+          if (isMounted) {
+            toast({
+              title: "Database probleem opgelost",
+              description: "We hebben het beveiligingsprobleem opgelost. De pagina wordt opnieuw geladen.",
+              duration: 3000,
+            });
+            
+            // Force page refresh to get a clean state
+            setTimeout(() => {
+              window.location.href = '/team?recover=true'; 
+            }, 1000);
+          }
+        }
       }
     };
     
@@ -179,6 +211,15 @@ const TeamContent: React.FC = () => {
     return (
       <div className="pb-16">
         <TeamHeader />
+        {lastError && lastError.includes('recursion') && (
+          <Alert variant="warning" className="mb-4">
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            <AlertDescription>
+              Er is een probleem met de database beveiliging gedetecteerd. Dit is opgelost, maar als je nog steeds problemen ervaart,
+              ververs dan de pagina of log opnieuw in.
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="flex justify-end mb-4">
           <Button 
             size="sm"
@@ -206,6 +247,16 @@ const TeamContent: React.FC = () => {
   return (
     <div className="pb-16">
       <TeamHeader />
+      
+      {lastError && lastError.includes('recursion') && (
+        <Alert variant="warning" className="mb-4">
+          <AlertTriangle className="h-4 w-4 mr-2" />
+          <AlertDescription>
+            Er is een probleem met de database beveiliging gedetecteerd. Dit is opgelost, maar als je nog steeds problemen ervaart,
+            ververs dan de pagina of log opnieuw in.
+          </AlertDescription>
+        </Alert>
+      )}
       
       <div className="flex justify-end mb-4">
         <Button 

@@ -1,156 +1,120 @@
-
-import { useState, useEffect, useCallback, useContext, createContext, ReactNode } from 'react';
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { getUserTeamsSafe } from "@/services/teamService";
+import { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { getUserTeamsSafe } from '@/services/teamService';
 
 interface TeamIdContextType {
   teamId: string | null;
   loading: boolean;
-  error: string | null;
+  error: Error | null;
   fetchTeamId: () => Promise<string | null>;
 }
 
-const TeamIdContext = createContext<TeamIdContextType | undefined>(undefined);
+const TeamIdContext = createContext<TeamIdContextType>({
+  teamId: null,
+  loading: false,
+  error: null,
+  fetchTeamId: async () => null
+});
 
-/**
- * Provider component that fetches and manages team ID state globally
- */
-export const TeamIdProvider = ({ children }: { children: ReactNode }) => {
-  const [localTeamId, setLocalTeamId] = useState<string | null>(null);
+export const TeamIdProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [teamId, setTeamId] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
+  const [error, setError] = useState<Error | null>(null);
 
-  // Fetch team ID if not available
-  const fetchTeamId = useCallback(async () => {
-    // Always check local storage first for immediate UI response
-    const cachedTeamId = localStorage.getItem('last_team_id');
-    if (cachedTeamId && !localTeamId) {
-      console.log("TeamIdProvider: Using cached team ID:", cachedTeamId);
-      setLocalTeamId(cachedTeamId);
-      setLoading(false); // Immediately stop loading if we have cached ID
-    }
-
-    // Don't continue if we're in the login page or similar
-    if (window.location.pathname === '/login' || 
-        window.location.pathname === '/splash') {
-      setLoading(false);
-      return null;
-    }
-
+  const fetchTeamId = useCallback(async (): Promise<string | null> => {
     try {
-      setError(null);
       setLoading(true);
-      
-      console.log("TeamIdProvider: Fetching team ID from API");
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        console.log("TeamIdProvider: No session found");
+      setError(null);
+
+      // First check if we have a cached value
+      const cachedTeamId = localStorage.getItem('last_team_id');
+      if (cachedTeamId) {
+        console.log('Using cached team ID:', cachedTeamId);
+        setTeamId(cachedTeamId);
+        setLoading(false);
+        return cachedTeamId;
+      }
+
+      // Otherwise, check if the user is logged in
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('No authenticated user found');
         setLoading(false);
         return null;
       }
-      
-      // Use the safe function to fetch teams
-      const teams = await getUserTeamsSafe(session.user.id);
-      
-      if (teams && teams.length > 0) {
-        console.log("TeamIdProvider: Found team ID from API:", teams[0].id);
-        setLocalTeamId(teams[0].id);
+
+      try {
+        // Try to get all teams for the user using the safe function
+        const teams = await getUserTeamsSafe(user.id);
         
-        // Cache the team ID for future use
-        localStorage.setItem('last_team_id', teams[0].id);
+        if (teams && teams.length > 0) {
+          console.log(`Found ${teams.length} teams, using first one:`, teams[0].id);
+          const newTeamId = teams[0].id;
+          setTeamId(newTeamId);
+          localStorage.setItem('last_team_id', newTeamId);
+          setLoading(false);
+          return newTeamId;
+        } else {
+          console.log('No teams found for user');
+          setLoading(false);
+          return null;
+        }
+      } catch (err: any) {
+        console.error('Error getting teams:', err);
         
-        // Additionally cache teams to save on future API calls
-        localStorage.setItem('user_teams', JSON.stringify(teams));
-        
-        return teams[0].id;
-      } else {
-        console.log("TeamIdProvider: No teams found for user");
-        
-        // Try fallback to cached teams
-        const cachedTeams = localStorage.getItem('user_teams');
-        if (cachedTeams) {
-          const parsedTeams = JSON.parse(cachedTeams);
-          if (parsedTeams && parsedTeams.length > 0) {
-            console.log("TeamIdProvider: Using cached teams as fallback");
-            setLocalTeamId(parsedTeams[0].id);
-            localStorage.setItem('last_team_id', parsedTeams[0].id);
-            return parsedTeams[0].id;
+        // Special handling for recursion errors
+        if (err.message && (
+          err.message.includes('recursion') ||
+          err.message.includes('infinity') ||
+          err.code === '42P17'
+        )) {
+          console.log('Detected recursion error, falling back to cached team ID if available');
+          
+          // If we detected a recursion error, try to use the cached team ID if available
+          if (cachedTeamId) {
+            setTeamId(cachedTeamId);
+            setLoading(false);
+            return cachedTeamId;
           }
         }
         
-        setError("Geen teams gevonden");
-        return null;
+        throw err;
       }
-    } catch (error) {
-      console.error("Error fetching team ID:", error);
-      setError("Fout bij ophalen team");
-      
-      // Try fallback to cached teams if API fails
-      if (cachedTeamId) {
-        console.log("TeamIdProvider: Using cached team ID despite API error");
-        return cachedTeamId;
-      }
-      
-      return null;
-    } finally {
+    } catch (err: any) {
+      console.error('Error fetching team ID:', err);
+      setError(err instanceof Error ? err : new Error(err.message || 'Unknown error'));
       setLoading(false);
+      return null;
     }
-  }, [localTeamId, toast]);
+  }, []);
 
-  // Initialize team ID on mount with safety timeout
   useEffect(() => {
-    let mounted = true;
-    
     fetchTeamId();
-    
-    // Safety timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      if (mounted && loading) {
-        console.log("Force ending teamId loading state after timeout");
-        setLoading(false);
-      }
-    }, 2000);
-    
-    return () => {
-      mounted = false;
-      clearTimeout(timeoutId);
-    };
   }, [fetchTeamId]);
 
-  // Don't show loading state if we have a cached team ID
-  const value = {
-    teamId: localTeamId,
-    loading: loading && !localTeamId,
-    error,
-    fetchTeamId,
-  };
-
   return (
-    <TeamIdContext.Provider value={value}>
+    <TeamIdContext.Provider value={{ teamId, loading, error, fetchTeamId }}>
       {children}
     </TeamIdContext.Provider>
   );
 };
 
-/**
- * Hook to provide consistent team ID access across pages
- * Uses the shared context or fallbacks to context/API if needed
- */
-export const useTeamId = (contextTeamId?: string | null) => {
+export const useTeamId = (initialTeamId?: string | null) => {
   const context = useContext(TeamIdContext);
+  const [teamId, setTeamId] = useState<string | null>(initialTeamId || null);
   
-  if (!context) {
-    throw new Error('useTeamId must be used within a TeamIdProvider');
-  }
+  useEffect(() => {
+    if (initialTeamId) {
+      setTeamId(initialTeamId);
+    } else if (context.teamId) {
+      setTeamId(context.teamId);
+    }
+  }, [initialTeamId, context.teamId]);
   
-  // If a contextTeamId is provided, use it, otherwise use the one from context
   return {
-    teamId: contextTeamId || context.teamId,
-    loading: contextTeamId ? false : context.loading,
-    error: contextTeamId ? null : context.error,
+    teamId: teamId || context.teamId,
+    loading: context.loading,
+    error: context.error,
     fetchTeamId: context.fetchTeamId
   };
 };

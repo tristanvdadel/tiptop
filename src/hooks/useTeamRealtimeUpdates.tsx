@@ -1,286 +1,270 @@
 
-import { useEffect, useRef, useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { TeamMember, Period } from '@/contexts/AppContext';
-import { useToast } from '@/hooks/use-toast';
 
-/**
- * Hook to manage real-time updates for team data from Supabase
- * Enhanced with better error handling and reconnection logic
- */
+export type ConnectionState = 'connected' | 'disconnected' | 'connecting';
+
 export const useTeamRealtimeUpdates = (
-  teamId: string | null,
-  periods: Period[],
-  teamMembers: TeamMember[],
-  refreshTeamData: () => Promise<void>
+  teamId: string | undefined,
+  periods: any[],
+  teamMembers: any[],
+  refreshData: () => Promise<void>
 ) => {
-  const { toast } = useToast();
+  const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [lastActivity, setLastActivity] = useState<Date>(new Date());
   const channelsRef = useRef<any[]>([]);
-  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [connectionState, setConnectionState] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
-  const lastRefreshRef = useRef<number>(Date.now());
-  const reconnectAttemptsRef = useRef<number>(0);
-
-  // Monitor overall connection state
+  const refreshingRef = useRef<boolean>(false);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const periodsRef = useRef(periods);
+  const teamMembersRef = useRef(teamMembers);
+  
+  // Update refs when props change
   useEffect(() => {
-    if (!teamId) return;
-    
-    const presenceChannel = supabase.channel('team-realtime-presence');
-    
-    presenceChannel
-      .on('presence', { event: 'sync' }, () => {
-        console.log('useTeamRealtimeUpdates: Connection synced');
-        setConnectionState('connected');
-        reconnectAttemptsRef.current = 0;
-      })
-      .on('presence', { event: 'join' }, () => {
-        console.log('useTeamRealtimeUpdates: Connection joined');
-      })
-      .on('system', { event: 'disconnect' }, () => {
-        console.log('useTeamRealtimeUpdates: Connection disconnected');
-        setConnectionState('disconnected');
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setConnectionState('connected');
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          setConnectionState('disconnected');
-        }
-      });
-    
-    // Add this channel to our refs for cleanup
-    channelsRef.current.push(presenceChannel);
-    
+    periodsRef.current = periods;
+    teamMembersRef.current = teamMembers;
+  }, [periods, teamMembers]);
+
+  // Clear retry timers on unmount to prevent memory leaks
+  useEffect(() => {
     return () => {
-      supabase.removeChannel(presenceChannel).catch(err => 
-        console.error("Error removing presence channel:", err)
-      );
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
     };
-  }, [teamId]);
+  }, []);
 
-  // Main realtime updates setup
-  useEffect(() => {
+  // Handle secure data refresh with debounce and error catching
+  const handleDataChange = useCallback(async () => {
+    // Prevent concurrent refreshes - important for performance and avoiding race conditions
+    if (refreshingRef.current) return;
+    
+    console.log('Realtime update received, refreshing data...');
+    setLastActivity(new Date());
+    refreshingRef.current = true;
+    
+    try {
+      await refreshData();
+      setLastError(null);
+    } catch (error: any) {
+      console.error('Error refreshing data after realtime update:', error);
+      
+      // Check for recursion errors specifically
+      if (error.message && (
+          error.message.includes('recursion') || 
+          error.message.includes('infinity') ||
+          error.code === '42P17'
+      )) {
+        setLastError(error.message);
+        
+        // Trigger immediate reconnect with clean state
+        reconnect();
+      } else {
+        setLastError(error.message || 'Unknown error refreshing data');
+      }
+    } finally {
+      refreshingRef.current = false;
+    }
+  }, [refreshData]);
+
+  // Set up channel for team updates with better error recovery
+  const setupChannels = useCallback(() => {
     if (!teamId) {
-      console.log("useTeamRealtimeUpdates: No team ID for real-time updates");
+      console.log('No team ID available for realtime updates');
       return;
     }
-
-    console.log("useTeamRealtimeUpdates: Setting up real-time updates for team:", teamId);
     
-    // Cleanup any existing channels to prevent duplicates
-    if (channelsRef.current.length > 0) {
-      console.log("useTeamRealtimeUpdates: Cleaning up existing channels before creating new ones");
-      channelsRef.current.forEach(channel => {
-        supabase.removeChannel(channel).catch(err => 
-          console.error("Error removing existing channel:", err)
-        );
-      });
-      channelsRef.current = [];
-    }
-    
-    // Create a debounced refresh function to prevent multiple refreshes at once
-    const debouncedRefresh = () => {
-      // Prevent refreshing too frequently (minimum 1 second between refreshes)
-      const now = Date.now();
-      if (now - lastRefreshRef.current < 1000) {
-        console.log('useTeamRealtimeUpdates: Skipping refresh - too soon after last refresh');
-        return;
-      }
-      
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-      
-      refreshTimeoutRef.current = setTimeout(async () => {
-        try {
-          console.log('useTeamRealtimeUpdates: Refreshing team data after real-time update');
-          lastRefreshRef.current = Date.now();
-          await refreshTeamData();
-        } catch (error) {
-          console.error('useTeamRealtimeUpdates: Error refreshing data:', error);
-        }
-      }, 300); // Short delay to debounce multiple updates
-    };
-    
-    // Listen for period changes
-    const periodChannel = supabase
-      .channel('team-periods-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // All events
-          schema: 'public',
-          table: 'periods',
-          filter: `team_id=eq.${teamId}`
-        },
-        (payload) => {
-          console.log('useTeamRealtimeUpdates: Real-time period update received:', payload);
-          debouncedRefresh();
-        }
-      )
-      .subscribe((status) => {
-        console.log(`useTeamRealtimeUpdates: Period channel subscription status: ${status}`);
-        if (status === 'CHANNEL_ERROR') {
-          toast({
-            title: "Fout bij realtime updates",
-            description: "Er was een probleem met realtime updates. Probeer de pagina te verversen.",
-            variant: "destructive"
-          });
-        }
-      });
-    
-    channelsRef.current.push(periodChannel);
-    
-    // Listen for team member changes
-    const teamMemberChannel = supabase
-      .channel('team-members-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // All events
-          schema: 'public',
-          table: 'team_members',
-          filter: `team_id=eq.${teamId}`
-        },
-        (payload) => {
-          console.log('useTeamRealtimeUpdates: Real-time team member update received:', payload);
-          debouncedRefresh();
-        }
-      )
-      .subscribe((status) => {
-        console.log(`useTeamRealtimeUpdates: Team member channel subscription status: ${status}`);
-      });
-    
-    channelsRef.current.push(teamMemberChannel);
-    
-    // Listen for tip changes
-    const tipChannel = supabase
-      .channel('team-tips-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // All events
-          schema: 'public',
-          table: 'tips',
-        },
-        async (payload) => {
-          console.log('useTeamRealtimeUpdates: Real-time tip update received:', payload);
-          
-          // Check if tip belongs to one of our periods
-          const newPeriodId = payload.new && 'period_id' in payload.new ? payload.new.period_id : undefined;
-          const oldPeriodId = payload.old && 'period_id' in payload.old ? payload.old.period_id : undefined;
-          const tipPeriodId = newPeriodId || oldPeriodId;
-          
-          if (tipPeriodId && periods.some(p => p.id === tipPeriodId)) {
-            debouncedRefresh();
-          } else {
-            console.log('useTeamRealtimeUpdates: Ignoring tip update for period not in our team');
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log(`useTeamRealtimeUpdates: Tip channel subscription status: ${status}`);
-      });
-    
-    channelsRef.current.push(tipChannel);
-    
-    // Listen for hour registrations changes
-    const hourChannel = supabase
-      .channel('team-hours-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // All events
-          schema: 'public',
-          table: 'hour_registrations',
-        },
-        async (payload) => {
-          console.log('useTeamRealtimeUpdates: Real-time hour registration update received:', payload);
-          
-          // Check if hour belongs to one of our team members
-          const newTeamMemberId = payload.new && 'team_member_id' in payload.new ? payload.new.team_member_id : undefined;
-          const oldTeamMemberId = payload.old && 'team_member_id' in payload.old ? payload.old.team_member_id : undefined;
-          const hourTeamMemberId = newTeamMemberId || oldTeamMemberId;
-          
-          if (hourTeamMemberId && teamMembers.some(m => m.id === hourTeamMemberId)) {
-            debouncedRefresh();
-          } else {
-            console.log('useTeamRealtimeUpdates: Ignoring hour update for team member not in our team');
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log(`useTeamRealtimeUpdates: Hour registration channel subscription status: ${status}`);
-      });
-    
-    channelsRef.current.push(hourChannel);
-    
-    // Setup auto-reconnect for channels when connection is lost
-    const setupAutoReconnect = () => {
-      if (connectionState === 'disconnected') {
-        console.log("useTeamRealtimeUpdates: Connection lost, will attempt to reconnect");
-        
-        // Increase reconnection delay based on number of attempts (exponential backoff)
-        const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttemptsRef.current));
-        reconnectAttemptsRef.current++;
-        
-        setTimeout(() => {
-          console.log(`useTeamRealtimeUpdates: Attempting reconnect #${reconnectAttemptsRef.current}`);
-          reconnect();
-        }, delay);
-      }
-    };
-    
-    // Watch for connection state changes to auto-reconnect
-    const disconnectWatcher = setInterval(setupAutoReconnect, 10000);
-    
-    // Cleanup function
-    return () => {
-      console.log("useTeamRealtimeUpdates: Cleaning up real-time subscriptions");
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-      
-      clearInterval(disconnectWatcher);
-      
-      channelsRef.current.forEach(channel => {
-        supabase.removeChannel(channel).catch(err => 
-          console.error("Error removing channel:", err)
-        );
-      });
-      channelsRef.current = [];
-    };
-  }, [teamId, refreshTeamData, toast, periods, teamMembers, connectionState]);
-
-  // Provide a method to manually reconnect if needed
-  const reconnect = () => {
-    console.log("useTeamRealtimeUpdates: Manually reconnecting real-time channels");
-    setConnectionState('connecting');
-    
-    // Force cleanup and reconnect by setting teamId to null and back
+    // Clean up any existing channels
     channelsRef.current.forEach(channel => {
-      supabase.removeChannel(channel).catch(err => 
-        console.error("Error removing channel during reconnect:", err)
-      );
+      try {
+        supabase.removeChannel(channel);
+      } catch (e) {
+        console.error('Error removing channel:', e);
+      }
     });
     channelsRef.current = [];
     
-    // Setup will happen on next render due to dependency array
-    toast({
-      title: "Verbinding herstellen",
-      description: "Bezig met het opnieuw verbinden met de server...",
-    });
+    console.log(`Setting up realtime channels for team ${teamId}...`);
     
-    // Force refresh data after reconnection
-    setTimeout(async () => {
-      try {
-        await refreshTeamData();
-        console.log("useTeamRealtimeUpdates: Successfully refreshed data after reconnection");
-      } catch (error) {
-        console.error("useTeamRealtimeUpdates: Failed to refresh data after reconnection:", error);
-      }
-    }, 1000);
-  };
+    try {
+      // Main connection status channel
+      const statusChannel = supabase.channel('connection-status')
+        .on('presence', { event: 'sync' }, () => {
+          console.log('Connection synced');
+          setConnectionState('connected');
+        })
+        .on('system', { event: 'disconnect' }, () => {
+          console.log('Disconnected from Supabase realtime');
+          setConnectionState('disconnected');
+        })
+        .subscribe(status => {
+          console.log(`Channel status: ${status}`);
+          if (status === 'SUBSCRIBED') {
+            setConnectionState('connected');
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            setConnectionState('disconnected');
+            
+            // Auto-reconnect with exponential backoff
+            const delay = Math.min(1000 * Math.pow(2, retryCount), 30000); // Max 30s
+            console.log(`Will auto-reconnect in ${delay}ms`);
+            
+            if (reconnectTimerRef.current) {
+              clearTimeout(reconnectTimerRef.current);
+            }
+            
+            reconnectTimerRef.current = setTimeout(() => {
+              setRetryCount(prev => prev + 1);
+              reconnect();
+            }, delay);
+          }
+        });
+      
+      channelsRef.current.push(statusChannel);
+      
+      // Team members channel
+      const teamMembersChannel = supabase.channel('team-members-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'team_members',
+            filter: `team_id=eq.${teamId}`
+          },
+          () => handleDataChange()
+        )
+        .subscribe();
+      
+      channelsRef.current.push(teamMembersChannel);
+      
+      // Periods channel
+      const periodsChannel = supabase.channel('periods-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'periods',
+            filter: `team_id=eq.${teamId}`
+          },
+          () => handleDataChange()
+        )
+        .subscribe();
+      
+      channelsRef.current.push(periodsChannel);
+      
+      // Tips channel - needs to listen to all tips since we can't filter by team_id
+      const tipsChannel = supabase.channel('tips-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'tips'
+          },
+          async (payload) => {
+            // Only refresh if the tip belongs to one of our periods
+            const periodId = payload.new?.period_id;
+            if (periodId && periodsRef.current.some(p => p.id === periodId)) {
+              await handleDataChange();
+            }
+          }
+        )
+        .subscribe();
+      
+      channelsRef.current.push(tipsChannel);
+      
+      // Hour registrations channel
+      const hoursChannel = supabase.channel('hours-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'hour_registrations'
+          },
+          async (payload) => {
+            // Only refresh if the hour registration belongs to one of our team members
+            const teamMemberId = payload.new?.team_member_id;
+            if (teamMemberId && teamMembersRef.current.some(m => m.id === teamMemberId)) {
+              await handleDataChange();
+            }
+          }
+        )
+        .subscribe();
+      
+      channelsRef.current.push(hoursChannel);
+      
+      console.log('All realtime channels set up successfully');
+    } catch (error) {
+      console.error('Error setting up realtime channels:', error);
+      setConnectionState('disconnected');
+    }
+  }, [teamId, handleDataChange, retryCount]);
 
-  return { reconnect, connectionState };
+  // Reconnect function with clean state - useful for error recovery
+  const reconnect = useCallback(() => {
+    console.log('Attempting to reconnect realtime channels...');
+    setConnectionState('connecting');
+    setupChannels();
+  }, [setupChannels]);
+
+  // Initial setup
+  useEffect(() => {
+    if (teamId) {
+      setupChannels();
+    }
+    
+    return () => {
+      // Clean up on component unmount
+      channelsRef.current.forEach(channel => {
+        try {
+          supabase.removeChannel(channel);
+        } catch (e) {
+          console.error('Error removing channel during cleanup:', e);
+        }
+      });
+      channelsRef.current = [];
+      
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
+    };
+  }, [teamId, setupChannels]);
+
+  // Heartbeat to detect stale connections
+  useEffect(() => {
+    const heartbeatInterval = setInterval(() => {
+      const now = new Date();
+      const timeSinceLastActivity = now.getTime() - lastActivity.getTime();
+      
+      // If it's been more than 5 minutes since last activity and we think we're connected
+      if (timeSinceLastActivity > 5 * 60 * 1000 && connectionState === 'connected') {
+        console.log('Connection may be stale, checking status...');
+        
+        // Send a presence update to check connection
+        const testChannel = supabase.channel('heartbeat-test');
+        testChannel.subscribe(status => {
+          if (status !== 'SUBSCRIBED') {
+            console.log('Heartbeat detected connection issue, reconnecting...');
+            setConnectionState('disconnected');
+            reconnect();
+          }
+          
+          // Remove test channel either way
+          setTimeout(() => supabase.removeChannel(testChannel), 1000);
+        });
+      }
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(heartbeatInterval);
+  }, [connectionState, lastActivity, reconnect]);
+
+  return {
+    connectionState,
+    reconnect,
+    lastError,
+    lastActivity
+  };
 };

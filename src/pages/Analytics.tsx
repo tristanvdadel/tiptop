@@ -1,41 +1,22 @@
 
-import React, { useMemo, useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Info, TrendingUp, ArrowRight, AlertTriangle, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { format } from 'date-fns';
-import { nl } from 'date-fns/locale';
-import TipChart from '@/components/TipChart';
-import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { getUserTeamsSafe } from '@/services/teamService';
 import { useNavigate } from 'react-router-dom';
+import TipChart from '@/components/TipChart';
 
-interface HistoricalPeriod {
-  id: string;
-  startDate: string;
-  endDate: string | null;
-  isPaid: boolean;
-  averageTipPerHour: number | null;
-  totalTips: number;
-  payoutDate: string | null;
-  totalHours?: number;
-}
+// New Component Imports
+import AverageTipCard from '@/components/analytics/AverageTipCard';
+import TipPerHourChart from '@/components/analytics/TipPerHourChart';
+import PeriodList from '@/components/analytics/PeriodList';
+import ErrorCard from '@/components/analytics/ErrorCard';
+import Loading from '@/components/analytics/Loading';
 
-interface PeriodChartData {
-  name: string;
-  total: number;
-  average: number;
-  id: string;
-  isPaid: boolean;
-  timestamp: number;
-  isHistorical?: boolean;
-}
+// Custom Hooks
+import { useHistoricalData } from '@/hooks/useHistoricalData';
+import { usePeriodData, useLineChartData, useChartConfig } from '@/hooks/usePeriodData';
+import { useAverageTipPerHour, getEmptyStateMessage } from '@/hooks/useAverageTipPerHour';
 
 const Analytics = () => {
   const {
@@ -48,13 +29,13 @@ const Analytics = () => {
   } = useApp();
   
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
+  
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [localTeamId, setLocalTeamId] = useState<string | null>(null);
-  const [historicalData, setHistoricalData] = useState<HistoricalPeriod[]>([]);
   
+  // Get team ID if not available in context
   useEffect(() => {
     const fetchTeamID = async () => {
       try {
@@ -86,172 +67,10 @@ const Analytics = () => {
     fetchTeamID();
   }, [teamId]);
   
-  useEffect(() => {
-    const fetchHistoricalData = async () => {
-      const effectiveTeamId = localTeamId || teamId;
-      if (!effectiveTeamId) return;
-      
-      try {
-        console.log("Analytics.tsx: Fetching historical payout data");
-        
-        // Fetch payouts with total_hours column
-        const { data: payoutsData, error: payoutsError } = await supabase
-          .from('payouts')
-          .select(`
-            id,
-            date,
-            payout_time,
-            total_hours
-          `)
-          .eq('team_id', effectiveTeamId);
-          
-        if (payoutsError) {
-          console.error("Analytics.tsx: Error fetching historical payout data:", payoutsError);
-          return;
-        }
-        
-        if (!payoutsData || payoutsData.length === 0) {
-          console.log("Analytics.tsx: No historical payout data found");
-          return;
-        }
-        
-        console.log("Analytics.tsx: Found historical payout data:", payoutsData.length, "payouts");
-        
-        const payoutIds = payoutsData.map(p => p.id);
-        const { data: payoutPeriodsData, error: payoutPeriodsError } = await supabase
-          .from('payout_periods')
-          .select('payout_id, period_id')
-          .in('payout_id', payoutIds);
-          
-        if (payoutPeriodsError) {
-          console.error("Analytics.tsx: Error fetching payout periods:", payoutPeriodsError);
-          return;
-        }
-        
-        // Fetch payout distributions with hours column
-        const { data: payoutDistributionsData, error: distributionsError } = await supabase
-          .from('payout_distributions')
-          .select('payout_id, team_member_id, amount, actual_amount, balance, hours')
-          .in('payout_id', payoutIds);
-          
-        if (distributionsError) {
-          console.error("Analytics.tsx: Error fetching payout distributions:", distributionsError);
-          return;
-        }
-        
-        const payoutPeriods = {};
-        const payoutDistributions = {};
-        const payoutTotalHours = {};
-        
-        if (payoutPeriodsData) {
-          payoutPeriodsData.forEach(item => {
-            if (!payoutPeriods[item.payout_id]) {
-              payoutPeriods[item.payout_id] = [];
-            }
-            payoutPeriods[item.payout_id].push(item.period_id);
-          });
-        }
-        
-        if (payoutDistributionsData) {
-          payoutDistributionsData.forEach(item => {
-            if (!payoutDistributions[item.payout_id]) {
-              payoutDistributions[item.payout_id] = [];
-            }
-            payoutDistributions[item.payout_id].push(item);
-          });
-        }
-        
-        // Calculate total hours for each payout from distribution data
-        payoutsData.forEach(payout => {
-          // Try to use the stored total_hours if available
-          if (payout.total_hours && payout.total_hours > 0) {
-            payoutTotalHours[payout.id] = payout.total_hours;
-          } else {
-            // Otherwise calculate from distributions
-            const distributions = payoutDistributions[payout.id] || [];
-            const totalHours = distributions.reduce((sum, dist) => {
-              return sum + (dist.hours || 0);
-            }, 0);
-            
-            payoutTotalHours[payout.id] = totalHours;
-          }
-        });
-        
-        const enhancedPayouts = payoutsData.map(payout => ({
-          ...payout,
-          payout_periods: payoutPeriods[payout.id] || [],
-          payout_distributions: payoutDistributions[payout.id] || [],
-          total_hours: payoutTotalHours[payout.id] || payout.total_hours || 0
-        }));
-        
-        const periodIds = enhancedPayouts
-          .flatMap(payout => payout.payout_periods || [])
-          .filter(id => id);
-          
-        if (periodIds.length === 0) {
-          console.log("Analytics.tsx: No period IDs found in payouts");
-          return;
-        }
-        
-        const { data: periodsData, error: periodsError } = await supabase
-          .from('periods')
-          .select(`
-            id,
-            start_date,
-            end_date,
-            is_paid,
-            average_tip_per_hour,
-            tips (
-              id,
-              amount,
-              date
-            )
-          `)
-          .in('id', periodIds);
-          
-        if (periodsError) {
-          console.error("Analytics.tsx: Error fetching historical period data:", periodsError);
-          return;
-        }
-        
-        if (!periodsData || periodsData.length === 0) {
-          console.log("Analytics.tsx: No historical period data found");
-          return;
-        }
-        
-        console.log("Analytics.tsx: Found historical period data:", periodsData.length, "periods");
-        
-        const historicalPeriods = periodsData.map(period => {
-          const relatedPayout = enhancedPayouts.find(p => 
-            p.payout_periods.includes(period.id)
-          );
-          
-          const totalTips = period.tips?.reduce((sum, tip) => sum + tip.amount, 0) || 0;
-          
-          let totalHours = relatedPayout?.total_hours || 0;
-          
-          return {
-            id: period.id,
-            startDate: period.start_date,
-            endDate: period.end_date,
-            isPaid: period.is_paid,
-            averageTipPerHour: period.average_tip_per_hour || (totalHours > 0 ? totalTips / totalHours : 0),
-            totalTips,
-            payoutDate: relatedPayout?.date,
-            totalHours
-          };
-        });
-        
-        setHistoricalData(historicalPeriods);
-        console.log("Analytics.tsx: Historical data prepared:", historicalPeriods.length, "items");
-      } catch (error) {
-        console.error("Analytics.tsx: Error in fetchHistoricalData:", error);
-      }
-    };
-    
-    fetchHistoricalData();
-  }, [localTeamId, teamId, payouts]);
+  // Fetch historical data using custom hook
+  const { historicalData } = useHistoricalData(localTeamId || teamId);
   
+  // Load team data
   useEffect(() => {
     const loadData = async () => {
       const effectiveTeamId = localTeamId || teamId;
@@ -283,154 +102,11 @@ const Analytics = () => {
     loadData();
   }, [localTeamId, teamId, refreshTeamData]);
   
-  const averageTipPerHour = useMemo(() => {
-    const currentAverage = calculateAverageTipPerHour();
-    
-    if (historicalData.length === 0) {
-      return currentAverage;
-    }
-    
-    let totalHistoricalTips = 0;
-    let totalHistoricalHours = 0;
-    
-    historicalData.forEach(period => {
-      if (period.totalTips && period.totalHours && period.totalHours > 0) {
-        totalHistoricalTips += period.totalTips;
-        totalHistoricalHours += period.totalHours;
-      }
-    });
-    
-    if (totalHistoricalHours === 0) {
-      return currentAverage || 0;
-    }
-    
-    const historicalAverage = totalHistoricalTips / totalHistoricalHours;
-    
-    if (!currentAverage || currentAverage === 0) {
-      return historicalAverage;
-    }
-    
-    const currentTotalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
-    
-    const combinedAverage = 
-      (currentAverage * currentTotalHours + historicalAverage * totalHistoricalHours) / 
-      (currentTotalHours + totalHistoricalHours);
-    
-    return combinedAverage;
-  }, [calculateAverageTipPerHour, historicalData, teamMembers]);
-  
-  const periodData = useMemo(() => {
-    const currentPeriodsData: PeriodChartData[] = periods.map(period => {
-      let avgTipPerHour = period.averageTipPerHour;
-      
-      if (avgTipPerHour === undefined || avgTipPerHour === null) {
-        avgTipPerHour = calculateAverageTipPerHour(period.id);
-      }
-      
-      const totalTips = period.tips.reduce((sum, tip) => sum + tip.amount, 0);
-      const startDate = format(new Date(period.startDate), 'd MMM', {
-        locale: nl
-      });
-      const endDate = period.endDate ? format(new Date(period.endDate), 'd MMM', {
-        locale: nl
-      }) : 'Actief';
-      
-      const timestamp = new Date(period.startDate).getTime();
-      return {
-        name: `${startDate} - ${endDate}`,
-        total: totalTips,
-        average: avgTipPerHour || 0,
-        id: period.id,
-        isPaid: period.isPaid,
-        timestamp: timestamp,
-        isHistorical: false
-      };
-    });
-    
-    const currentPeriodIds = periods.map(p => p.id);
-    
-    const historicalPeriodsData: PeriodChartData[] = historicalData
-      .filter(hp => !currentPeriodIds.includes(hp.id))
-      .map(hp => {
-        const startDate = format(new Date(hp.startDate), 'd MMM', {
-          locale: nl
-        });
-        const endDate = hp.endDate ? format(new Date(hp.endDate), 'd MMM', {
-          locale: nl
-        }) : '';
-        
-        const timestamp = new Date(hp.startDate).getTime();
-        return {
-          name: `${startDate} - ${endDate}`,
-          total: hp.totalTips || 0,
-          average: hp.averageTipPerHour || 0,
-          id: hp.id,
-          isPaid: true,
-          timestamp: timestamp,
-          isHistorical: true
-        };
-      });
-    
-    return [...currentPeriodsData, ...historicalPeriodsData]
-      .sort((a, b) => a.timestamp - b.timestamp);
-  }, [periods, calculateAverageTipPerHour, historicalData]);
-  
-  const lineChartData = useMemo(() => {
-    const filteredData = periodData.filter(period => period.average > 0 || period.total > 0);
-    if (filteredData.length > 10) {
-      return filteredData.slice(-10);
-    }
-    return filteredData;
-  }, [periodData]);
-  
-  const chartConfig = useMemo(() => {
-    return {
-      average: {
-        label: 'Gem. fooi per uur',
-        color: '#33C3F0'
-      }
-    };
-  }, []);
-  
-  const getEmptyStateMessage = () => {
-    const allPeriods = periods;
-    const periodsWithTips = allPeriods.some(period => period.tips.length > 0);
-    const teamHasHours = teamMembers.some(member => member.hours > 0 || member.hourRegistrations && member.hourRegistrations.length > 0);
-    if (!periodsWithTips && !teamHasHours) {
-      return "Er ontbreken uur gegevens en fooi gegevens. Voeg ze toe om een gemiddelde te zien.";
-    } else if (!periodsWithTips) {
-      return "Er ontbreken fooi gegevens. Voeg ze toe om een gemiddelde te zien.";
-    } else if (!teamHasHours) {
-      return "Er ontbreken uur gegevens. Voeg ze toe om een gemiddelde te zien.";
-    }
-    return "";
-  };
-  
-  const AverageTipCard = () => <Card className="mb-4 w-full">
-      <CardContent className="p-4">
-        {averageTipPerHour > 0 ? <div className="flex justify-between items-center bg-gradient-to-r from-[#9b87f5]/10 to-[#7E69AB]/5 border-[#9b87f5]/20 rounded-md p-3">
-            <div className="flex items-center gap-2">
-              <TrendingUp size={20} className="text-[#9b87f5]" />
-              <div>
-                <h3 className="text-sm font-medium">Gemiddelde fooi per uur</h3>
-                <TooltipProvider>
-                  <UITooltip>
-                    <TooltipTrigger asChild>
-                      <span className="text-xs text-muted-foreground">Gemiddelde over alle periodes (incl. uitbetaald)</span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Gemiddelde berekend over alle periodes (inclusief uitbetaalde periodes)</p>
-                    </TooltipContent>
-                  </UITooltip>
-                </TooltipProvider>
-              </div>
-            </div>
-            <span className="font-bold text-[#9b87f5]">€{averageTipPerHour.toFixed(2)} / uur</span>
-          </div> : <div className="text-center py-2 text-muted-foreground">
-            <p>{getEmptyStateMessage()}</p>
-          </div>}
-      </CardContent>
-    </Card>;
+  // Process period data and averages
+  const averageTipPerHour = useAverageTipPerHour(calculateAverageTipPerHour, historicalData, teamMembers);
+  const periodData = usePeriodData(periods, historicalData, calculateAverageTipPerHour);
+  const lineChartData = useLineChartData(periodData);
+  const chartConfig = useChartConfig();
   
   const handleRetryLoading = () => {
     setIsLoading(true);
@@ -450,189 +126,39 @@ const Analytics = () => {
   };
   
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#9b87f5]"></div>
-      </div>
-    );
+    return <Loading />;
   }
   
   const effectiveTeamId = localTeamId || teamId;
   
   if (hasError) {
-    return (
-      <div className="space-y-6">
-        <Card className="border-destructive/50">
-          <CardContent className="p-6">
-            <div className="flex flex-col items-center justify-center text-center space-y-4">
-              <AlertCircle className="h-10 w-10 text-destructive" />
-              <div>
-                <h3 className="text-lg font-medium">Fout bij laden</h3>
-                <p className="text-muted-foreground mt-1">{errorMessage || "Er is een fout opgetreden bij het laden van de analysegegevens."}</p>
-              </div>
-              <Button onClick={handleRetryLoading}>
-                Opnieuw proberen
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorCard type="error" message={errorMessage} onRetry={handleRetryLoading} />;
   }
 
   if (!effectiveTeamId) {
-    return (
-      <div className="space-y-6">
-        <Card className="border-amber-300">
-          <CardContent className="p-6">
-            <div className="flex flex-col items-center justify-center text-center space-y-4">
-              <AlertTriangle className="h-10 w-10 text-amber-500" />
-              <div>
-                <h3 className="text-lg font-medium">Geen team gevonden</h3>
-                <p className="text-muted-foreground mt-1">Je moet eerst een team aanmaken of lid worden van een team voordat je analyses kunt bekijken.</p>
-              </div>
-              <Button onClick={() => navigate('/management')}>
-                Naar Teambeheer
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorCard type="noTeam" message={null} />;
   }
   
-  const hasAnyPeriodWithTips = periodData.some(period => period.total > 0);
-  
-  return <div className="space-y-4 w-full max-w-full px-1 sm:px-4">
+  return (
+    <div className="space-y-4 w-full max-w-full px-1 sm:px-4">
       <h1 className="text-xl font-bold">Analyse</h1>
       
-      <AverageTipCard />
+      <AverageTipCard 
+        averageTipPerHour={averageTipPerHour} 
+        getEmptyStateMessage={() => getEmptyStateMessage(periods, teamMembers)} 
+      />
       
       <TipChart />
       
-      <Card className="w-full">
-        <CardHeader className="pb-2 pt-4">
-          <CardTitle className="text-lg">Verloop van fooi per uur</CardTitle>
-        </CardHeader>
-        <CardContent className="pb-4">
-          <p className="text-muted-foreground mb-2 text-sm">
-            Deze grafiek toont het verloop van de gemiddelde fooi per uur over verschillende periodes, inclusief uitbetaalde periodes.
-            {lineChartData.length < periodData.filter(period => period.total > 0).length && ` (Laatste ${lineChartData.length} periodes weergegeven)`}
-          </p>
-          {hasAnyPeriodWithTips ? (
-            <div className="h-[300px] sm:h-[350px] md:h-[400px] w-full">
-              <ChartContainer config={chartConfig} className="h-full w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart 
-                    data={lineChartData} 
-                    margin={{
-                      top: 10,
-                      right: isMobile ? 5 : 20,
-                      left: isMobile ? 5 : 20,
-                      bottom: isMobile ? 70 : 40
-                    }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="name" 
-                      tickMargin={5} 
-                      height={60} 
-                      tick={{
-                        fontSize: isMobile ? 8 : 10
-                      }} 
-                      interval={0} 
-                      angle={-45} 
-                      textAnchor="end" 
-                    />
-                    <YAxis 
-                      width={isMobile ? 30 : 40} 
-                      tick={{
-                        fontSize: isMobile ? 10 : 12
-                      }} 
-                    />
-                    <ChartTooltip 
-                      content={({active, payload}) => {
-                        if (active && payload && payload.length) {
-                          return <ChartTooltipContent formatter={(value: number) => [`€${value.toFixed(2)}`, 'Gem. fooi per uur']} />;
-                        }
-                        return null;
-                      }} 
-                    />
-                    <Legend 
-                      wrapperStyle={{
-                        fontSize: isMobile ? '10px' : '12px',
-                        marginTop: isMobile ? '10px' : '5px'
-                      }} 
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="average" 
-                      name="Gem. fooi per uur" 
-                      stroke="#33C3F0" 
-                      strokeWidth={2} 
-                      dot={{
-                        r: isMobile ? 3 : 5
-                      }} 
-                      activeDot={{
-                        r: isMobile ? 5 : 8
-                      }} 
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </div>
-          ) : (
-            <div className="text-center py-6 text-muted-foreground h-[300px] sm:h-[350px] md:h-[400px] flex items-center justify-center">
-              <p>Er zijn nog geen periodes met fooi gegevens.</p>
-              <p className="mt-1">Voeg fooi toe aan een periode om deze grafiek te zien.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <TipPerHourChart 
+        lineChartData={lineChartData} 
+        periodData={periodData} 
+        chartConfig={chartConfig} 
+      />
       
-      <Card className="w-full mb-6">
-        <CardHeader className="pb-2 pt-4">
-          <CardTitle className="text-lg">Gemiddeld fooi per uur</CardTitle>
-        </CardHeader>
-        <CardContent className="pb-4">
-          <p className="text-muted-foreground mb-2 text-sm">
-            Het gemiddelde fooi per uur wordt berekend op basis van de totale fooi en de gewerkte uren van het team.
-            <span className="font-medium ml-1">Inclusief uitbetaalde periodes.</span>
-          </p>
-          {hasAnyPeriodWithTips ? (
-            <ScrollArea className="h-64 w-full">
-              <div className="space-y-2 pr-2">
-                {periodData.filter(period => period.average > 0 || period.total > 0).reverse().map(period => (
-                  <div key={period.id} className="flex justify-between p-2 border rounded-md">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{period.name}</span>
-                      {period.isPaid && (
-                        <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
-                          Uitbetaald
-                        </span>
-                      )}
-                      {period.isHistorical && (
-                        <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full">
-                          Historisch
-                        </span>
-                      )}
-                    </div>
-                    <div className="font-medium text-sm">
-                      €{period.average.toFixed(2)}/uur
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          ) : (
-            <div className="text-center py-6 text-muted-foreground">
-              <p>Er zijn nog geen periodes met fooi gegevens.</p>
-              <p className="mt-1">Voeg fooi toe aan een periode om deze lijst te zien.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>;
+      <PeriodList periodData={periodData} />
+    </div>
+  );
 };
 
 export default Analytics;

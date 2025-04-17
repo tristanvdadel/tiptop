@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Plus, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileText, DollarSign, Crown, Calendar, Pencil, AlertCircle } from 'lucide-react';
+import { Plus, AlertTriangle, ArrowRight, Trash2, TrendingUp, Edit, FileText, DollarSign, Crown, Calendar, Pencil, AlertCircle, WifiOff, RefreshCw } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -55,6 +55,8 @@ const Periods = () => {
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [realtimeSetup, setRealtimeSetup] = useState(false);
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
+  const channelsRef = useRef<any[]>([]);
   
   const { toast } = useToast();
 
@@ -90,6 +92,35 @@ const Periods = () => {
     }
   }, [teamId, refreshTeamData, toast]);
   
+  // Monitor realtime connection status
+  useEffect(() => {
+    const channel = supabase.channel('global-periods');
+    
+    const subscription = channel
+      .on('presence', { event: 'sync' }, () => {
+        console.log('Periods.tsx: Realtime connection synced');
+        setRealtimeStatus('connected');
+      })
+      .on('system', { event: 'disconnect' }, () => {
+        console.log('Periods.tsx: Realtime disconnected');
+        setRealtimeStatus('disconnected');
+      })
+      .subscribe((status) => {
+        console.log('Periods.tsx: Subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          setRealtimeStatus('connected');
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setRealtimeStatus('disconnected');
+        } else {
+          setRealtimeStatus('connecting');
+        }
+      });
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+  
   // Initial data loading
   useEffect(() => {
     if (teamId) {
@@ -114,11 +145,16 @@ const Periods = () => {
     console.log("Periods.tsx: Setting up real-time updates for periods");
     setRealtimeSetup(true);
     
-    let periodChannel;
-    let tipChannel;
+    // Cleanup any existing channels
+    channelsRef.current.forEach(channel => {
+      supabase.removeChannel(channel).catch(err => 
+        console.error("Error removing existing channel:", err)
+      );
+    });
+    channelsRef.current = [];
     
     try {
-      periodChannel = supabase
+      const periodChannel = supabase
         .channel('periods-page-changes')
         .on(
           'postgres_changes',
@@ -149,7 +185,9 @@ const Periods = () => {
           }
         });
       
-      tipChannel = supabase
+      channelsRef.current.push(periodChannel);
+      
+      const tipChannel = supabase
         .channel('periods-tips-changes')
         .on(
           'postgres_changes',
@@ -188,6 +226,8 @@ const Periods = () => {
             console.error('Periods.tsx: Failed to subscribe to tip changes:', status);
           }
         });
+      
+      channelsRef.current.push(tipChannel);
     } catch (error) {
       console.error("Periods.tsx: Error setting up real-time subscriptions:", error);
       toast({
@@ -201,19 +241,21 @@ const Periods = () => {
       console.log("Periods.tsx: Cleaning up real-time subscriptions");
       setRealtimeSetup(false);
       
-      if (periodChannel) {
-        supabase.removeChannel(periodChannel).catch(err => 
-          console.error("Error removing period channel:", err)
+      channelsRef.current.forEach(channel => {
+        supabase.removeChannel(channel).catch(err => 
+          console.error("Error removing channel:", err)
         );
-      }
-      
-      if (tipChannel) {
-        supabase.removeChannel(tipChannel).catch(err => 
-          console.error("Error removing tip channel:", err)
-        );
-      }
+      });
+      channelsRef.current = [];
     };
   }, [teamId, periods, refreshTeamData, realtimeSetup, toast]);
+  
+  // Handle reconnection attempt when disconnected
+  const handleReconnect = () => {
+    setRealtimeStatus('connecting');
+    // Force reconnection by refreshing the page
+    window.location.reload();
+  };
   
   // Helper functions for date formatting
   const formatPeriodDate = (date: string) => {
@@ -508,6 +550,18 @@ const Periods = () => {
   
   return (
     <div className="space-y-6">
+      {realtimeStatus === 'disconnected' && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3 flex items-center justify-between">
+          <div className="flex items-center">
+            <WifiOff className="h-5 w-5 text-red-500 mr-2" />
+            <span className="text-red-700">Je bent offline. Wijzigingen worden pas zichtbaar als je weer online bent.</span>
+          </div>
+          <Button size="sm" variant="outline" onClick={handleReconnect}>
+            <RefreshCw className="h-4 w-4 mr-1" /> Verbind opnieuw
+          </Button>
+        </div>
+      )}
+      
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Periodes</h1>
         <div className="flex items-center gap-2">

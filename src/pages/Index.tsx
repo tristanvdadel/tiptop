@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import TipInput from '@/components/TipInput';
 import TipCard from '@/components/TipCard';
 import PeriodSummary from '@/components/PeriodSummary';
@@ -8,7 +8,7 @@ import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Users, RefreshCw } from "lucide-react";
+import { AlertCircle, Users, RefreshCw, WifiOff } from "lucide-react";
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { getUserTeamsSafe } from '@/services/teamService';
@@ -25,9 +25,40 @@ const Index = () => {
   const [checkingTeam, setCheckingTeam] = useState(true);
   const [periodLoading, setPeriodLoading] = useState(false);
   const [recursionError, setRecursionError] = useState(false);
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
+  const channelsRef = useRef<any[]>([]);
   const { teamId, fetchTeamId } = useTeamId();
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  // Monitor realtime connection status
+  useEffect(() => {
+    const channel = supabase.channel('global-index');
+    
+    const subscription = channel
+      .on('presence', { event: 'sync' }, () => {
+        console.log('Index: Realtime connection synced');
+        setRealtimeStatus('connected');
+      })
+      .on('system', { event: 'disconnect' }, () => {
+        console.log('Index: Realtime disconnected');
+        setRealtimeStatus('disconnected');
+      })
+      .subscribe((status) => {
+        console.log('Index: Subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          setRealtimeStatus('connected');
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setRealtimeStatus('disconnected');
+        } else {
+          setRealtimeStatus('connecting');
+        }
+      });
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
   
   // Check team membership optimized with useCallback for reuse 
   const checkTeamMembership = useCallback(async () => {
@@ -146,7 +177,7 @@ const Index = () => {
     checkTeamMembership();
   }, [checkTeamMembership]);
 
-  // Real-time updates setup with memoized channel refs
+  // Real-time updates setup with better channel management
   useEffect(() => {
     if (!currentPeriod || !currentPeriod.id) {
       console.log('Index: No current period for real-time updates');
@@ -154,6 +185,14 @@ const Index = () => {
     }
 
     console.log('Index: Setting up real-time updates for period:', currentPeriod.id);
+    
+    // Cleanup existing channels
+    channelsRef.current.forEach(channel => {
+      supabase.removeChannel(channel).catch(err => 
+        console.error("Error removing channel:", err)
+      );
+    });
+    channelsRef.current = [];
     
     // Create real-time subscription channels
     const tipChannel = supabase
@@ -181,7 +220,11 @@ const Index = () => {
           })();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`Index: Tip channel subscription status: ${status}`);
+      });
+    
+    channelsRef.current.push(tipChannel);
 
     const periodChannel = supabase
       .channel('real-time-period-home')
@@ -208,18 +251,41 @@ const Index = () => {
           })();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`Index: Period channel subscription status: ${status}`);
+      });
+    
+    channelsRef.current.push(periodChannel);
     
     // Cleanup function to remove subscriptions
     return () => {
       console.log('Index: Cleaning up real-time subscriptions');
-      supabase.removeChannel(tipChannel);
-      supabase.removeChannel(periodChannel);
+      channelsRef.current.forEach(channel => {
+        supabase.removeChannel(channel).catch(err => 
+          console.error("Error removing channel during cleanup:", err)
+        );
+      });
+      channelsRef.current = [];
     };
   }, [currentPeriod, refreshTeamData]);
   
   const formatPeriodDate = (date: string) => {
     return format(new Date(date), 'd MMMM yyyy', { locale: nl });
+  };
+  
+  // Handle reconnection attempt when disconnected
+  const handleReconnect = () => {
+    setRealtimeStatus('connecting');
+    // Force reconnection by removing and recreating channels
+    channelsRef.current.forEach(channel => {
+      supabase.removeChannel(channel).catch(err => 
+        console.error("Error removing channel during reconnect:", err)
+      );
+    });
+    channelsRef.current = [];
+    
+    // Force page refresh to recreate all connections
+    window.location.reload();
   };
   
   // Show recursion error if detected
@@ -260,6 +326,18 @@ const Index = () => {
   
   return (
     <div className="space-y-6">
+      {realtimeStatus === 'disconnected' && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3 flex items-center justify-between">
+          <div className="flex items-center">
+            <WifiOff className="h-5 w-5 text-red-500 mr-2" />
+            <span className="text-red-700">Je bent offline. Wijzigingen worden pas zichtbaar als je weer online bent.</span>
+          </div>
+          <Button size="sm" variant="outline" onClick={handleReconnect}>
+            <RefreshCw className="h-4 w-4 mr-1" /> Verbind opnieuw
+          </Button>
+        </div>
+      )}
+      
       <div className="grid md:grid-cols-2 gap-6">
         <div>
           {loading || periodLoading ? (

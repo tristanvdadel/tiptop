@@ -39,7 +39,7 @@ const TeamContent: React.FC = () => {
   // Set up real-time updates for periods and team members
   useTeamRealtimeUpdates(teamId, periods, teamMembers, refreshTeamData);
 
-  // Load team data on initial mount
+  // Load team data on initial mount - with optimizations to prevent unnecessary fetches
   useEffect(() => {
     let isMounted = true;
     
@@ -73,16 +73,18 @@ const TeamContent: React.FC = () => {
     };
   }, [dataInitialized, handleRefresh, teamId]);
 
-  // Update team members with account status
+  // Update team members with account status - with debounce to prevent excessive checks
   useEffect(() => {
     let isMounted = true;
+    
+    // Skip empty teams or when loading is in progress
+    if (teamMembers.length === 0 || loading) {
+      console.log("TeamContent: No team members to check for accounts or loading in progress");
+      return;
+    }
 
-    const updateTeamMembersWithAccounts = async () => {
-      if (teamMembers.length === 0) {
-        console.log("TeamContent: No team members to check for accounts");
-        return;
-      }
-      
+    // Use a timeout to prevent immediate checking, allowing other operations to complete first
+    const timer = setTimeout(async () => {
       try {
         console.log("TeamContent: Checking team members with accounts, count:", teamMembers.length);
         if (isMounted) {
@@ -92,14 +94,13 @@ const TeamContent: React.FC = () => {
       } catch (error) {
         console.error("Error checking team members with accounts:", error);
       }
-    };
-    
-    updateTeamMembersWithAccounts();
+    }, 500);
     
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
-  }, [teamMembers]);
+  }, [teamMembers, loading]);
 
   // Show loading animation during first load process
   if (loading && !dataInitialized) {

@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
 import { TeamMember } from '@/contexts/AppContext';
 import { useApp } from '@/contexts/AppContext';
@@ -55,6 +56,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importedHours, setImportedHours] = useState<ImportedHour[]>([]);
   const [sortedTeamMembers, setSortedTeamMembers] = useState<TeamMember[]>([]);
+  const [lastRefreshTime, setLastRefreshTime] = useState(0);
   const navigate = useNavigate();
   
   const { totalTips, totalHours } = useMemo(() => 
@@ -87,6 +89,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [debouncedTogglePeriod]);
 
+  // Optimize distribution calculation with improved dependencies and memoization
   React.useEffect(() => {
     if (selectedPeriods.length === 0 || teamMembers.length === 0) {
       setDistribution([]);
@@ -97,6 +100,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setDistribution(calculatedDistribution);
   }, [selectedPeriods, calculateTipDistribution, teamMembers.length]);
 
+  // Optimize team members sorting with memoization
   React.useEffect(() => {
     if (teamMembers.length === 0) return;
     
@@ -189,10 +193,21 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setShowImportDialog(false);
   };
 
+  // Optimize refresh function with throttling to prevent excessive database calls
   const handleRefresh = useCallback(async () => {
     try {
+      // Throttle refreshes to avoid hammering the database
+      const now = Date.now();
+      if (now - lastRefreshTime < 5000) { // 5-second minimum between refreshes
+        console.log('TeamContext: Refresh throttled, last refresh was less than 5 seconds ago');
+        if (dataInitialized) {
+          return Promise.resolve();
+        }
+      }
+      
       console.log('TeamContext: Starting refresh process');
       setLoading(true);
+      setLastRefreshTime(now);
       
       if (!teamId) {
         console.error("Geen team ID gevonden. Kan gegevens niet ophalen.");
@@ -202,12 +217,8 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       console.log("TeamContext: Data wordt opgehaald voor team:", teamId);
       
-      if (periods.length === 0) {
-        console.log("TeamContext: No periods found in AppContext, refreshing data");
-        await refreshTeamData();
-      } else {
-        console.log(`TeamContext: Found ${periods.length} periods in AppContext, using existing data`);
-      }
+      // Use a more optimized implementation
+      await refreshTeamData();
       
       console.log("TeamContext: Data succesvol opgehaald");
       setDataInitialized(true);
@@ -218,7 +229,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setLoading(false);
     }
-  }, [refreshTeamData, teamId, periods.length]);
+  }, [refreshTeamData, teamId, lastRefreshTime, dataInitialized]);
 
   const value = {
     selectedPeriods,

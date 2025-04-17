@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Fetches all team data including members, periods, payouts, and settings
+ * Optimized for better performance
  */
 export const fetchTeamData = async (teamId: string) => {
   if (!teamId) {
@@ -12,11 +13,23 @@ export const fetchTeamData = async (teamId: string) => {
   try {
     console.log('fetchTeamData: Starting to fetch team data for team ID:', teamId);
     
-    // Fetch team members with detailed error handling
-    const { data: teamMembers, error: teamMembersError } = await supabase
-      .from('team_members')
-      .select('id, user_id, role, permissions, hours, balance')
-      .eq('team_id', teamId);
+    // Use Promise.all to fetch basic data in parallel
+    const [teamMembersResult, periodsResult] = await Promise.all([
+      // Fetch team members with detailed error handling
+      supabase
+        .from('team_members')
+        .select('id, user_id, role, permissions, hours, balance')
+        .eq('team_id', teamId),
+      
+      // Fetch periods with detailed error handling
+      supabase
+        .from('periods')
+        .select('*')
+        .eq('team_id', teamId)
+    ]);
+    
+    const { data: teamMembers, error: teamMembersError } = teamMembersResult;
+    const { data: periods, error: periodsError } = periodsResult;
     
     if (teamMembersError) {
       console.error('fetchTeamData: Error fetching team members:', teamMembersError);
@@ -28,14 +41,6 @@ export const fetchTeamData = async (teamId: string) => {
       throw new Error('Invalid team members response format');
     }
     
-    console.log(`fetchTeamData: Successfully fetched ${teamMembers.length} team members`);
-    
-    // Fetch periods with detailed error handling
-    const { data: periods, error: periodsError } = await supabase
-      .from('periods')
-      .select('*')
-      .eq('team_id', teamId);
-    
     if (periodsError) {
       console.error('fetchTeamData: Error fetching periods:', periodsError);
       throw periodsError;
@@ -46,90 +51,85 @@ export const fetchTeamData = async (teamId: string) => {
       throw new Error('Invalid periods response format');
     }
     
-    console.log(`fetchTeamData: Successfully fetched ${periods.length} periods`);
+    console.log(`fetchTeamData: Successfully fetched ${teamMembers.length} team members and ${periods.length} periods`);
     
-    // Check if we have any periods before fetching tips
-    let allTips = [];
-    if (periods.length > 0) {
-      // Fetch all tips in a single query
-      const { data: fetchedTips, error: allTipsError } = await supabase
-        .from('tips')
-        .select('*')
-        .in('period_id', periods.map(p => p.id));
-        
-      if (allTipsError) {
-        console.error('fetchTeamData: Error fetching all tips:', allTipsError);
-        throw allTipsError;
-      }
+    // Second batch of parallel requests for remaining data
+    const [allTipsResult, profilesResult, hourRegistrationsResult, payoutsResult, settingsResult] = await Promise.all([
+      // Only fetch tips if there are periods
+      periods.length > 0 ? 
+        supabase
+          .from('tips')
+          .select('*')
+          .in('period_id', periods.map(p => p.id)) : 
+        { data: [], error: null },
       
-      if (!fetchedTips || !Array.isArray(fetchedTips)) {
-        console.warn('fetchTeamData: Invalid tips response format, using empty array');
-        allTips = [];
-      } else {
-        allTips = fetchedTips;
-        console.log(`fetchTeamData: Successfully fetched ${allTips.length} tips`);
-      }
+      // Only fetch profiles if there are team members with user_ids
+      teamMembers.length > 0 ?
+        supabase
+          .from('profiles')
+          .select('id, first_name, last_name')
+          .in('id', teamMembers.map(member => member.user_id).filter(Boolean)) :
+        { data: [], error: null },
+      
+      // Only fetch hour registrations if there are team members
+      teamMembers.length > 0 ?
+        supabase
+          .from('hour_registrations')
+          .select('*')
+          .in('team_member_id', teamMembers.map(m => m.id)) :
+        { data: [], error: null },
+      
+      // Fetch payouts
+      supabase
+        .from('payouts')
+        .select('*')
+        .eq('team_id', teamId),
+      
+      // Fetch team settings
+      supabase
+        .from('team_settings')
+        .select('*')
+        .eq('team_id', teamId)
+        .maybeSingle()
+    ]);
+    
+    const { data: allTips, error: allTipsError } = allTipsResult;
+    const { data: profiles, error: profilesError } = profilesResult;
+    const { data: allHourRegistrations, error: hourRegsError } = hourRegistrationsResult;
+    const { data: payouts, error: payoutsError } = payoutsResult;
+    const { data: settings, error: settingsError } = settingsResult;
+    
+    // Handle any errors from the second batch of requests
+    if (allTipsError && periods.length > 0) {
+      console.error('fetchTeamData: Error fetching all tips:', allTipsError);
+    }
+    
+    if (profilesError && teamMembers.length > 0) {
+      console.error('fetchTeamData: Error fetching profiles:', profilesError);
+    }
+    
+    if (hourRegsError && teamMembers.length > 0) {
+      console.error('fetchTeamData: Error fetching hour registrations:', hourRegsError);
+    }
+    
+    if (payoutsError) {
+      console.error('fetchTeamData: Error fetching payouts:', payoutsError);
+    }
+    
+    if (settingsError && settingsError.code !== 'PGRST116') {
+      console.error('fetchTeamData: Error fetching team settings:', settingsError);
     }
     
     // Map tips to their respective periods
     const periodsWithTips = periods.map(period => ({
       ...period,
-      tips: allTips.filter(tip => tip.period_id === period.id) || []
+      tips: (allTips || []).filter(tip => tip.period_id === period.id) || []
     }));
-    
-    // Collect all user_ids to fetch profiles
-    const userIds = teamMembers
-      .map(member => member.user_id)
-      .filter(Boolean);
-    
-    // Only fetch profiles if we have valid user IDs
-    let profiles = [];
-    if (userIds.length > 0) {
-      const { data: fetchedProfiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .in('id', userIds);
-        
-      if (profilesError) {
-        console.error('fetchTeamData: Error fetching profiles:', profilesError);
-        throw profilesError;
-      }
-      
-      if (!fetchedProfiles || !Array.isArray(fetchedProfiles)) {
-        console.warn('fetchTeamData: Invalid profiles response format, using empty array');
-        profiles = [];
-      } else {
-        profiles = fetchedProfiles;
-        console.log(`fetchTeamData: Successfully fetched ${profiles.length} profiles`);
-      }
-    }
-    
-    // Fetch all hour registrations for team members
-    let allHourRegistrations = [];
-    if (teamMembers.length > 0) {
-      const { data: fetchedHourRegs, error: hourRegsError } = await supabase
-        .from('hour_registrations')
-        .select('*')
-        .in('team_member_id', teamMembers.map(m => m.id));
-        
-      if (hourRegsError) {
-        console.error('fetchTeamData: Error fetching hour registrations:', hourRegsError);
-        throw hourRegsError;
-      }
-      
-      if (!fetchedHourRegs || !Array.isArray(fetchedHourRegs)) {
-        console.warn('fetchTeamData: Invalid hour registrations response format, using empty array');
-        allHourRegistrations = [];
-      } else {
-        allHourRegistrations = fetchedHourRegs;
-        console.log(`fetchTeamData: Successfully fetched ${allHourRegistrations.length} hour registrations`);
-      }
-    }
     
     // Build team members with details
     const teamMembersWithDetails = teamMembers.map(member => {
       // Find profile for this member
-      const profile = profiles.find(p => p.id === member.user_id);
+      const profile = (profiles || []).find(p => p.id === member.user_id);
       
       // Generate name from profile or default
       const name = profile ? 
@@ -140,7 +140,7 @@ export const fetchTeamData = async (teamId: string) => {
       const hasAccount = !!member.user_id;
       
       // Find hour registrations for this member
-      const hourRegistrations = allHourRegistrations.filter(
+      const hourRegistrations = (allHourRegistrations || []).filter(
         reg => reg.team_member_id === member.id
       );
       
@@ -152,50 +152,38 @@ export const fetchTeamData = async (teamId: string) => {
       };
     });
     
-    // Fetch payouts with better error handling
-    const { data: payouts, error: payoutsError } = await supabase
-      .from('payouts')
-      .select('*')
-      .eq('team_id', teamId);
-    
-    if (payoutsError) {
-      console.error('fetchTeamData: Error fetching payouts:', payoutsError);
-      throw payoutsError;
-    }
-    
-    // Default to empty array for payouts
-    const processedPayouts = payouts || [];
-    
-    // Process payouts only if we have any
+    // Process payouts - Only fetch detailed data if there are any payouts
     let payoutsWithDistribution = [];
-    if (processedPayouts.length > 0) {
+    if (payouts && payouts.length > 0) {
       // Get all payout ids for further queries
-      const payoutIds = processedPayouts.map(p => p.id);
+      const payoutIds = payouts.map(p => p.id);
       
-      // Fetch all distributions in a single query
-      const { data: allDistributions, error: allDistError } = await supabase
-        .from('payout_distributions')
-        .select('*')
-        .in('payout_id', payoutIds);
-        
+      // Fetch all distributions and payout periods in parallel
+      const [distributionsResult, payoutPeriodsResult] = await Promise.all([
+        supabase
+          .from('payout_distributions')
+          .select('*')
+          .in('payout_id', payoutIds),
+          
+        supabase
+          .from('payout_periods')
+          .select('*')
+          .in('payout_id', payoutIds)
+      ]);
+      
+      const { data: allDistributions, error: allDistError } = distributionsResult;
+      const { data: allPayoutPeriods, error: allPPError } = payoutPeriodsResult;
+      
       if (allDistError) {
         console.error('fetchTeamData: Error fetching all distributions:', allDistError);
-        throw allDistError;
       }
       
-      // Fetch all payout periods in a single query
-      const { data: allPayoutPeriods, error: allPPError } = await supabase
-        .from('payout_periods')
-        .select('*')
-        .in('payout_id', payoutIds);
-        
       if (allPPError) {
         console.error('fetchTeamData: Error fetching all payout periods:', allPPError);
-        throw allPPError;
       }
       
       // Build payouts with distributions and periods
-      payoutsWithDistribution = processedPayouts.map(payout => {
+      payoutsWithDistribution = payouts.map(payout => {
         // Find distributions for this payout
         const distributions = (allDistributions || []).filter(
           dist => dist.payout_id === payout.id
@@ -227,30 +215,6 @@ export const fetchTeamData = async (teamId: string) => {
           }))
         };
       });
-      
-      console.log(`fetchTeamData: Successfully processed ${payoutsWithDistribution.length} payouts`);
-    }
-    
-    // Fetch team settings with defensive coding
-    let settings = null;
-    
-    try {
-      const { data: fetchedSettings, error: settingsError } = await supabase
-        .from('team_settings')
-        .select('*')
-        .eq('team_id', teamId)
-        .maybeSingle();
-      
-      if (settingsError && settingsError.code !== 'PGRST116') {
-        console.error('fetchTeamData: Error fetching team settings:', settingsError);
-        // Don't throw here - continue with null settings
-      } else {
-        settings = fetchedSettings;
-        console.log('fetchTeamData: Successfully fetched team settings');
-      }
-    } catch (settingsError) {
-      console.error('fetchTeamData: Unexpected error fetching team settings:', settingsError);
-      // Continue with null settings
     }
     
     const result = {

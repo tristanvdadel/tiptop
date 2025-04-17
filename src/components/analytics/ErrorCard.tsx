@@ -22,6 +22,7 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
       localStorage.removeItem('sb-auth-token-cached');
       localStorage.removeItem('last_team_id');
       localStorage.removeItem('analytics_last_refresh');
+      localStorage.removeItem('login_attempt_time');
       
       // Specifieke teamcache wissen
       const teamIds = Object.keys(localStorage).filter(key => key.startsWith('team_data_refresh_'));
@@ -41,12 +42,15 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
     // Gericht de database security policy recursie oplossen
     localStorage.removeItem('sb-auth-token-cached');
     localStorage.removeItem('last_team_id');
+    localStorage.removeItem('login_attempt_time');
+    
     // Alle team-gerelateerde cache wissen
     Object.keys(localStorage).forEach(key => {
       if (key.startsWith('team_data_') || key.includes('analytics_')) {
         localStorage.removeItem(key);
       }
     });
+    
     // Doorsturen naar login met recursie-parameter
     window.location.href = '/login?error=recursion';
   };
@@ -65,7 +69,7 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
                 </p>
                 <Alert className="mt-3 bg-amber-50 border-amber-200 text-left">
                   <AlertDescription className="text-sm">
-                    Dit is geen tijdelijk probleem, maar een structurele fout in de beveiligingsregels van de database.
+                    Dit is <strong>geen tijdelijk probleem</strong>, maar een structurele fout in de beveiligingsregels van de database.
                     De fout ontstaat door een oneindige lus (recursie) in de Row Level Security policies.
                   </AlertDescription>
                 </Alert>
@@ -81,7 +85,7 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
                     Gegevens Verversen
                   </Button>
                 )}
-                <Button variant="outline" onClick={handleFixSecurityRecursion} className="gap-2 border-amber-500 text-amber-700">
+                <Button variant="default" onClick={handleFixSecurityRecursion} className="gap-2">
                   <FileText className="h-4 w-4" />
                   Beveiligingsprobleem Oplossen
                 </Button>

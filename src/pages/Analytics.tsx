@@ -6,7 +6,7 @@ import TipChart from '@/components/TipChart';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, LogOut } from 'lucide-react';
+import { RefreshCw, LogOut, AlertTriangle } from 'lucide-react';
 
 // Component Imports
 import AverageTipCard from '@/components/analytics/AverageTipCard';
@@ -47,6 +47,7 @@ const Analytics = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { teamId, loading: teamIdLoading, error: teamIdError } = useTeamId();
+  const [hasAttemptedRecovery, setHasAttemptedRecovery] = useState(false);
   
   // Gebruik cached team data
   const { 
@@ -87,12 +88,44 @@ const Analytics = () => {
   const periodData = usePeriodData(adaptedPeriods, historicalData || [], calculateAverageTipPerHour);
   const lineChartData = useLineChartData(periodData);
   const chartConfig = useChartConfig();
+
+  // Poging om problematische gegevens automatisch proberen te herstellen bij fouten
+  useEffect(() => {
+    if ((teamDataError || historicalDataError) && !hasAttemptedRecovery) {
+      console.log("Analytics: Attempting automatic data recovery on error detection");
+      
+      // Probeer lokale caching problemen op te lossen
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('team_data_refresh_') || key === 'analytics_last_refresh') {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      // Plan een gegevensherstel na een korte vertraging
+      const timer = setTimeout(() => {
+        refreshTeamData2(true);
+        refreshData();
+        setHasAttemptedRecovery(true);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [teamDataError, historicalDataError, hasAttemptedRecovery, refreshTeamData2, refreshData]);
   
   // Logout functie voor het geval dat de database recursie niet opgelost kan worden
   const handleLogout = async () => {
     try {
+      // Wis alle lokale cache die problemen kan veroorzaken
       localStorage.removeItem('sb-auth-token-cached');
       localStorage.removeItem('last_team_id');
+      localStorage.removeItem('login_attempt_time');
+      
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('team_data_') || key.includes('analytics_')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
       await supabase.auth.signOut();
       toast({
         title: "Uitgelogd",
@@ -109,9 +142,19 @@ const Analytics = () => {
   // Laad gegevens opnieuw bij een fout
   const handleRetryLoading = () => {
     console.log("Analytics: Manually retrying data load");
-    // Wis cache om volledige refresh af te dwingen
-    localStorage.removeItem('analytics_last_refresh');
     
+    // Eerst lokale cache volledig wissen
+    localStorage.removeItem('analytics_last_refresh');
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('team_data_refresh_')) {
+        localStorage.removeItem(key);
+      }
+    });
+    
+    // Begin met een schone lei
+    setHasAttemptedRecovery(false);
+    
+    // Probeer nu alle gegevens opnieuw te laden
     Promise.all([refreshTeamData(), refreshData()])
       .then(() => {
         toast({
@@ -145,18 +188,24 @@ const Analytics = () => {
   }
   
   // Toon speciale alert voor database recursie-errors
-  if (showRecursionAlert) {
+  if (showRecursionAlert || (historicalDataError && historicalDataError.includes('recursion'))) {
     return (
       <div className="space-y-6">
         <ErrorCard 
           type="dbPolicy" 
-          message="Er is een tijdelijk probleem met de database rechten. Dit wordt veroorzaakt door een recursie-probleem in de database security policies." 
+          message="Er is een structureel probleem met de database beveiligingsregels. Dit wordt veroorzaakt door een recursie-probleem in de database security policies." 
           onRetry={refreshTeamData2} 
         />
         
         <Alert className="border-amber-400 bg-amber-50">
-          <AlertTitle className="font-medium">Oplossingssuggesties</AlertTitle>
+          <AlertTitle className="flex items-center font-medium">
+            <AlertTriangle className="h-4 w-4 mr-2 text-amber-500" />
+            Gegevens verdwijnen?
+          </AlertTitle>
           <AlertDescription className="mt-2">
+            <p className="mb-2">
+              Dit probleem is structureel en zorgt ervoor dat je gegevens lijken te verdwijnen, maar ze zijn niet echt verloren - ze kunnen alleen niet geladen worden door het beveiligingsprobleem in de database.
+            </p>
             <p className="mb-4">Om dit probleem op te lossen kun je een van de volgende acties proberen:</p>
             <div className="flex flex-col space-y-3">
               <Button 
@@ -179,6 +228,15 @@ const Analytics = () => {
               
               <Button 
                 variant="outline" 
+                className="flex items-center gap-2 justify-start border-amber-500 text-amber-700"
+                onClick={handleDatabaseRecursionError}
+              >
+                <AlertTriangle className="h-4 w-4" />
+                <span>Los beveiligingsprobleem op (aanbevolen)</span>
+              </Button>
+              
+              <Button 
+                variant="outline" 
                 className="flex items-center gap-2 justify-start" 
                 onClick={handleLogout}
               >
@@ -196,11 +254,12 @@ const Analytics = () => {
   if (teamDataError || historicalDataError) {
     return <ErrorCard 
       type="dbPolicy" 
-      message={teamDataErrorMessage || historicalDataError || "Er is een tijdelijk probleem met de database rechten. Als dit probleem blijft bestaan, probeer de pagina te verversen."} 
+      message={teamDataErrorMessage || historicalDataError || "Er is een structureel probleem met de database beveiligingsregels. Probeer de pagina te verversen of log uit en opnieuw in."} 
       onRetry={handleRetryLoading} 
     />;
   }
   
+  // Alles goed, toon de normale inhoud
   return (
     <div className="space-y-4 w-full max-w-full px-1 sm:px-4">
       <h1 className="text-xl font-bold">Analyse</h1>

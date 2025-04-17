@@ -140,6 +140,17 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       
       // Bij een recursie-error tonen we een bericht
       if (hasRecursionError) {
+        // Alles wissen uit localStorage om problemen te voorkomen
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('team_data_') || 
+              key.includes('analytics_') || 
+              key.includes('sb-') ||
+              key === 'last_team_id' ||
+              key === 'login_attempt_time') {
+            localStorage.removeItem(key);
+          }
+        });
+        
         navigate('/login', { 
           replace: true, 
           state: { 
@@ -150,7 +161,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
         // Toon een toast om duidelijk te maken wat er gebeurt
         toast({
           title: "Database beveiligingsprobleem gedetecteerd",
-          description: "Probeer opnieuw in te loggen om het database beveiligingsprobleem op te lossen.",
+          description: "Probeer opnieuw in te loggen om het database beveiligingsprobleem op te lossen. Wij hebben gegevens gereset om dit te helpen.",
           variant: "destructive",
           duration: 5000
         });

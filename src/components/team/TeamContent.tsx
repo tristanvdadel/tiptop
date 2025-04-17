@@ -114,7 +114,8 @@ const TeamContent: React.FC = () => {
         onTogglePeriodSelection={togglePeriodSelection}
       />
       
-      {periods.filter(period => !period.isPaid && !period.isActive).length > 0 && 
+      {/* Toon TipDistributionSection voor alle niet-actieve periodes, niet alleen onbetaalde */}
+      {periods.filter(period => !period.isActive).length > 0 && 
         <TipDistributionSection />
       }
     </div>

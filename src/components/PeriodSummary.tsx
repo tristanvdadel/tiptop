@@ -22,7 +22,8 @@ const PeriodSummary = () => {
     endCurrentPeriod,
     hasReachedPeriodLimit,
     autoClosePeriods,
-    calculateAverageTipPerHour
+    calculateAverageTipPerHour,
+    periods
   } = useApp();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCloseConfirmDialogOpen, setIsCloseConfirmDialogOpen] = useState(false);
@@ -34,12 +35,17 @@ const PeriodSummary = () => {
     return currentPeriod.tips.reduce((sum, tip) => sum + tip.amount, 0);
   }, [currentPeriod]);
   
+  // Bereken het gemiddelde fooi per uur over alle periodes (inclusief uitbetaald)
   const averageTipPerHour = useMemo(() => {
-    if (!currentPeriod) return 0;
-    if (currentPeriod.averageTipPerHour !== undefined) {
-      return currentPeriod.averageTipPerHour || 0; // Return 0 if null or undefined
+    // Gebruik het algemene gemiddelde van alle periodes
+    const overallAverage = calculateAverageTipPerHour();
+    
+    // Als er geen algemeen gemiddelde is, gebruik de waarde van de huidige periode (indien beschikbaar)
+    if (!overallAverage && currentPeriod?.averageTipPerHour !== undefined) {
+      return currentPeriod.averageTipPerHour || 0;
     }
-    return calculateAverageTipPerHour(currentPeriod.id) || 0; // Return 0 if null or undefined
+    
+    return overallAverage || 0;
   }, [currentPeriod, calculateAverageTipPerHour]);
 
   const handleEditClick = () => {
@@ -128,6 +134,9 @@ const PeriodSummary = () => {
     locale: nl
   });
 
+  // Bereken het aantal periodes met tips voor de tooltip
+  const periodsWithTips = periods.filter(p => p.tips && p.tips.length > 0).length;
+
   return <>
     <Card className="border-[#9b87f5]/30 bg-[#9b87f5]/5">
       <CardHeader className="pb-2">
@@ -171,8 +180,20 @@ const PeriodSummary = () => {
           </div>
           
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Gemiddelde fooi per uur</span>
-            <span className="font-medium">€{averageTipPerHour.toFixed(2)}</span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger className="w-full flex justify-between">
+                  <span className="text-muted-foreground">Gemiddelde fooi per uur</span>
+                  <span className="font-medium">€{averageTipPerHour.toFixed(2)}</span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Gemiddeld over alle periodes (inclusief uitbetaalde)</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Gebaseerd op {periodsWithTips} {periodsWithTips === 1 ? 'periode' : 'periodes'} met fooi
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           
           {autoClosePeriods && currentPeriod.autoCloseDate && <div className="flex justify-between">

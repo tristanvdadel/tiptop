@@ -9,14 +9,34 @@ const TipDistributionSection: React.FC = () => {
   const { selectedPeriods, distribution, totalTips, totalHours, handlePayout } = useTeam();
   const { toast } = useToast();
 
+  // Controleer of er uitbetaalde periodes geselecteerd zijn
+  const hasSelectedPaidPeriods = useMemo(() => {
+    return selectedPeriods.some(periodId => {
+      const period = distribution.find(member => member.paidPeriods?.includes(periodId));
+      return !!period;
+    });
+  }, [selectedPeriods, distribution]);
+
   // Memoize the button disabled state to prevent unnecessary re-renders
-  const isButtonDisabled = useMemo(() => selectedPeriods.length === 0, [selectedPeriods.length]);
+  const isButtonDisabled = useMemo(() => 
+    selectedPeriods.length === 0 || hasSelectedPaidPeriods, 
+    [selectedPeriods.length, hasSelectedPaidPeriods]
+  );
 
   const handlePayoutClick = () => {
-    if (isButtonDisabled) {
+    if (selectedPeriods.length === 0) {
       toast({
         title: "Selecteer periodes",
         description: "Selecteer ten minste één periode voor uitbetaling.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (hasSelectedPaidPeriods) {
+      toast({
+        title: "Reeds uitbetaalde periodes",
+        description: "Eén of meer geselecteerde periodes zijn reeds uitbetaald. Deselecteer deze periodes.",
         variant: "destructive"
       });
       return;
@@ -41,6 +61,7 @@ const TipDistributionSection: React.FC = () => {
           className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white"
           onClick={handlePayoutClick} 
           disabled={isButtonDisabled}
+          title={hasSelectedPaidPeriods ? "Sommige geselecteerde periodes zijn al uitbetaald" : ""}
         >
           Uitbetaling voltooien
         </Button>

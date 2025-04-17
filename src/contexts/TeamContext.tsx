@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
 import { TeamMember } from '@/contexts/AppContext';
 import { useApp } from '@/contexts/AppContext';
@@ -6,6 +7,8 @@ import { calculateTipDistributionTotals } from '@/services/teamDataService';
 import { debounce } from '@/services/payoutService';
 import { fetchTeamPeriods } from '@/services/periodService';
 import { useTeamId } from '@/hooks/useTeamId';
+import { useCachedTeamData } from '@/hooks/useCachedTeamData';
+import { useToast } from '@/hooks/use-toast';
 
 interface TeamContextType {
   selectedPeriods: string[];
@@ -17,6 +20,10 @@ interface TeamContextType {
   totalTips: number;
   totalHours: number;
   sortedTeamMembers: TeamMember[];
+  hasError: boolean;
+  errorMessage: string | null;
+  showRecursionAlert: boolean;
+  handleDatabaseRecursionError: () => void;
   togglePeriodSelection: (periodId: string) => void;
   handlePayout: () => void;
   handleImportHours: () => void;
@@ -48,16 +55,34 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   } = useApp();
   
   const { teamId } = useTeamId();
+  const { toast } = useToast();
   
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
   const [distribution, setDistribution] = useState<TeamMember[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [dataInitialized, setDataInitialized] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importedHours, setImportedHours] = useState<ImportedHour[]>([]);
   const [sortedTeamMembers, setSortedTeamMembers] = useState<TeamMember[]>([]);
   const [lastRefreshTime, setLastRefreshTime] = useState(0);
   const navigate = useNavigate();
+  
+  // Use the cached team data hook for improved loading and error handling
+  const { 
+    isLoading: cacheLoading, 
+    hasError, 
+    errorMessage, 
+    refreshData, 
+    showRecursionAlert,
+    handleDatabaseRecursionError,
+    isInitialized
+  } = useCachedTeamData(refreshTeamData);
+  
+  // Update the loading state based on the cache loading state
+  useEffect(() => {
+    setLoading(cacheLoading);
+    setDataInitialized(isInitialized);
+  }, [cacheLoading, isInitialized]);
   
   const { totalTips, totalHours } = useMemo(() => 
     calculateTipDistributionTotals(
@@ -190,34 +215,20 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     console.log('Import process completed');
     setShowImportDialog(false);
+    
+    // Show success message
+    toast({
+      title: "Uren geïmporteerd",
+      description: `${confirmedHours.length} uurregistraties succesvol geïmporteerd.`,
+      duration: 3000,
+    });
   };
 
   const handleRefresh = useCallback(async () => {
     try {
-      const now = Date.now();
-      if (now - lastRefreshTime < 5000) {
-        console.log('TeamContext: Refresh throttled, last refresh was less than 5 seconds ago');
-        if (dataInitialized) {
-          return Promise.resolve();
-        }
-      }
-      
-      console.log('TeamContext: Starting refresh process');
       setLoading(true);
-      setLastRefreshTime(now);
-      
-      if (!teamId) {
-        console.error("Geen team ID gevonden. Kan gegevens niet ophalen.");
-        setLoading(false);
-        return Promise.reject("Geen team ID gevonden");
-      }
-      
-      console.log("TeamContext: Data wordt opgehaald voor team:", teamId);
-      
-      await refreshTeamData();
-      
-      console.log("TeamContext: Data succesvol opgehaald");
-      setDataInitialized(true);
+      await refreshData(true);  // Force refresh the data
+      setLastRefreshTime(Date.now());
       return Promise.resolve();
     } catch (error) {
       console.error("Error refreshing team data:", error);
@@ -225,7 +236,14 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setLoading(false);
     }
-  }, [refreshTeamData, teamId, lastRefreshTime, dataInitialized]);
+  }, [refreshData]);
+
+  // Auto-refresh on mount if needed
+  useEffect(() => {
+    if (!dataInitialized && teamId) {
+      handleRefresh();
+    }
+  }, [dataInitialized, teamId, handleRefresh]);
 
   const value = {
     selectedPeriods,
@@ -237,6 +255,10 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     totalTips,
     totalHours,
     sortedTeamMembers,
+    hasError,
+    errorMessage,
+    showRecursionAlert,
+    handleDatabaseRecursionError,
     togglePeriodSelection,
     handlePayout,
     handleImportHours,

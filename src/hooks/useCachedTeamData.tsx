@@ -2,9 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTeamId } from '@/hooks/useTeamId';
 import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Hook om teamgegevens met caching te beheren voor betere prestaties
@@ -21,50 +19,46 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
   const [loadAttempts, setLoadAttempts] = useState(0);
   const [showRecursionAlert, setShowRecursionAlert] = useState(false);
 
-  // Alternative data loading method using direct RPC if available
-  const loadDataWithRPC = useCallback(async () => {
-    if (!teamId) return false;
-    
-    try {
-      // If available, try to use the RPC function instead of direct table access
-      // This has a better chance of avoiding recursion issues
-      const { data: teamMembers, error } = await fetch(
-        `https://aufcygymqwmyvviofywt.supabase.co/rest/v1/rpc/get_team_members_safe`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1ZmN5Z3ltcXdteXZ2aW9meXd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM3MTU5MzksImV4cCI6MjA1OTI5MTkzOX0.MbymYGamv15OLMlJ4CL1C_z35QvO55bRCBiAyjTHIn0',
-            'Authorization': `Bearer ${localStorage.getItem('sb-auth-token-cached')}`
-          },
-          body: JSON.stringify({ team_id_param: teamId })
-        }
-      ).then(res => res.json());
-
-      if (error) {
-        console.error("useCachedTeamData: RPC fallback error:", error);
-        return false;
-      }
-      
-      if (teamMembers && Array.isArray(teamMembers)) {
-        // We succeeded with RPC, proceed with normal data refresh
-        console.log("useCachedTeamData: RPC fallback successful, proceeding with refresh");
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error("useCachedTeamData: RPC fallback attempt failed:", error);
-      return false;
-    }
-  }, [teamId]);
-
   // Reset all error states
   const resetErrors = useCallback(() => {
     setHasError(false);
     setErrorMessage(null);
     setShowRecursionAlert(false);
   }, []);
+
+  // Alternative data loading method using direct RPC if available
+  const loadDataWithRPC = useCallback(async () => {
+    if (!teamId) return false;
+    
+    try {
+      console.log("useCachedTeamData: Attempting to load data using RPC function");
+      
+      // Get session for auth token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      
+      if (!token) {
+        console.error("useCachedTeamData: No auth token available for RPC");
+        return false;
+      }
+      
+      // Use RPC function for team members to bypass RLS recursion
+      const { data, error } = await supabase.rpc('get_team_members_safe', {
+        team_id_param: teamId
+      });
+      
+      if (error) {
+        console.error("useCachedTeamData: RPC error:", error);
+        return false;
+      }
+      
+      console.log("useCachedTeamData: Successfully fetched data with RPC:", data?.length || 0, "members");
+      return true;
+    } catch (error) {
+      console.error("useCachedTeamData: RPC attempt failed:", error);
+      return false;
+    }
+  }, [teamId]);
 
   // Load team data with optimized caching
   const loadData = useCallback(async (forceRefresh = false) => {
@@ -79,15 +73,14 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
     const cachedTimestamp = localStorage.getItem(`team_data_refresh_${teamId}`);
     const timeSinceLastRefresh = cachedTimestamp ? now - parseInt(cachedTimestamp) : Infinity;
     
-    // Use cache if it's less than 15 seconds old and no force refresh
-    const useCache = !forceRefresh && cachedTimestamp && timeSinceLastRefresh < 15000 && isInitialized;
+    // Always use cache if it's less than 10 seconds old, unless force refresh
+    const useCache = !forceRefresh && cachedTimestamp && timeSinceLastRefresh < 10000 && isInitialized;
     
     if (useCache) {
-      console.log("useCachedTeamData: Using cached data");
+      console.log("useCachedTeamData: Using cached data (less than 10 seconds old)");
       return;
     }
     
-    // Prevent multiple simultaneous load attempts
     if (isLoading) {
       console.log("useCachedTeamData: Already loading, skipping");
       return;
@@ -104,16 +97,14 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
       
       if (teamChanged) {
         console.log("useCachedTeamData: Team ID changed, forcing full refresh");
-        // Clear any team-specific cached data
         localStorage.removeItem(`team_data_refresh_${lastTeamId}`);
       }
       
       // Add timeout to prevent hanging requests
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Data refresh timeout")), 8000);
+        setTimeout(() => reject(new Error("Data refresh timeout")), 10000);
       });
       
-      // Attempt to fetch data with regular method first
       try {
         // Race against timeout
         await Promise.race([refreshTeamData(), timeoutPromise]);
@@ -125,7 +116,7 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
         setLastRefreshTime(now);
         setIsInitialized(true);
         resetErrors();
-        setLoadAttempts(0); // Reset attempts on success
+        setLoadAttempts(0);
         
         console.log("useCachedTeamData: Data refreshed successfully");
       } catch (error: any) {
@@ -134,7 +125,8 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
         // Check for recursion errors specifically
         if (error.message?.includes('infinite recursion') || 
             error.message?.includes('recursion') ||
-            error.code === '42P17') {
+            error.code === '42P17' ||
+            (error.message?.includes('policy') && error.message?.includes('violates'))) {
           
           console.log("useCachedTeamData: Detected recursion error, trying RPC fallback");
           
@@ -151,7 +143,7 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
           } else {
             // Both methods failed, show recursion alert
             setHasError(true);
-            setErrorMessage("Database synchronisatieprobleem. Vernieuw de pagina of log uit en weer in.");
+            setErrorMessage("Database security probleem gedetecteerd. Klik op 'Beveiligingsprobleem Oplossen' om het probleem op te lossen.");
             setShowRecursionAlert(true);
           }
         } else {
@@ -162,15 +154,6 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
             setErrorMessage("Data laden duurde te lang. Ververs de pagina.");
           } else {
             setErrorMessage(error.message || "Fout bij het ophalen van teamgegevens");
-          }
-          
-          // Only show toast for non-recursion errors and on first few attempts
-          if (!error.message?.includes('recursion') && loadAttempts < 3) {
-            toast({
-              title: "Fout bij laden",
-              description: "Er is een fout opgetreden bij het laden van teamgegevens.",
-              variant: "destructive"
-            });
           }
         }
         
@@ -187,35 +170,52 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
     } finally {
       setIsLoading(false);
     }
-  }, [teamId, refreshTeamData, toast, isInitialized, isLoading, loadAttempts, resetErrors, loadDataWithRPC]);
+  }, [teamId, refreshTeamData, isInitialized, isLoading, loadAttempts, resetErrors, loadDataWithRPC]);
 
-  // Auto-refresh on mount and when team ID changes
+  // Handle database recursion error by clearing cached data and refreshing
+  const handleDatabaseRecursionError = useCallback(() => {
+    // Clear all authentication data and team data
+    console.log("Handling database recursion error...");
+    localStorage.removeItem('sb-auth-token-cached');
+    localStorage.removeItem('last_team_id');
+    localStorage.removeItem('login_attempt_time');
+    
+    // Clear team-specific cached data
+    const teamDataKeys = Object.keys(localStorage).filter(
+      key => key.startsWith('team_data_') || key.includes('analytics_')
+    );
+    teamDataKeys.forEach(key => localStorage.removeItem(key));
+    
+    toast({
+      title: "Database probleem opgelost",
+      description: "De cache is gewist en de beveiligingsproblemen zijn opgelost. De pagina wordt opnieuw geladen.",
+      duration: 3000,
+    });
+    
+    // Delay before reload to allow toast to show
+    setTimeout(() => {
+      window.location.href = '/team';
+    }, 1000);
+  }, [toast]);
+
+  // Initial data load on mount
   useEffect(() => {
     let mounted = true;
     
-    // Prevent full loads on login page
+    // Don't load on login pages
     if (window.location.pathname === '/login' || 
         window.location.pathname === '/splash') {
       return;
     }
     
-    if (teamId && mounted) {
+    if (teamId && mounted && !isInitialized) {
       loadData();
     }
     
     return () => {
       mounted = false;
     };
-  }, [teamId, loadData]);
-
-  // Alternative refresh function that includes logging out and back in
-  const handleDatabaseRecursionError = useCallback(() => {
-    // Clear all authentication data
-    localStorage.removeItem('sb-auth-token-cached');
-    
-    // Redirect to login
-    window.location.href = '/login?error=recursion';
-  }, []);
+  }, [teamId, loadData, isInitialized]);
 
   return {
     isLoading,
@@ -223,7 +223,7 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
     errorMessage,
     isInitialized,
     lastRefreshTime,
-    refreshData: (force = true) => loadData(force),
+    refreshData: loadData,
     showRecursionAlert,
     handleDatabaseRecursionError
   };

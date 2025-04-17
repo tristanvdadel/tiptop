@@ -11,6 +11,7 @@ import PeriodSelector from '@/components/team/PeriodSelector';
 import TipDistributionSection from '@/components/team/TipDistributionSection';
 import LoadingIndicator from '@/components/team/LoadingIndicator';
 import { useTeamRealtimeUpdates } from '@/hooks/useTeamRealtimeUpdates';
+import ErrorCard from '@/components/analytics/ErrorCard';
 
 const TeamContent: React.FC = () => {
   const {
@@ -31,7 +32,11 @@ const TeamContent: React.FC = () => {
     handleRefresh, 
     selectedPeriods, 
     togglePeriodSelection,
-    sortedTeamMembers
+    sortedTeamMembers,
+    hasError,
+    errorMessage,
+    showRecursionAlert,
+    handleDatabaseRecursionError
   } = useTeam();
   
   const navigate = useNavigate();
@@ -39,27 +44,35 @@ const TeamContent: React.FC = () => {
   // Set up real-time updates for periods and team members
   useTeamRealtimeUpdates(teamId, periods, teamMembers, refreshTeamData);
 
-  // Load team data on initial mount with optimizations
+  // Load team data on initial mount with optimizations and more robust error handling
   useEffect(() => {
     let isMounted = true;
     let checkTimer: ReturnType<typeof setTimeout>;
     
     const loadInitialData = async () => {
-      if (dataInitialized) {
-        console.log("TeamContent: Data already initialized, skipping initial load");
-        return;
-      }
-      
       if (!teamId) {
         console.error("TeamContent: No team ID found, cannot load data");
         return;
       }
       
       try {
-        console.log("TeamContent: Initial data loading for team:", teamId);
+        console.log("TeamContent: Loading data for team:", teamId);
         await handleRefresh();
         if (isMounted) {
-          console.log("TeamContent: Initial data loaded successfully");
+          console.log("TeamContent: Data loaded successfully");
+          
+          // Try to check accounts for team members on a delay to allow for rendering first
+          if (teamMembers.length > 0) {
+            checkTimer = setTimeout(async () => {
+              try {
+                if (isMounted) {
+                  await checkTeamMembersWithAccounts(teamMembers);
+                }
+              } catch (error) {
+                console.error("Error checking team members with accounts:", error);
+              }
+            }, 800);
+          }
         }
       } catch (error) {
         console.error("Error loading team data:", error);
@@ -69,17 +82,18 @@ const TeamContent: React.FC = () => {
     console.log("TeamContent: Initializing component, loading data");
     loadInitialData();
     
-    // Update team members with account status - with debounce
-    if (teamMembers.length > 0 && !loading) {
-      checkTimer = setTimeout(async () => {
-        try {
-          if (isMounted) {
-            await checkTeamMembersWithAccounts(teamMembers);
-          }
-        } catch (error) {
-          console.error("Error checking team members with accounts:", error);
+    // Add automatic retry mechanism for data loading
+    if (!dataInitialized && !loading) {
+      const retryTimer = setTimeout(() => {
+        if (isMounted && !dataInitialized && teamId) {
+          console.log("TeamContent: Auto-retrying data load");
+          loadInitialData();
         }
-      }, 800); // Higher debounce to prioritize initial rendering
+      }, 3000);
+      
+      return () => {
+        clearTimeout(retryTimer);
+      };
     }
     
     return () => {
@@ -88,9 +102,40 @@ const TeamContent: React.FC = () => {
     };
   }, [dataInitialized, handleRefresh, teamId, teamMembers, loading]);
 
-  // Show loading animation during first load process
+  // Display appropriate loading or error states
   if (loading && !dataInitialized) {
     return <LoadingIndicator />;
+  }
+  
+  // Show error state if there's an error
+  if (hasError || showRecursionAlert) {
+    return (
+      <div className="container mx-auto py-8">
+        <ErrorCard 
+          type={showRecursionAlert ? 'dbPolicy' : 'error'} 
+          message={errorMessage || "Er is een fout opgetreden bij het laden van teamgegevens"}
+          onRetry={showRecursionAlert ? handleDatabaseRecursionError : handleRefresh}
+        />
+      </div>
+    );
+  }
+  
+  // Show team data with refresh option if no team members but no error
+  if (sortedTeamMembers.length === 0 && dataInitialized) {
+    return (
+      <div className="pb-16">
+        <TeamHeader />
+        <TeamMemberList 
+          teamMembers={[]}
+          addTeamMember={addTeamMember}
+          removeTeamMember={removeTeamMember}
+          updateTeamMemberHours={updateTeamMemberHours}
+          deleteHourRegistration={deleteHourRegistration}
+          updateTeamMemberName={updateTeamMemberName}
+        />
+        <ImportActions />
+      </div>
+    );
   }
 
   return (
@@ -114,7 +159,6 @@ const TeamContent: React.FC = () => {
         onTogglePeriodSelection={togglePeriodSelection}
       />
       
-      {/* Toon TipDistributionSection voor alle niet-actieve periodes, niet alleen onbetaalde */}
       {periods.filter(period => !period.isActive).length > 0 && 
         <TipDistributionSection />
       }

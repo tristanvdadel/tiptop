@@ -33,7 +33,7 @@ export interface Tip {
   note?: string; // Added for notes in tip cards
 }
 
-// Explicitly define TipEntry interface
+// Define TipEntry interface explicitly
 export interface TipEntry {
   id: string;
   amount: number;

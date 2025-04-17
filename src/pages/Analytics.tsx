@@ -1,283 +1,139 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Skeleton } from "@/components/ui/skeleton"
 import { useApp } from '@/contexts/AppContext';
-import { useNavigate } from 'react-router-dom';
-import TipChart from '@/components/TipChart';
-import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { RefreshCw, LogOut, AlertTriangle } from 'lucide-react';
-
-// Component Imports
-import AverageTipCard from '@/components/analytics/AverageTipCard';
-import TipPerHourChart from '@/components/analytics/TipPerHourChart';
-import PeriodList from '@/components/analytics/PeriodList';
-import ErrorCard from '@/components/analytics/ErrorCard';
-import Loading from '@/components/analytics/Loading';
-
-// Custom Hooks
-import { useHistoricalData } from '@/hooks/useHistoricalData';
-import { usePeriodData, useLineChartData, useChartConfig } from '@/hooks/usePeriodData';
-import { useAverageTipPerHour, getEmptyStateMessage } from '@/hooks/useAverageTipPerHour';
 import { useTeamId } from '@/hooks/useTeamId';
-import { useTeamRealtimeUpdates } from '@/hooks/useTeamRealtimeUpdates';
-import { useCachedTeamData } from '@/hooks/useCachedTeamData';
-import { supabase } from '@/integrations/supabase/client';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+import PeriodList from '@/components/analytics/PeriodList';
+import ErrorCard from '@/components/ErrorCard';
 
-// Interface voor periode die wordt aangepast aan ons formaat
-interface AdaptedPeriod {
-  id: string;
-  startDate: string;
-  endDate: string;
-  isActive: boolean;
-  isPaid: boolean;
-  tips: Array<{ id: string; amount: number }>;
-  averageTipPerHour?: number | null;
-}
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const Analytics = () => {
-  const {
-    periods,
-    calculateAverageTipPerHour,
-    teamMembers,
-    payouts,
-    refreshTeamData
-  } = useApp();
-  
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const { teamId, loading: teamIdLoading, error: teamIdError } = useTeamId();
-  const [hasAttemptedRecovery, setHasAttemptedRecovery] = useState(false);
-  
-  // Gebruik cached team data
-  const { 
-    isLoading: teamDataLoading, 
-    hasError: teamDataError, 
-    errorMessage: teamDataErrorMessage,
-    refreshData: refreshTeamData2,
-    showRecursionAlert,
-    handleDatabaseRecursionError
-  } = useCachedTeamData(refreshTeamData);
-  
-  // Gebruik historische data met verbeterde cache
-  const { 
-    historicalData, 
-    periodHistory, 
-    payoutHistory, 
-    loading: historicalDataLoading, 
-    error: historicalDataError, 
-    refreshData 
-  } = useHistoricalData();
-  
-  // Setup real-time updates voor betere synchronisatie
-  useTeamRealtimeUpdates(teamId, periods, teamMembers, refreshTeamData);
-  
-  // Converteer periodes naar het verwachte formaat
-  const adaptedPeriods: AdaptedPeriod[] = periods.map(period => ({
-    id: period.id,
-    startDate: period.startDate,
-    endDate: period.endDate || '', // Zorg ervoor dat endDate nooit null of undefined is
-    isActive: period.isActive,
-    isPaid: period.isPaid,
-    tips: period.tips,
-    averageTipPerHour: period.averageTipPerHour
-  }));
-  
-  // Verwerk periodegegevens en gemiddelden
-  const averageTipPerHour = useAverageTipPerHour(calculateAverageTipPerHour, historicalData || [], teamMembers);
-  const periodData = usePeriodData(adaptedPeriods, historicalData || [], calculateAverageTipPerHour);
-  const lineChartData = useLineChartData(periodData);
-  const chartConfig = useChartConfig();
+  const { teamId } = useTeamId();
+  const { periods, isLoading, error } = useApp();
+  const [periodData, setPeriodData] = useState([]);
 
-  // Poging om problematische gegevens automatisch proberen te herstellen bij fouten
   useEffect(() => {
-    if ((teamDataError || historicalDataError) && !hasAttemptedRecovery) {
-      console.log("Analytics: Attempting automatic data recovery on error detection");
-      
-      // Probeer lokale caching problemen op te lossen
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('team_data_refresh_') || key === 'analytics_last_refresh') {
-          localStorage.removeItem(key);
-        }
-      });
-      
-      // Plan een gegevensherstel na een korte vertraging
-      const timer = setTimeout(() => {
-        refreshTeamData2(true);
-        refreshData();
-        setHasAttemptedRecovery(true);
-      }, 1000);
-      
-      return () => clearTimeout(timer);
+    if (periods && periods.length > 0) {
+      const data = periods.map(period => ({
+        name: period.name || `Periode ${period.startDate}`,
+        total: period.tips.reduce((sum, tip) => sum + tip.amount, 0),
+        average: period.averageTipPerHour || 0,
+        id: period.id,
+        isPaid: period.isPaid || false,
+        timestamp: new Date(period.startDate).getTime(),
+        isHistorical: new Date(period.startDate) < new Date(),
+      }));
+      setPeriodData(data);
+    } else {
+      setPeriodData([]);
     }
-  }, [teamDataError, historicalDataError, hasAttemptedRecovery, refreshTeamData2, refreshData]);
-  
-  // Logout functie voor het geval dat de database recursie niet opgelost kan worden
-  const handleLogout = async () => {
-    try {
-      // Wis alle lokale cache die problemen kan veroorzaken
-      localStorage.removeItem('sb-auth-token-cached');
-      localStorage.removeItem('last_team_id');
-      localStorage.removeItem('login_attempt_time');
-      
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('team_data_') || key.includes('analytics_')) {
-          localStorage.removeItem(key);
-        }
-      });
-      
-      await supabase.auth.signOut();
-      toast({
-        title: "Uitgelogd",
-        description: "U bent succesvol uitgelogd. Log opnieuw in om te proberen de problemen op te lossen.",
-      });
-      navigate('/login');
-    } catch (error) {
-      console.error("Error during logout:", error);
-      // Force reload to the login page if signOut fails
-      window.location.href = '/login';
+  }, [periods]);
+
+  const chartData = useMemo(() => {
+    if (!periodData || periodData.length === 0) {
+      return null;
     }
+
+    const sortedData = [...periodData].sort((a, b) => a.timestamp - b.timestamp);
+
+    return {
+      labels: sortedData.map(period => period.name),
+      datasets: [
+        {
+          label: 'Gemiddelde fooi per uur',
+          data: sortedData.map(period => period.average),
+          backgroundColor: 'rgba(75, 192, 192, 0.6)',
+        },
+      ],
+    };
+  }, [periodData]);
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: 'Fooi per periode',
+      },
+    },
   };
-  
-  // Laad gegevens opnieuw bij een fout
-  const handleRetryLoading = () => {
-    console.log("Analytics: Manually retrying data load");
-    
-    // Eerst lokale cache volledig wissen
-    localStorage.removeItem('analytics_last_refresh');
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('team_data_refresh_')) {
-        localStorage.removeItem(key);
-      }
-    });
-    
-    // Begin met een schone lei
-    setHasAttemptedRecovery(false);
-    
-    // Probeer nu alle gegevens opnieuw te laden
-    Promise.all([refreshTeamData(), refreshData()])
-      .then(() => {
-        toast({
-          title: "Gegevens vernieuwd",
-          description: "De analysegegevens zijn succesvol vernieuwd.",
-        });
-      })
-      .catch(error => {
-        console.error("Error retrying data load:", error);
-        
-        toast({
-          title: "Fout bij verversen",
-          description: "Er is een fout opgetreden bij het verversen van de gegevens. Probeer het later opnieuw.",
-          variant: "destructive"
-        });
-      });
-  };
-  
-  // Controleer laadstatus
-  if (teamDataLoading || historicalDataLoading || teamIdLoading) {
-    return <Loading />;
+
+  if (isLoading) {
+    return <Card className="w-full mb-6">
+      <CardHeader className="pb-2 pt-4">
+        <CardTitle className="text-lg">
+          <Skeleton className="h-6 w-64" />
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pb-4">
+        <Skeleton className="h-4 w-full mb-2" />
+        <div className="space-y-2">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex justify-between p-2 border rounded-md">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-16" />
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>;
   }
 
-  // Afhandeling van team ID-fouten eerst, omdat deze het meest kritiek zijn
-  if (teamIdError || !teamId) {
-    return <ErrorCard 
-      type="noTeam" 
-      message={teamIdError || "Je moet eerst een team aanmaken of lid worden van een team voordat je analyses kunt bekijken."} 
-      onRetry={handleRetryLoading}
-    />;
-  }
-  
-  // Toon speciale alert voor database recursie-errors
-  if (showRecursionAlert || (historicalDataError && historicalDataError.includes('recursion'))) {
-    return (
-      <div className="space-y-6">
-        <ErrorCard 
-          type="dbPolicy" 
-          message="Er is een structureel probleem met de database beveiligingsregels. Dit wordt veroorzaakt door een recursie-probleem in de database security policies." 
-          onRetry={refreshTeamData2} 
-        />
-        
-        <Alert className="border-amber-400 bg-amber-50">
-          <AlertTitle className="flex items-center font-medium">
-            <AlertTriangle className="h-4 w-4 mr-2 text-amber-500" />
-            Gegevens verdwijnen?
-          </AlertTitle>
-          <AlertDescription className="mt-2">
-            <p className="mb-2">
-              Dit probleem is structureel en zorgt ervoor dat je gegevens lijken te verdwijnen, maar ze zijn niet echt verloren - ze kunnen alleen niet geladen worden door het beveiligingsprobleem in de database.
-            </p>
-            <p className="mb-4">Om dit probleem op te lossen kun je een van de volgende acties proberen:</p>
-            <div className="flex flex-col space-y-3">
-              <Button 
-                variant="outline" 
-                className="flex items-center gap-2 justify-start" 
-                onClick={handleRetryLoading}
-              >
-                <RefreshCw className="h-4 w-4" />
-                <span>Probeer de gegevens opnieuw te laden</span>
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                className="flex items-center gap-2 justify-start" 
-                onClick={() => window.location.reload()}
-              >
-                <RefreshCw className="h-4 w-4" />
-                <span>Ververs de pagina</span>
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                className="flex items-center gap-2 justify-start border-amber-500 text-amber-700"
-                onClick={handleDatabaseRecursionError}
-              >
-                <AlertTriangle className="h-4 w-4" />
-                <span>Los beveiligingsprobleem op (aanbevolen)</span>
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                className="flex items-center gap-2 justify-start" 
-                onClick={handleLogout}
-              >
-                <LogOut className="h-4 w-4" />
-                <span>Uitloggen en opnieuw inloggen</span>
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-  
-  // Controleer op de specifieke databasebeleidsfout
-  if (teamDataError || historicalDataError) {
-    return <ErrorCard 
-      type="dbPolicy" 
-      message={teamDataErrorMessage || historicalDataError || "Er is een structureel probleem met de database beveiligingsregels. Probeer de pagina te verversen of log uit en opnieuw in."} 
-      onRetry={handleRetryLoading} 
-    />;
-  }
-  
-  // Alles goed, toon de normale inhoud
   return (
-    <div className="space-y-4 w-full max-w-full px-1 sm:px-4">
-      <h1 className="text-xl font-bold">Analyse</h1>
-      
-      <AverageTipCard 
-        averageTipPerHour={averageTipPerHour} 
-        getEmptyStateMessage={() => getEmptyStateMessage(periods, teamMembers)} 
-      />
-      
-      <TipChart />
-      
-      <TipPerHourChart 
-        lineChartData={lineChartData} 
-        periodData={periodData} 
-        chartConfig={chartConfig} 
-      />
-      
-      <PeriodList periodData={periodData} />
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Analytics</h1>
+        <p className="text-muted-foreground">
+          Overzicht van de fooi gegevens van het team.
+        </p>
+      </div>
+
+      {teamId ? (
+        <>
+          {chartData && <Card className="w-full mb-6">
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-lg">Fooi per periode</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Bar options={chartOptions} data={chartData} />
+            </CardContent>
+          </Card>}
+
+          <PeriodList periodData={periodData} />
+        </>
+      ) : (
+        <Card className="w-full mb-6">
+          <CardContent className="p-6">
+            <div className="text-center">
+              <h3 className="text-lg font-medium mb-2">Geen team geselecteerd</h3>
+              <p className="text-muted-foreground">Selecteer een team om de analytics te bekijken.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {error && <ErrorCard error={error instanceof Error ? error.message : String(error)} />}
     </div>
   );
 };

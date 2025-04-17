@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -20,13 +19,11 @@ export const useTeamRealtimeUpdates = (
   const periodsRef = useRef(periods);
   const teamMembersRef = useRef(teamMembers);
   
-  // Update refs when props change
   useEffect(() => {
     periodsRef.current = periods;
     teamMembersRef.current = teamMembers;
   }, [periods, teamMembers]);
 
-  // Clear retry timers on unmount to prevent memory leaks
   useEffect(() => {
     return () => {
       if (reconnectTimerRef.current) {
@@ -35,9 +32,7 @@ export const useTeamRealtimeUpdates = (
     };
   }, []);
 
-  // Handle secure data refresh with debounce and error catching
   const handleDataChange = useCallback(async () => {
-    // Prevent concurrent refreshes - important for performance and avoiding race conditions
     if (refreshingRef.current) return;
     
     console.log('Realtime update received, refreshing data...');
@@ -50,7 +45,6 @@ export const useTeamRealtimeUpdates = (
     } catch (error: any) {
       console.error('Error refreshing data after realtime update:', error);
       
-      // Check for recursion errors specifically
       if (error.message && (
           error.message.includes('recursion') || 
           error.message.includes('infinity') ||
@@ -58,7 +52,6 @@ export const useTeamRealtimeUpdates = (
       )) {
         setLastError(error.message);
         
-        // Trigger immediate reconnect with clean state
         reconnect();
       } else {
         setLastError(error.message || 'Unknown error refreshing data');
@@ -68,14 +61,12 @@ export const useTeamRealtimeUpdates = (
     }
   }, [refreshData]);
 
-  // Set up channel for team updates with better error recovery
   const setupChannels = useCallback(() => {
     if (!teamId) {
       console.log('No team ID available for realtime updates');
       return;
     }
     
-    // Clean up any existing channels
     channelsRef.current.forEach(channel => {
       try {
         supabase.removeChannel(channel);
@@ -88,7 +79,6 @@ export const useTeamRealtimeUpdates = (
     console.log(`Setting up realtime channels for team ${teamId}...`);
     
     try {
-      // Main connection status channel
       const statusChannel = supabase.channel('connection-status')
         .on('presence', { event: 'sync' }, () => {
           console.log('Connection synced');
@@ -105,8 +95,7 @@ export const useTeamRealtimeUpdates = (
           } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
             setConnectionState('disconnected');
             
-            // Auto-reconnect with exponential backoff
-            const delay = Math.min(1000 * Math.pow(2, retryCount), 30000); // Max 30s
+            const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
             console.log(`Will auto-reconnect in ${delay}ms`);
             
             if (reconnectTimerRef.current) {
@@ -122,7 +111,6 @@ export const useTeamRealtimeUpdates = (
       
       channelsRef.current.push(statusChannel);
       
-      // Team members channel
       const teamMembersChannel = supabase.channel('team-members-changes')
         .on(
           'postgres_changes',
@@ -138,7 +126,6 @@ export const useTeamRealtimeUpdates = (
       
       channelsRef.current.push(teamMembersChannel);
       
-      // Periods channel
       const periodsChannel = supabase.channel('periods-changes')
         .on(
           'postgres_changes',
@@ -152,9 +139,6 @@ export const useTeamRealtimeUpdates = (
         )
         .subscribe();
       
-      channelsRef.current.push(periodsChannel);
-      
-      // Tips channel - needs to listen to all tips since we can't filter by team_id
       const tipsChannel = supabase.channel('tips-changes')
         .on(
           'postgres_changes',
@@ -164,8 +148,7 @@ export const useTeamRealtimeUpdates = (
             table: 'tips'
           },
           async (payload) => {
-            // Only refresh if the tip belongs to one of our periods
-            const periodId = payload.new?.period_id;
+            const periodId = payload.new && 'period_id' in payload.new ? payload.new.period_id : undefined;
             if (periodId && periodsRef.current.some(p => p.id === periodId)) {
               await handleDataChange();
             }
@@ -173,9 +156,6 @@ export const useTeamRealtimeUpdates = (
         )
         .subscribe();
       
-      channelsRef.current.push(tipsChannel);
-      
-      // Hour registrations channel
       const hoursChannel = supabase.channel('hours-changes')
         .on(
           'postgres_changes',
@@ -185,14 +165,15 @@ export const useTeamRealtimeUpdates = (
             table: 'hour_registrations'
           },
           async (payload) => {
-            // Only refresh if the hour registration belongs to one of our team members
-            const teamMemberId = payload.new?.team_member_id;
+            const teamMemberId = payload.new && 'team_member_id' in payload.new ? payload.new.team_member_id : undefined;
             if (teamMemberId && teamMembersRef.current.some(m => m.id === teamMemberId)) {
               await handleDataChange();
             }
           }
         )
         .subscribe();
+      
+      channelsRef.current.push(tipsChannel);
       
       channelsRef.current.push(hoursChannel);
       
@@ -203,21 +184,18 @@ export const useTeamRealtimeUpdates = (
     }
   }, [teamId, handleDataChange, retryCount]);
 
-  // Reconnect function with clean state - useful for error recovery
   const reconnect = useCallback(() => {
     console.log('Attempting to reconnect realtime channels...');
     setConnectionState('connecting');
     setupChannels();
   }, [setupChannels]);
 
-  // Initial setup
   useEffect(() => {
     if (teamId) {
       setupChannels();
     }
     
     return () => {
-      // Clean up on component unmount
       channelsRef.current.forEach(channel => {
         try {
           supabase.removeChannel(channel);
@@ -233,17 +211,14 @@ export const useTeamRealtimeUpdates = (
     };
   }, [teamId, setupChannels]);
 
-  // Heartbeat to detect stale connections
   useEffect(() => {
     const heartbeatInterval = setInterval(() => {
       const now = new Date();
       const timeSinceLastActivity = now.getTime() - lastActivity.getTime();
       
-      // If it's been more than 5 minutes since last activity and we think we're connected
       if (timeSinceLastActivity > 5 * 60 * 1000 && connectionState === 'connected') {
         console.log('Connection may be stale, checking status...');
         
-        // Send a presence update to check connection
         const testChannel = supabase.channel('heartbeat-test');
         testChannel.subscribe(status => {
           if (status !== 'SUBSCRIBED') {
@@ -252,11 +227,10 @@ export const useTeamRealtimeUpdates = (
             reconnect();
           }
           
-          // Remove test channel either way
           setTimeout(() => supabase.removeChannel(testChannel), 1000);
         });
       }
-    }, 60000); // Check every minute
+    }, 60000);
     
     return () => clearInterval(heartbeatInterval);
   }, [connectionState, lastActivity, reconnect]);

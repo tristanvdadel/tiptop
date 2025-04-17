@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
@@ -48,7 +47,6 @@ const TeamContent: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Set up real-time updates for periods and team members with enhanced error handling
   const { reconnect, connectionState, lastError } = useTeamRealtimeUpdates(
     teamId || contextTeamId, 
     periods, 
@@ -56,7 +54,6 @@ const TeamContent: React.FC = () => {
     refreshTeamData
   );
 
-  // Load team data on initial mount with better team ID handling
   useEffect(() => {
     let isMounted = true;
     let checkTimer: ReturnType<typeof setTimeout>;
@@ -89,7 +86,6 @@ const TeamContent: React.FC = () => {
         if (isMounted) {
           console.log("TeamContent: Data loaded successfully");
           
-          // Try to check accounts for team members on a delay to allow for rendering first
           if (teamMembers.length > 0) {
             checkTimer = setTimeout(async () => {
               try {
@@ -105,17 +101,14 @@ const TeamContent: React.FC = () => {
       } catch (error: any) {
         console.error("Error loading team data:", error);
         
-        // Check if this is a database recursion error and handle appropriately
         if (error.message && (
             error.message.includes('recursion') || 
             error.message.includes('infinity') ||
             error.code === '42P17'
         )) {
-          // Redirect to a clean state instead of showing error
           localStorage.removeItem('sb-auth-token-cached');
           localStorage.removeItem('last_team_id');
           
-          // Clear team-specific cache data
           Object.keys(localStorage).forEach(key => {
             if (key.startsWith('team_data_') || key.includes('analytics_')) {
               localStorage.removeItem(key);
@@ -129,7 +122,6 @@ const TeamContent: React.FC = () => {
               duration: 3000,
             });
             
-            // Force page refresh to get a clean state
             setTimeout(() => {
               window.location.href = '/team?recover=true'; 
             }, 1000);
@@ -141,7 +133,6 @@ const TeamContent: React.FC = () => {
     console.log("TeamContent: Initializing component, loading data");
     loadInitialData();
     
-    // Add automatic retry mechanism for data loading
     if (!dataInitialized && !loading) {
       const retryTimer = setTimeout(() => {
         if (isMounted && !dataInitialized) {
@@ -161,7 +152,6 @@ const TeamContent: React.FC = () => {
     };
   }, [dataInitialized, handleRefresh, teamId, contextTeamId, teamMembers, loading, fetchTeamId, toast]);
 
-  // Handle manual refresh
   const handleManualRefresh = async () => {
     try {
       toast({
@@ -185,12 +175,10 @@ const TeamContent: React.FC = () => {
     }
   };
 
-  // Display appropriate loading or error states
   if (loading && !dataInitialized) {
     return <LoadingIndicator />;
   }
   
-  // Show error state if there's an error
   if (hasError || showRecursionAlert) {
     return (
       <div className="container mx-auto py-8">
@@ -203,10 +191,8 @@ const TeamContent: React.FC = () => {
     );
   }
 
-  // Show connection issue alert when disconnected
   const showConnectionIssue = connectionState === 'disconnected';
   
-  // Show team data with refresh option if no team members but no error
   if (sortedTeamMembers.length === 0 && dataInitialized) {
     return (
       <div className="pb-16">

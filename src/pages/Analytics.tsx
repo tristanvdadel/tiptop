@@ -98,18 +98,7 @@ const Analytics = () => {
           .select(`
             id,
             date,
-            payout_time,
-            total_hours,
-            payout_periods (
-              period_id
-            ),
-            payout_distributions (
-              team_member_id,
-              amount,
-              actual_amount,
-              balance,
-              hours
-            )
+            payout_time
           `)
           .eq('team_id', effectiveTeamId);
           
@@ -125,8 +114,62 @@ const Analytics = () => {
         
         console.log("Analytics.tsx: Found historical payout data:", payoutsData.length, "payouts");
         
-        const periodIds = payoutsData
-          .flatMap(payout => payout.payout_periods?.map(pp => pp.period_id) || [])
+        const payoutIds = payoutsData.map(p => p.id);
+        const { data: payoutPeriodsData, error: payoutPeriodsError } = await supabase
+          .from('payout_periods')
+          .select('payout_id, period_id')
+          .in('payout_id', payoutIds);
+          
+        if (payoutPeriodsError) {
+          console.error("Analytics.tsx: Error fetching payout periods:", payoutPeriodsError);
+          return;
+        }
+        
+        const { data: payoutDistributionsData, error: distributionsError } = await supabase
+          .from('payout_distributions')
+          .select('payout_id, team_member_id, amount, actual_amount, balance, hours')
+          .in('payout_id', payoutIds);
+          
+        if (distributionsError) {
+          console.error("Analytics.tsx: Error fetching payout distributions:", distributionsError);
+          return;
+        }
+        
+        const payoutPeriods = {};
+        const payoutDistributions = {};
+        const payoutTotalHours = {};
+        
+        if (payoutPeriodsData) {
+          payoutPeriodsData.forEach(item => {
+            if (!payoutPeriods[item.payout_id]) {
+              payoutPeriods[item.payout_id] = [];
+            }
+            payoutPeriods[item.payout_id].push(item.period_id);
+          });
+        }
+        
+        if (payoutDistributionsData) {
+          payoutDistributionsData.forEach(item => {
+            if (!payoutDistributions[item.payout_id]) {
+              payoutDistributions[item.payout_id] = [];
+              payoutTotalHours[item.payout_id] = 0;
+            }
+            payoutDistributions[item.payout_id].push(item);
+            if (item.hours) {
+              payoutTotalHours[item.payout_id] += Number(item.hours);
+            }
+          });
+        }
+        
+        const enhancedPayouts = payoutsData.map(payout => ({
+          ...payout,
+          payout_periods: payoutPeriods[payout.id] || [],
+          payout_distributions: payoutDistributions[payout.id] || [],
+          total_hours: payoutTotalHours[payout.id] || 0
+        }));
+        
+        const periodIds = enhancedPayouts
+          .flatMap(payout => payout.payout_periods || [])
           .filter(id => id);
           
         if (periodIds.length === 0) {
@@ -163,16 +206,13 @@ const Analytics = () => {
         console.log("Analytics.tsx: Found historical period data:", periodsData.length, "periods");
         
         const historicalPeriods = periodsData.map(period => {
-          const relatedPayout = payoutsData.find(p => 
-            p.payout_periods?.some(pp => pp.period_id === period.id)
+          const relatedPayout = enhancedPayouts.find(p => 
+            p.payout_periods.includes(period.id)
           );
           
           const totalTips = period.tips?.reduce((sum, tip) => sum + tip.amount, 0) || 0;
           
-          let totalHours = relatedPayout?.total_hours;
-          if (!totalHours && relatedPayout) {
-            totalHours = relatedPayout.payout_distributions?.reduce((sum, dist) => sum + (dist.hours || 0), 0) || 0;
-          }
+          let totalHours = relatedPayout?.total_hours || 0;
           
           return {
             id: period.id,

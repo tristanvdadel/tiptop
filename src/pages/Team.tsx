@@ -57,10 +57,24 @@ const Team: React.FC = () => {
         }
       });
     
+    // Setup connection monitor with auto-recovery
+    const connectionMonitor = setInterval(() => {
+      if (realtimeStatus === 'disconnected') {
+        console.log('Team.tsx: Detected disconnected state, attempting auto-recovery');
+        // Instead of immediately refreshing, try to resubscribe first
+        try {
+          channel.subscribe();
+        } catch (error) {
+          console.error('Team.tsx: Error trying to resubscribe:', error);
+        }
+      }
+    }, 30000); // Check every 30 seconds
+    
     return () => {
+      clearInterval(connectionMonitor);
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [realtimeStatus]);
   
   // Show toast when realtime status changes
   useEffect(() => {
@@ -132,8 +146,29 @@ const Team: React.FC = () => {
   // Handle reconnection attempt when disconnected
   const handleReconnect = () => {
     setRealtimeStatus('connecting');
-    // Force reconnection by removing and recreating channels
-    window.location.reload();
+    
+    // Try a soft reconnect first
+    const channel = supabase.channel('reconnect-attempt');
+    channel.subscribe((status) => {
+      console.log('Team.tsx: Reconnection attempt status:', status);
+      if (status === 'SUBSCRIBED') {
+        // Successfully reconnected - refresh the data
+        window.location.reload(); 
+      } else if (status === 'CHANNEL_ERROR') {
+        // If soft reconnect fails, try a full page reload
+        console.log('Team.tsx: Soft reconnect failed, attempting full reload');
+        window.location.reload();
+      }
+    });
+    
+    // Set a timeout for the reconnection attempt
+    setTimeout(() => {
+      supabase.removeChannel(channel);
+      // If we still haven't reconnected, force a full reload
+      if (realtimeStatus !== 'connected') {
+        window.location.reload();
+      }
+    }, 5000);
   };
 
   console.log("Team.tsx: Rendering Team component with TeamProvider");

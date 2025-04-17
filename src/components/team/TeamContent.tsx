@@ -14,6 +14,8 @@ import { useTeamRealtimeUpdates } from '@/hooks/useTeamRealtimeUpdates';
 import ErrorCard from '@/components/analytics/ErrorCard';
 import { useTeamId } from '@/hooks/useTeamId';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 
 const TeamContent: React.FC = () => {
   const {
@@ -46,7 +48,12 @@ const TeamContent: React.FC = () => {
   const navigate = useNavigate();
 
   // Set up real-time updates for periods and team members
-  useTeamRealtimeUpdates(teamId || contextTeamId, periods, teamMembers, refreshTeamData);
+  const { reconnect, connectionState } = useTeamRealtimeUpdates(
+    teamId || contextTeamId, 
+    periods, 
+    teamMembers, 
+    refreshTeamData
+  );
 
   // Load team data on initial mount with better team ID handling
   useEffect(() => {
@@ -122,6 +129,30 @@ const TeamContent: React.FC = () => {
     };
   }, [dataInitialized, handleRefresh, teamId, contextTeamId, teamMembers, loading, fetchTeamId, toast]);
 
+  // Handle manual refresh
+  const handleManualRefresh = async () => {
+    try {
+      toast({
+        title: "Gegevens verversen",
+        description: "Bezig met het ophalen van de laatste gegevens...",
+      });
+      
+      await handleRefresh();
+      
+      toast({
+        title: "Gegevens ververst",
+        description: "De laatste teamgegevens zijn opgehaald",
+      });
+    } catch (error) {
+      console.error("Error refreshing data manually:", error);
+      toast({
+        title: "Fout bij verversen",
+        description: "Er is een probleem opgetreden bij het verversen van de gegevens",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Display appropriate loading or error states
   if (loading && !dataInitialized) {
     return <LoadingIndicator />;
@@ -139,12 +170,26 @@ const TeamContent: React.FC = () => {
       </div>
     );
   }
+
+  // Show connection issue alert when disconnected
+  const showConnectionIssue = connectionState === 'disconnected';
   
   // Show team data with refresh option if no team members but no error
   if (sortedTeamMembers.length === 0 && dataInitialized) {
     return (
       <div className="pb-16">
         <TeamHeader />
+        <div className="flex justify-end mb-4">
+          <Button 
+            size="sm"
+            variant="outline"
+            onClick={handleManualRefresh}
+            className="ml-auto"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Gegevens verversen
+          </Button>
+        </div>
         <TeamMemberList 
           teamMembers={[]}
           addTeamMember={addTeamMember}
@@ -161,6 +206,18 @@ const TeamContent: React.FC = () => {
   return (
     <div className="pb-16">
       <TeamHeader />
+      
+      <div className="flex justify-end mb-4">
+        <Button 
+          size="sm"
+          variant="outline"
+          onClick={handleManualRefresh}
+          className="ml-auto"
+        >
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Gegevens verversen
+        </Button>
+      </div>
       
       <TeamMemberList 
         teamMembers={sortedTeamMembers}

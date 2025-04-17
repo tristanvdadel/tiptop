@@ -1,5 +1,5 @@
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { TeamMember, Period } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
@@ -17,7 +17,48 @@ export const useTeamRealtimeUpdates = (
   const { toast } = useToast();
   const channelsRef = useRef<any[]>([]);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [connectionState, setConnectionState] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
+  const lastRefreshRef = useRef<number>(Date.now());
+  const reconnectAttemptsRef = useRef<number>(0);
 
+  // Monitor overall connection state
+  useEffect(() => {
+    if (!teamId) return;
+    
+    const presenceChannel = supabase.channel('team-realtime-presence');
+    
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        console.log('useTeamRealtimeUpdates: Connection synced');
+        setConnectionState('connected');
+        reconnectAttemptsRef.current = 0;
+      })
+      .on('presence', { event: 'join' }, () => {
+        console.log('useTeamRealtimeUpdates: Connection joined');
+      })
+      .on('system', { event: 'disconnect' }, () => {
+        console.log('useTeamRealtimeUpdates: Connection disconnected');
+        setConnectionState('disconnected');
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setConnectionState('connected');
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setConnectionState('disconnected');
+        }
+      });
+    
+    // Add this channel to our refs for cleanup
+    channelsRef.current.push(presenceChannel);
+    
+    return () => {
+      supabase.removeChannel(presenceChannel).catch(err => 
+        console.error("Error removing presence channel:", err)
+      );
+    };
+  }, [teamId]);
+
+  // Main realtime updates setup
   useEffect(() => {
     if (!teamId) {
       console.log("useTeamRealtimeUpdates: No team ID for real-time updates");
@@ -39,6 +80,13 @@ export const useTeamRealtimeUpdates = (
     
     // Create a debounced refresh function to prevent multiple refreshes at once
     const debouncedRefresh = () => {
+      // Prevent refreshing too frequently (minimum 1 second between refreshes)
+      const now = Date.now();
+      if (now - lastRefreshRef.current < 1000) {
+        console.log('useTeamRealtimeUpdates: Skipping refresh - too soon after last refresh');
+        return;
+      }
+      
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
       }
@@ -46,6 +94,7 @@ export const useTeamRealtimeUpdates = (
       refreshTimeoutRef.current = setTimeout(async () => {
         try {
           console.log('useTeamRealtimeUpdates: Refreshing team data after real-time update');
+          lastRefreshRef.current = Date.now();
           await refreshTeamData();
         } catch (error) {
           console.error('useTeamRealtimeUpdates: Error refreshing data:', error);
@@ -166,12 +215,33 @@ export const useTeamRealtimeUpdates = (
     
     channelsRef.current.push(hourChannel);
     
+    // Setup auto-reconnect for channels when connection is lost
+    const setupAutoReconnect = () => {
+      if (connectionState === 'disconnected') {
+        console.log("useTeamRealtimeUpdates: Connection lost, will attempt to reconnect");
+        
+        // Increase reconnection delay based on number of attempts (exponential backoff)
+        const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttemptsRef.current));
+        reconnectAttemptsRef.current++;
+        
+        setTimeout(() => {
+          console.log(`useTeamRealtimeUpdates: Attempting reconnect #${reconnectAttemptsRef.current}`);
+          reconnect();
+        }, delay);
+      }
+    };
+    
+    // Watch for connection state changes to auto-reconnect
+    const disconnectWatcher = setInterval(setupAutoReconnect, 10000);
+    
     // Cleanup function
     return () => {
       console.log("useTeamRealtimeUpdates: Cleaning up real-time subscriptions");
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
       }
+      
+      clearInterval(disconnectWatcher);
       
       channelsRef.current.forEach(channel => {
         supabase.removeChannel(channel).catch(err => 
@@ -180,11 +250,13 @@ export const useTeamRealtimeUpdates = (
       });
       channelsRef.current = [];
     };
-  }, [teamId, refreshTeamData, toast]);
+  }, [teamId, refreshTeamData, toast, periods, teamMembers, connectionState]);
 
   // Provide a method to manually reconnect if needed
   const reconnect = () => {
     console.log("useTeamRealtimeUpdates: Manually reconnecting real-time channels");
+    setConnectionState('connecting');
+    
     // Force cleanup and reconnect by setting teamId to null and back
     channelsRef.current.forEach(channel => {
       supabase.removeChannel(channel).catch(err => 
@@ -198,7 +270,17 @@ export const useTeamRealtimeUpdates = (
       title: "Verbinding herstellen",
       description: "Bezig met het opnieuw verbinden met de server...",
     });
+    
+    // Force refresh data after reconnection
+    setTimeout(async () => {
+      try {
+        await refreshTeamData();
+        console.log("useTeamRealtimeUpdates: Successfully refreshed data after reconnection");
+      } catch (error) {
+        console.error("useTeamRealtimeUpdates: Failed to refresh data after reconnection:", error);
+      }
+    }, 1000);
   };
 
-  return { reconnect };
+  return { reconnect, connectionState };
 };

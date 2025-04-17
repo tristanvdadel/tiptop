@@ -66,6 +66,9 @@ interface AppContextType {
   startNewPeriod: () => Promise<void>;
   endCurrentPeriod: () => Promise<void>;
   createTip: (amount: number, teamMemberId: string) => Promise<void>;
+  addTip: (amount: number, note?: string, date?: string) => void;
+  updateTip: (periodId: string, tipId: string, amount: number, note?: string, date?: string) => void;
+  deleteTip: (periodId: string, tipId: string) => void;
   updatePeriod: (periodId: string, updates: Partial<Period>) => Promise<void>;
   createTeamMember: (name: string, hourlyRate: number) => Promise<void>;
   updateTeamMember: (
@@ -256,6 +259,108 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         tips: [...prevPeriod.tips, newTip],
       };
     });
+  };
+
+  const addTip = (amount: number, note?: string, date?: string) => {
+    if (!currentPeriod) {
+      console.error('No current period to add tip to.');
+      return;
+    }
+    
+    const tipDate = date || new Date().toISOString();
+    
+    const newTip: TipEntry = {
+      id: Math.random().toString(), // Temporary ID
+      amount,
+      teamMemberId: 'default', // This would be replaced with actual teammember ID in a real implementation
+      periodId: currentPeriod.id,
+      timestamp: new Date().toISOString(),
+      date: tipDate,
+      note
+    };
+    
+    setCurrentPeriod((prevPeriod) => {
+      if (!prevPeriod) return prevPeriod;
+      
+      return {
+        ...prevPeriod,
+        tips: [...prevPeriod.tips, newTip],
+      };
+    });
+    
+    // You would implement saving to the database here
+  };
+
+  const updateTip = (periodId: string, tipId: string, amount: number, note?: string, date?: string) => {
+    setPeriods(prevPeriods => {
+      return prevPeriods.map(period => {
+        if (period.id === periodId) {
+          return {
+            ...period,
+            tips: period.tips.map(tip => {
+              if (tip.id === tipId) {
+                return {
+                  ...tip,
+                  amount,
+                  note,
+                  date: date || tip.date
+                };
+              }
+              return tip;
+            })
+          };
+        }
+        return period;
+      });
+    });
+    
+    // Also update current period if it's the one being modified
+    if (currentPeriod && currentPeriod.id === periodId) {
+      setCurrentPeriod(prevPeriod => {
+        if (!prevPeriod) return prevPeriod;
+        
+        return {
+          ...prevPeriod,
+          tips: prevPeriod.tips.map(tip => {
+            if (tip.id === tipId) {
+              return {
+                ...tip,
+                amount,
+                note,
+                date: date || tip.date
+              };
+            }
+            return tip;
+          })
+        };
+      });
+    }
+  };
+
+  const deleteTip = (periodId: string, tipId: string) => {
+    setPeriods(prevPeriods => {
+      return prevPeriods.map(period => {
+        if (period.id === periodId) {
+          return {
+            ...period,
+            tips: period.tips.filter(tip => tip.id !== tipId)
+          };
+        }
+        return period;
+      });
+    });
+    
+    // Also update current period if it's the one being modified
+    if (currentPeriod && currentPeriod.id === periodId) {
+      setCurrentPeriod(prevPeriod => {
+        if (!prevPeriod) return prevPeriod;
+        
+        return {
+          ...prevPeriod,
+          tips: prevPeriod.tips.filter(tip => tip.id !== tipId)
+        };
+      });
+    }
   };
 
   const updatePeriod = async (periodId: string, updates: Partial<Period>) => {
@@ -509,6 +614,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     startNewPeriod,
     endCurrentPeriod,
     createTip,
+    addTip,
+    updateTip,
+    deleteTip,
     updatePeriod,
     createTeamMember,
     updateTeamMember,

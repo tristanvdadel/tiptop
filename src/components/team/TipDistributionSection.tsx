@@ -9,11 +9,15 @@ const TipDistributionSection: React.FC = () => {
   const { selectedPeriods, distribution, totalTips, totalHours, handlePayout } = useTeam();
   const { toast } = useToast();
 
-  // Controleer of er uitbetaalde periodes geselecteerd zijn
+  // Check if there are any paid periods selected
   const hasSelectedPaidPeriods = useMemo(() => {
     return selectedPeriods.some(periodId => {
-      const period = distribution.find(member => member.paidPeriods?.includes(periodId));
-      return !!period;
+      // Find if any period is among the paid periods in the team context
+      const isPaid = distribution.some(member => {
+        // Check if this member has this period marked as paid through another property
+        return member.paidPeriodsIds?.includes(periodId);
+      });
+      return isPaid;
     });
   }, [selectedPeriods, distribution]);
 

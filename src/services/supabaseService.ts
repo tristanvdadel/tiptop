@@ -171,7 +171,7 @@ export const saveTeamMember = async (teamId: string, member: TeamMember) => {
           team_member_id: id,
           hours: reg.hours,
           date: reg.date,
-          processed: false
+          processed: reg.processed || false
         })));
       
       if (upsertError) {

@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -93,6 +94,7 @@ const Analytics = () => {
       try {
         console.log("Analytics.tsx: Fetching historical payout data");
         
+        // Fetch payouts with total_hours column
         const { data: payoutsData, error: payoutsError } = await supabase
           .from('payouts')
           .select(`
@@ -126,7 +128,7 @@ const Analytics = () => {
           return;
         }
         
-        // Fetch payout distributions
+        // Fetch payout distributions with hours column
         const { data: payoutDistributionsData, error: distributionsError } = await supabase
           .from('payout_distributions')
           .select('payout_id, team_member_id, amount, actual_amount, balance, hours')

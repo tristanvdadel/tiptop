@@ -91,6 +91,7 @@ export type Database = {
           amount: number
           balance: number | null
           created_at: string
+          hours: number | null
           id: string
           payout_id: string
           team_member_id: string
@@ -100,6 +101,7 @@ export type Database = {
           amount: number
           balance?: number | null
           created_at?: string
+          hours?: number | null
           id?: string
           payout_id: string
           team_member_id: string
@@ -109,6 +111,7 @@ export type Database = {
           amount?: number
           balance?: number | null
           created_at?: string
+          hours?: number | null
           id?: string
           payout_id?: string
           team_member_id?: string
@@ -174,6 +177,7 @@ export type Database = {
           payer_name: string | null
           payout_time: string
           team_id: string
+          total_hours: number | null
         }
         Insert: {
           created_at?: string
@@ -182,6 +186,7 @@ export type Database = {
           payer_name?: string | null
           payout_time?: string
           team_id: string
+          total_hours?: number | null
         }
         Update: {
           created_at?: string
@@ -190,6 +195,7 @@ export type Database = {
           payer_name?: string | null
           payout_time?: string
           team_id?: string
+          total_hours?: number | null
         }
         Relationships: [
           {

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
 import { TeamMember } from '@/contexts/AppContext';
 import { useApp } from '@/contexts/AppContext';
@@ -25,6 +24,7 @@ interface TeamContextType {
   handleConfirmImportedHours: (confirmedHours: ImportedHour[]) => void;
   closeImportDialog: () => void;
   handleRefresh: () => Promise<void>;
+  periods: any[];
 }
 
 export interface ImportedHour {
@@ -247,7 +247,8 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     handleFileImport,
     handleConfirmImportedHours,
     closeImportDialog,
-    handleRefresh
+    handleRefresh,
+    periods
   };
 
   return (

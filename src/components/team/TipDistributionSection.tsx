@@ -6,20 +6,18 @@ import { useToast } from '@/hooks/use-toast';
 import TipDistribution from '@/components/team/TipDistribution';
 
 const TipDistributionSection: React.FC = () => {
-  const { selectedPeriods, distribution, totalTips, totalHours, handlePayout } = useTeam();
+  const { selectedPeriods, distribution, totalTips, totalHours, handlePayout, periods } = useTeam();
   const { toast } = useToast();
 
   // Check if there are any paid periods selected
   const hasSelectedPaidPeriods = useMemo(() => {
+    if (!periods || periods.length === 0) return false;
+    
     return selectedPeriods.some(periodId => {
-      // Find if any period is among the paid periods in the team context
-      const isPaid = distribution.some(member => {
-        // Check if this member has this period marked as paid
-        return member.paidPeriods?.includes(periodId);
-      });
-      return isPaid;
+      const period = periods.find(p => p.id === periodId);
+      return period?.is_paid === true;
     });
-  }, [selectedPeriods, distribution]);
+  }, [selectedPeriods, periods]);
 
   // Memoize the button disabled state to prevent unnecessary re-renders
   const isButtonDisabled = useMemo(() => 

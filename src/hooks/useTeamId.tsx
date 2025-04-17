@@ -29,6 +29,14 @@ export const TeamIdProvider = ({ children }: { children: ReactNode }) => {
     if (cachedTeamId && !localTeamId) {
       console.log("TeamIdProvider: Using cached team ID:", cachedTeamId);
       setLocalTeamId(cachedTeamId);
+      setLoading(false); // Immediately stop loading if we have cached ID
+    }
+
+    // Don't continue if we're in the login page or similar
+    if (window.location.pathname === '/login' || 
+        window.location.pathname === '/splash') {
+      setLoading(false);
+      return null;
     }
 
     try {
@@ -68,9 +76,24 @@ export const TeamIdProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [localTeamId, toast]);
 
-  // Initialize team ID on mount
+  // Initialize team ID on mount with safety timeout
   useEffect(() => {
+    let mounted = true;
+    
     fetchTeamId();
+    
+    // Safety timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (mounted && loading) {
+        console.log("Force ending teamId loading state after timeout");
+        setLoading(false);
+      }
+    }, 2000);
+    
+    return () => {
+      mounted = false;
+      clearTimeout(timeoutId);
+    };
   }, [fetchTeamId]);
 
   // Don't show loading state if we have a cached team ID

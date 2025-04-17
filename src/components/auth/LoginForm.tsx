@@ -29,16 +29,15 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
     if (!email || !password || loading) return;
     
     setLoading(true);
-    setLoginProgress(40); // Start progress higher
+    setLoginProgress(40); // Start progress higher for faster feedback
     
     try {
-      // Show immediate feedback
-      toast({
-        title: "Bezig met inloggen...",
-        description: "Even geduld aub",
-      });
-      
+      // Provide immediate feedback
       setLoginProgress(60);
+      
+      // Cache the login attempt to avoid session deadlocks
+      const timestamp = Date.now().toString();
+      localStorage.setItem('login_attempt_time', timestamp);
       
       // Direct login without artificial waits
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -46,11 +45,13 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
         password
       });
       
+      if (error) throw error;
+      
       // Handle success immediately
-      if (!error && data.session) {
+      if (data.session) {
         setLoginProgress(100);
         
-        // Cache session locally for faster auth check
+        // Cache session token locally for faster auth check
         localStorage.setItem('sb-auth-token-cached', data.session.access_token);
         
         toast({
@@ -60,7 +61,7 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
         
         // Immediate navigation, no delays
         navigate('/', { replace: true });
-        return; // Exit early on successful login
+        return;
       }
       
       // Only reach here if there was no session but also no error
@@ -68,6 +69,7 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
       
     } catch (error: any) {
       setLoginProgress(0);
+      console.error("Login error:", error);
       
       // More specific error messages
       let errorMessage = "Controleer je gegevens en probeer opnieuw.";
@@ -82,6 +84,9 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
       } else if (error.message?.includes("network") || !navigator.onLine) {
         errorTitle = "Netwerkfout";
         errorMessage = "Controleer je internetverbinding en probeer opnieuw.";
+      } else if (error.message?.includes("timeout") || error.message?.includes("TIMEOUT")) {
+        errorTitle = "Time-out";
+        errorMessage = "Inlogpoging duurde te lang. Probeer het opnieuw.";
       }
       
       toast({
@@ -91,6 +96,19 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
       });
     } finally {
       setLoading(false);
+      
+      // Safety timeout - if still on login page after 5 seconds, show warning
+      setTimeout(() => {
+        const currentPath = window.location.pathname;
+        if (currentPath.includes('/login') && loading) {
+          setLoading(false);
+          toast({
+            title: "Inloggen duurt lang",
+            description: "Probeer het opnieuw of ververs de pagina",
+            variant: "destructive"
+          });
+        }
+      }, 5000);
     }
   };
 

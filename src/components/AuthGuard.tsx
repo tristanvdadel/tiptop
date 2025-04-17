@@ -10,14 +10,65 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const authCheckTimeout = useRef<number | null>(null);
-  const maxAuthCheckTime = 200; // Reduced from 300ms to 200ms
+  // Reduced from 200ms to 150ms for even faster initial response
+  const maxAuthCheckTime = 150;
 
   useEffect(() => {
     // For quick initial render, check if we have a cached token
     const cachedToken = localStorage.getItem('sb-auth-token-cached');
     const isCachedSessionLikely = !!cachedToken;
+    const loginAttemptTime = localStorage.getItem('login_attempt_time');
+    const recentLoginAttempt = loginAttemptTime && (Date.now() - parseInt(loginAttemptTime)) < 10000;
     
     let mounted = true;
+    
+    // Set a shorter timeout for better user experience
+    authCheckTimeout.current = window.setTimeout(() => {
+      if (mounted && isLoading) {
+        console.log('Session check timeout - forcing completion');
+        // If we have a cached token, assume user is logged in for now
+        if (isCachedSessionLikely) {
+          setSession({ dummy: 'temporary' }); // Temporary session object
+        } else {
+          setSession(null);
+        }
+        setIsLoading(false);
+      }
+    }, maxAuthCheckTime);
+    
+    // Fast session check with priority on cached data
+    const checkSession = async () => {
+      try {
+        // If we have a recent login attempt, prioritize cache first
+        if (recentLoginAttempt && isCachedSessionLikely && mounted) {
+          console.log('Recent login detected, using cached session first');
+          setSession({ dummy: 'temporary' }); // Temporary session from cache
+          setIsLoading(false);
+        }
+        
+        // Still do the full check in background
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          if (mounted) setIsLoading(false);
+          return;
+        }
+        
+        if (mounted) {
+          setSession(data.session);
+          setIsLoading(false);
+          
+          // Clear login attempt timestamp after successful auth
+          if (data.session) {
+            localStorage.removeItem('login_attempt_time');
+          }
+        }
+      } catch (error) {
+        console.error('Unexpected error in session check:', error);
+        if (mounted) setIsLoading(false);
+      }
+    };
     
     // Setup auth state listener for ALL auth events
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
@@ -30,54 +81,19 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
         // If user logs out, clear the cached token
         if (event === 'SIGNED_OUT') {
           localStorage.removeItem('sb-auth-token-cached');
+          localStorage.removeItem('login_attempt_time');
         }
         
         // If user logs in, set the cached token
         if (event === 'SIGNED_IN' && newSession?.access_token) {
           localStorage.setItem('sb-auth-token-cached', newSession.access_token);
+          localStorage.removeItem('login_attempt_time');
         }
       }
     });
 
-    // Perform fast session check
-    const checkSession = async () => {
-      try {
-        // Go with fast session check
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Error getting session:', error);
-          if (mounted) setIsLoading(false);
-          return;
-        }
-        
-        if (mounted) {
-          setSession(data.session);
-          setIsLoading(false);
-        }
-      } catch (error) {
-        console.error('Unexpected error in session check:', error);
-        if (mounted) setIsLoading(false);
-      }
-    };
-
     // Start session check immediately
     checkSession();
-    
-    // Set a shorter timeout for better user experience
-    authCheckTimeout.current = window.setTimeout(() => {
-      if (mounted && isLoading) {
-        console.log('Session check timeout - forcing completion');
-        // If we have a cached token, assume user is logged in for now
-        // This gives a smoother UX while the full check completes
-        if (isCachedSessionLikely) {
-          setSession({ dummy: 'temporary' }); // Temporary session object
-        } else {
-          setSession(null);
-        }
-        setIsLoading(false);
-      }
-    }, maxAuthCheckTime);
 
     return () => {
       mounted = false;

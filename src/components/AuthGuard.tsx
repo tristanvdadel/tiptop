@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<any>(null);
@@ -10,6 +11,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const authCheckTimeout = useRef<number | null>(null);
+  const { toast } = useToast();
   // Gereduceerd naar 100ms voor snellere respons
   const maxAuthCheckTime = 100;
 
@@ -141,15 +143,23 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
         navigate('/login', { 
           replace: true, 
           state: { 
-            message: "Je bent uitgelogd vanwege een database synchronisatie probleem. Inloggen zou dit probleem moeten oplossen."
+            message: "Je bent uitgelogd vanwege een database beveiligingsprobleem. Inloggen zou dit probleem moeten oplossen door een nieuwe sessie aan te maken."
           } 
+        });
+        
+        // Toon een toast om duidelijk te maken wat er gebeurt
+        toast({
+          title: "Database beveiligingsprobleem gedetecteerd",
+          description: "Probeer opnieuw in te loggen om het database beveiligingsprobleem op te lossen.",
+          variant: "destructive",
+          duration: 5000
         });
       } else {
         // Gebruik replace in plaats van push voor betere geschiedenisbeheer
         navigate('/login', { replace: true });
       }
     }
-  }, [needsRedirect, navigate, location.pathname, location.search]);
+  }, [needsRedirect, navigate, location.pathname, location.search, toast]);
 
   // Toon minimale laadstatus
   if (isLoading) {

@@ -1,10 +1,11 @@
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertCircle, AlertTriangle, Database, RefreshCw, Home, ArrowLeft, LogOut } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Database, RefreshCw, Home, ArrowLeft, LogOut, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface ErrorCardProps {
   type: 'error' | 'noTeam' | 'dbPolicy';
@@ -17,8 +18,16 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
   
   const handleLogout = async () => {
     try {
+      // Wis alle cache en sessiegegevens voor een schone start
       localStorage.removeItem('sb-auth-token-cached');
       localStorage.removeItem('last_team_id');
+      localStorage.removeItem('analytics_last_refresh');
+      
+      // Specifieke teamcache wissen
+      const teamIds = Object.keys(localStorage).filter(key => key.startsWith('team_data_refresh_'));
+      teamIds.forEach(key => localStorage.removeItem(key));
+      
+      // Uitloggen bij Supabase
       await supabase.auth.signOut();
       navigate('/login');
     } catch (error) {
@@ -26,6 +35,20 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
       // Force reload to the login page if signOut fails
       window.location.href = '/login';
     }
+  };
+
+  const handleFixSecurityRecursion = () => {
+    // Gericht de database security policy recursie oplossen
+    localStorage.removeItem('sb-auth-token-cached');
+    localStorage.removeItem('last_team_id');
+    // Alle team-gerelateerde cache wissen
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('team_data_') || key.includes('analytics_')) {
+        localStorage.removeItem(key);
+      }
+    });
+    // Doorsturen naar login met recursie-parameter
+    window.location.href = '/login?error=recursion';
   };
 
   if (type === 'dbPolicy') {
@@ -36,14 +59,16 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
             <div className="flex flex-col items-center justify-center text-center space-y-4">
               <Database className="h-10 w-10 text-amber-500" />
               <div>
-                <h3 className="text-lg font-medium">Database Synchronisatie Probleem</h3>
+                <h3 className="text-lg font-medium">Database Beveiligingsprobleem</h3>
                 <p className="text-muted-foreground mt-1">
-                  {message || "Er is een tijdelijk probleem met de database synchronisatie. Probeer de pagina te verversen."}
+                  {message || "Er is een structureel probleem met de database beveiligingsregels (recursie in RLS policies)."}
                 </p>
-                <p className="text-sm text-muted-foreground mt-3">
-                  Dit probleem kan optreden door een recursie in de beveiligingsregels van de database. 
-                  De app zal automatisch proberen te herstellen, maar je kunt ook uitloggen en opnieuw inloggen om het te verhelpen.
-                </p>
+                <Alert className="mt-3 bg-amber-50 border-amber-200 text-left">
+                  <AlertDescription className="text-sm">
+                    Dit is geen tijdelijk probleem, maar een structurele fout in de beveiligingsregels van de database.
+                    De fout ontstaat door een oneindige lus (recursie) in de Row Level Security policies.
+                  </AlertDescription>
+                </Alert>
               </div>
               <div className="flex flex-col md:flex-row gap-3">
                 <Button variant="outline" onClick={() => navigate('/')}>
@@ -56,6 +81,10 @@ const ErrorCard: React.FC<ErrorCardProps> = ({ type, message, onRetry }) => {
                     Gegevens Verversen
                   </Button>
                 )}
+                <Button variant="outline" onClick={handleFixSecurityRecursion} className="gap-2 border-amber-500 text-amber-700">
+                  <FileText className="h-4 w-4" />
+                  Beveiligingsprobleem Oplossen
+                </Button>
                 <Button variant="outline" onClick={handleLogout}>
                   <LogOut className="h-4 w-4 mr-2" />
                   Uitloggen

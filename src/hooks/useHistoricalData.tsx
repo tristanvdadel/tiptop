@@ -90,34 +90,28 @@ export function useHistoricalData() {
       setHistoricalData(historicalPeriods);
       
       try {
-        // First try using the RPC function to avoid recursion issues
-        const { data: payoutData, error: payoutRpcError } = await supabase
-          .rpc('get_team_payouts_safe', { team_id_param: teamId });
+        // First try using direct query instead of RPC to avoid type issues
+        const { data: payoutData, error: payoutError } = await supabase
+          .from('payouts')
+          .select('id, date, payout_time, payer_name, total_hours')
+          .eq('team_id', teamId)
+          .order('date', { ascending: false });
           
-        if (payoutRpcError) {
-          console.log('RPC function failed, falling back to direct query:', payoutRpcError);
-          
-          // Try to fetch payout data - this might fail due to recursion
-          const { data: directPayoutData, error: payoutError } = await supabase
-            .from('payouts')
-            .select('id, date, payout_time, payer_name, total_hours')
-            .eq('team_id', teamId)
-            .order('date', { ascending: false });
-            
-          if (payoutError) {
-            // If it's a recursion error, we'll handle it gracefully
-            if (payoutError.message && payoutError.message.includes('recursion')) {
-              console.warn('Recursion error in payout query, using empty payout data');
-              setPayoutHistory([]);
-            } else {
-              throw payoutError;
-            }
+        if (payoutError) {
+          // If it's a recursion error, we'll handle it gracefully
+          if (payoutError.message && payoutError.message.includes('recursion')) {
+            console.warn('Recursion error in payout query, using empty payout data');
+            setPayoutHistory([]);
           } else {
-            await processPayoutData(directPayoutData || []);
+            throw payoutError;
           }
         } else {
-          // RPC function worked, process the data
-          await processPayoutData(payoutData || []);
+          // Process the payouts if we got data
+          if (payoutData && Array.isArray(payoutData)) {
+            await processPayoutData(payoutData);
+          } else {
+            setPayoutHistory([]);
+          }
         }
       } catch (payoutsError: any) {
         console.error('Error processing payouts:', payoutsError);

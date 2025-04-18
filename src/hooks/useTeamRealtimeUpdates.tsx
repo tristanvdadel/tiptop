@@ -1,5 +1,7 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export type ConnectionState = 'connected' | 'disconnected' | 'connecting';
 
@@ -13,7 +15,7 @@ export const useTeamRealtimeUpdates = (
   const [lastError, setLastError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [lastActivity, setLastActivity] = useState<Date>(new Date());
-  const channelsRef = useRef<any[]>([]);
+  const channelsRef = useRef<RealtimeChannel[]>([]);
   const refreshingRef = useRef<boolean>(false);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const periodsRef = useRef(periods);
@@ -185,10 +187,10 @@ export const useTeamRealtimeUpdates = (
         )
         .subscribe(status => {
           console.log(`Channel status: ${status}`);
-          if (status === 'SUBSCRIBED') {
+          if (status === "SUBSCRIBED") {
             setConnectionState('connected');
             setRetryCount(0);
-          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          } else if (status === "CLOSED" || status === "CHANNEL_ERROR") {
             setConnectionState('disconnected');
             
             const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
@@ -267,7 +269,7 @@ export const useTeamRealtimeUpdates = (
           console.log('Connection may be stale, checking status...');
           
           const isAnyChannelConnected = channelsRef.current.some(channel => {
-            return channel.state === 'SUBSCRIBED';
+            return channel.state === "SUBSCRIBED";
           });
           
           if (!isAnyChannelConnected) {

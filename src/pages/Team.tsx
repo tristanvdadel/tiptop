@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PayoutSummary } from '@/components/PayoutSummary';
@@ -9,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { StatusIndicator } from '@/components/ui/status-indicator';
 import { LoadingState } from '@/components/ui/loading-state';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 const Team: React.FC = () => {
   const location = useLocation();
@@ -42,13 +42,12 @@ const Team: React.FC = () => {
     const channels = supabase.getChannels();
     if (channels.length === 0) return undefined;
     
-    const channel = channels[0];
-    const isConnected = channel && channel.state === 'SUBSCRIBED';
+    const channel = channels[0] as RealtimeChannel;
     
-    if (isConnected) {
+    if (channel && channel.state === "SUBSCRIBED") {
       setRealtimeStatus('connected');
       return 1;
-    } else if (channel && channel.state === 'SUBSCRIBING') {
+    } else if (channel && channel.state === "SUBSCRIBING") {
       setRealtimeStatus('connecting');
       return 0;
     } else {
@@ -79,13 +78,13 @@ const Team: React.FC = () => {
       .subscribe((status) => {
         console.log('Team.tsx: Subscription status:', status);
         
-        if (status === 'SUBSCRIBED') {
+        if (status === "SUBSCRIBED") {
           if (realtimeStatus !== 'connected') {
             setRealtimeStatus('connected');
             statusChangedRef.current = true;
             reconnectionAttemptsRef.current = 0;
           }
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+        } else if (status === "CLOSED" || status === "CHANNEL_ERROR") {
           if (realtimeStatus !== 'disconnected') {
             setRealtimeStatus('disconnected');
             statusChangedRef.current = true;

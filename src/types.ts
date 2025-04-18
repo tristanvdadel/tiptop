@@ -30,7 +30,7 @@ export interface Tip {
   teamMemberId: string;
   periodId: string;
   timestamp: string;
-  date?: string; // Added for date display in UI
+  date: string; // Changed from optional to required to match TipEntry
   note?: string; // Added for notes in tip cards
 }
 

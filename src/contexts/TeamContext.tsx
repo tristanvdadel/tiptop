@@ -1,14 +1,32 @@
-
 import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
 import { TeamMember } from '@/types';
 import { useApp } from '@/contexts/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { calculateTipDistributionTotals } from '@/services/teamDataService';
-import { debounce } from '@/services/payoutService';
-import { fetchTeamPeriods } from '@/services/periodService';
 import { useTeamId } from '@/hooks/useTeamId';
 import { useCachedTeamData } from '@/hooks/useCachedTeamData';
 import { useToast } from '@/hooks/use-toast';
+
+// Create our own debounce function since the import is problematic
+const debounce = <F extends (...args: any[]) => any>(
+  func: F,
+  waitFor: number
+) => {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
+  return (...args: Parameters<F>): Promise<ReturnType<F>> => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+
+    return new Promise(resolve => {
+      timeout = setTimeout(() => {
+        const result = func(...args);
+        resolve(result);
+      }, waitFor);
+    });
+  };
+};
 
 interface TeamContextType {
   selectedPeriods: string[];

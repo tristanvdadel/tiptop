@@ -1,4 +1,3 @@
-
 import React, {
   createContext,
   useState,
@@ -226,7 +225,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
-  const createTip = async (amount: number, teamMemberId: string) => {
+  const createTip = async (amount: number, teamMemberId: string, note?: string) => {
     if (!currentPeriod) {
       console.warn('No current period to add tip to.');
       return;
@@ -234,7 +233,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
     try {
       // Placeholder for tip creation logic
-      console.log(`Tip of ${amount} created for team member ${teamMemberId}`);
+      console.log(`Tip of ${amount} created for team member ${teamMemberId} with note: ${note || 'No note'}`);
       toast({
         title: "Fooi aangemaakt",
         description: `Fooi van €${amount.toFixed(2)} aangemaakt voor teamlid ${teamMemberId}.`,

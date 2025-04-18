@@ -17,9 +17,12 @@ interface PayoutDetailItem {
 export interface PayoutData {
   id: string;
   date: string;
-  totalAmount: number;
-  totalHours?: number; // Property to store total hours
+  payerName?: string;
+  payoutTime?: string;
+  totalAmount?: number; // Made optional so it works with Payout interface too
+  totalHours?: number;
   distribution: PayoutDetailItem[];
+  periodIds?: string[];
 }
 
 interface PayoutDetailsProps {

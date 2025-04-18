@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import TipInput from '@/components/TipInput';
 import TipCard from '@/components/TipCard';
@@ -19,7 +18,7 @@ import { useTeamId } from '@/hooks/useTeamId';
 import ErrorCard from '@/components/analytics/ErrorCard';
 
 const Index = () => {
-  const { currentPeriod, refreshTeamData, addTip, updatePeriod } = useApp();
+  const { currentPeriod, refreshTeamData, addTip, updatePeriod, updateTip } = useApp();
   const [hasTeam, setHasTeam] = useState(false);
   const [loading, setLoading] = useState(true);
   const [checkingTeam, setCheckingTeam] = useState(true);
@@ -324,6 +323,16 @@ const Index = () => {
     );
   }
   
+  const handleTipUpdate = (tipId: string, amount: number, note?: string, date?: string) => {
+    if (!currentPeriod) return;
+    
+    // Ensure date is always present by defaulting to today if not provided
+    const tipDate = date || new Date().toISOString();
+    
+    updateTip(currentPeriod.id, tipId, amount, note, tipDate);
+    setEditDialogOpen(false);
+  };
+
   return (
     <div className="space-y-6">
       {realtimeStatus === 'disconnected' && (

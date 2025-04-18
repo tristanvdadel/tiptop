@@ -1,51 +1,11 @@
 
-import React, { useMemo } from 'react';
-import { Button } from '@/components/ui/button';
+import React from 'react';
 import { useTeam } from '@/contexts/TeamContext';
-import { useToast } from '@/hooks/use-toast';
 import TipDistribution from '@/components/team/TipDistribution';
+import { PayoutButton } from '@/components/team/PayoutButton';
 
 const TipDistributionSection: React.FC = () => {
-  const { selectedPeriods, distribution, totalTips, totalHours, handlePayout, periods } = useTeam();
-  const { toast } = useToast();
-
-  // Check if there are any paid periods selected
-  const hasSelectedPaidPeriods = useMemo(() => {
-    if (!periods || periods.length === 0) return false;
-    
-    return selectedPeriods.some(periodId => {
-      const period = periods.find(p => p.id === periodId);
-      return period?.isPaid === true; // Changed from is_paid to isPaid
-    });
-  }, [selectedPeriods, periods]);
-
-  // Memoize the button disabled state to prevent unnecessary re-renders
-  const isButtonDisabled = useMemo(() => 
-    selectedPeriods.length === 0 || hasSelectedPaidPeriods, 
-    [selectedPeriods.length, hasSelectedPaidPeriods]
-  );
-
-  const handlePayoutClick = () => {
-    if (selectedPeriods.length === 0) {
-      toast({
-        title: "Selecteer periodes",
-        description: "Selecteer ten minste één periode voor uitbetaling.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    if (hasSelectedPaidPeriods) {
-      toast({
-        title: "Reeds uitbetaalde periodes",
-        description: "Eén of meer geselecteerde periodes zijn reeds uitbetaald. Deselecteer deze periodes.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    handlePayout();
-  };
+  const { selectedPeriods, distribution, totalTips, totalHours } = useTeam();
 
   return (
     <>
@@ -58,18 +18,11 @@ const TipDistributionSection: React.FC = () => {
       )}
       
       <div className="flex gap-2 mt-4">
-        <Button 
-          variant="default" 
-          className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white"
-          onClick={handlePayoutClick} 
-          disabled={isButtonDisabled}
-          title={hasSelectedPaidPeriods ? "Sommige geselecteerde periodes zijn al uitbetaald" : ""}
-        >
-          Uitbetaling voltooien
-        </Button>
+        <PayoutButton />
       </div>
     </>
   );
 };
 
 export default TipDistributionSection;
+

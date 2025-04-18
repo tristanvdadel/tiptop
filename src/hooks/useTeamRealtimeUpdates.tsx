@@ -20,62 +20,76 @@ export const useTeamRealtimeUpdates = (
   const periodsRef = useRef(periods);
   const teamMembersRef = useRef(teamMembers);
   const lastRefreshTimeRef = useRef<number>(Date.now());
+  const pendingRefreshRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Update refs when props change
   useEffect(() => {
     periodsRef.current = periods;
     teamMembersRef.current = teamMembers;
   }, [periods, teamMembers]);
 
+  // Cleanup function for timeouts
   useEffect(() => {
     return () => {
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
       }
+      if (pendingRefreshRef.current) {
+        clearTimeout(pendingRefreshRef.current);
+      }
     };
   }, []);
 
-  const handleDataChange = useCallback(async () => {
+  // Debounced data refresh function to prevent rapid UI updates
+  const handleDataChange = useCallback(() => {
     if (refreshingRef.current) return;
     
-    // Add debounce to prevent multiple refreshes in quick succession
-    const now = Date.now();
-    if (now - lastRefreshTimeRef.current < 2000) {
-      console.log('Skipping refresh, too soon after last refresh');
-      return;
+    // Cancel any pending refresh
+    if (pendingRefreshRef.current) {
+      clearTimeout(pendingRefreshRef.current);
     }
     
-    console.log('Realtime update received, refreshing data...');
-    setLastActivity(new Date());
-    refreshingRef.current = true;
-    lastRefreshTimeRef.current = now;
-    
-    try {
-      await refreshData();
-      setLastError(null);
-    } catch (error: any) {
-      console.error('Error refreshing data after realtime update:', error);
-      
-      if (error.message && (
-          error.message.includes('recursion') || 
-          error.message.includes('infinity') ||
-          error.code === '42P17'
-      )) {
-        setLastError(error.message);
-        
-        // Don't immediately reconnect on recursion errors, 
-        // wait for the server to recover
-        setTimeout(() => {
-          reconnect();
-        }, 5000);
-      } else {
-        setLastError(error.message || 'Unknown error refreshing data');
+    // Debounce refresh to prevent flashing
+    pendingRefreshRef.current = setTimeout(async () => {
+      // Check if we should refresh based on time since last refresh
+      const now = Date.now();
+      if (now - lastRefreshTimeRef.current < 2000) {
+        console.log('Skipping refresh, too soon after last refresh');
+        return;
       }
-    } finally {
-      // Add a small delay before allowing new refreshes
-      setTimeout(() => {
-        refreshingRef.current = false;
-      }, 1000);
-    }
+      
+      console.log('Realtime update received, refreshing data...');
+      setLastActivity(new Date());
+      refreshingRef.current = true;
+      lastRefreshTimeRef.current = now;
+      
+      try {
+        await refreshData();
+        setLastError(null);
+      } catch (error: any) {
+        console.error('Error refreshing data after realtime update:', error);
+        
+        if (error.message && (
+            error.message.includes('recursion') || 
+            error.message.includes('infinity') ||
+            error.code === '42P17'
+        )) {
+          setLastError(error.message);
+          
+          // Don't immediately reconnect on recursion errors
+          setTimeout(() => {
+            reconnect();
+          }, 5000);
+        } else {
+          setLastError(error.message || 'Unknown error refreshing data');
+        }
+      } finally {
+        // Add a delay before allowing new refreshes
+        setTimeout(() => {
+          refreshingRef.current = false;
+        }, 1000);
+      }
+    }, 300); // Short debounce delay for responsiveness while preventing flashing
   }, [refreshData]);
 
   const setupChannels = useCallback(() => {
@@ -84,6 +98,7 @@ export const useTeamRealtimeUpdates = (
       return;
     }
     
+    // Cleanup existing channels
     channelsRef.current.forEach(channel => {
       try {
         supabase.removeChannel(channel);
@@ -96,7 +111,8 @@ export const useTeamRealtimeUpdates = (
     console.log(`Setting up realtime channels for team ${teamId}...`);
     
     try {
-      const statusChannel = supabase.channel('connection-status')
+      // Create a single channel for all events to reduce connections
+      const mainChannel = supabase.channel('team-realtime-all')
         .on('presence', { event: 'sync' }, () => {
           console.log('Connection synced');
           setConnectionState('connected');
@@ -105,31 +121,6 @@ export const useTeamRealtimeUpdates = (
           console.log('Disconnected from Supabase realtime');
           setConnectionState('disconnected');
         })
-        .subscribe(status => {
-          console.log(`Channel status: ${status}`);
-          if (status === 'SUBSCRIBED') {
-            setConnectionState('connected');
-          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-            setConnectionState('disconnected');
-            
-            const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
-            console.log(`Will auto-reconnect in ${delay}ms`);
-            
-            if (reconnectTimerRef.current) {
-              clearTimeout(reconnectTimerRef.current);
-            }
-            
-            reconnectTimerRef.current = setTimeout(() => {
-              setRetryCount(prev => prev + 1);
-              reconnect();
-            }, delay);
-          }
-        });
-      
-      channelsRef.current.push(statusChannel);
-      
-      // Use a single channel with multiple event listeners to reduce the number of connections
-      const dataChannel = supabase.channel('team-data-changes')
         .on(
           'postgres_changes',
           {
@@ -160,7 +151,7 @@ export const useTeamRealtimeUpdates = (
           async (payload) => {
             const periodId = payload.new && 'period_id' in payload.new ? payload.new.period_id : undefined;
             if (periodId && periodsRef.current.some(p => p.id === periodId)) {
-              await handleDataChange();
+              handleDataChange();
             }
           }
         )
@@ -174,15 +165,34 @@ export const useTeamRealtimeUpdates = (
           async (payload) => {
             const teamMemberId = payload.new && 'team_member_id' in payload.new ? payload.new.team_member_id : undefined;
             if (teamMemberId && teamMembersRef.current.some(m => m.id === teamMemberId)) {
-              await handleDataChange();
+              handleDataChange();
             }
           }
         )
-        .subscribe();
+        .subscribe(status => {
+          console.log(`Channel status: ${status}`);
+          if (status === 'SUBSCRIBED') {
+            setConnectionState('connected');
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            setConnectionState('disconnected');
+            
+            const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+            console.log(`Will auto-reconnect in ${delay}ms`);
+            
+            if (reconnectTimerRef.current) {
+              clearTimeout(reconnectTimerRef.current);
+            }
+            
+            reconnectTimerRef.current = setTimeout(() => {
+              setRetryCount(prev => prev + 1);
+              reconnect();
+            }, delay);
+          }
+        });
       
-      channelsRef.current.push(dataChannel);
+      channelsRef.current.push(mainChannel);
       
-      console.log('All realtime channels set up successfully');
+      console.log('Realtime channel set up successfully');
     } catch (error) {
       console.error('Error setting up realtime channels:', error);
       setConnectionState('disconnected');
@@ -195,6 +205,7 @@ export const useTeamRealtimeUpdates = (
     setupChannels();
   }, [setupChannels]);
 
+  // Initial setup of realtime channels
   useEffect(() => {
     if (teamId) {
       setupChannels();
@@ -213,9 +224,13 @@ export const useTeamRealtimeUpdates = (
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
       }
+      if (pendingRefreshRef.current) {
+        clearTimeout(pendingRefreshRef.current);
+      }
     };
   }, [teamId, setupChannels]);
 
+  // Heartbeat check for connection
   useEffect(() => {
     const heartbeatInterval = setInterval(() => {
       const now = new Date();

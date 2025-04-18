@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTeamId } from '@/hooks/useTeamId';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,6 +18,8 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [loadAttempts, setLoadAttempts] = useState(0);
   const [showRecursionAlert, setShowRecursionAlert] = useState(false);
+  const pendingRefreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLoadingRef = useRef(false);
 
   // Reset all error states
   const resetErrors = useCallback(() => {
@@ -68,6 +71,23 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
       return;
     }
 
+    // Prevent multiple simultaneous loading attempts
+    if (isLoadingRef.current) {
+      console.log("useCachedTeamData: Already loading, debouncing request");
+      
+      // Cancel any existing pending refresh
+      if (pendingRefreshTimerRef.current) {
+        clearTimeout(pendingRefreshTimerRef.current);
+      }
+      
+      // Schedule a refresh for later if multiple requests are coming in
+      pendingRefreshTimerRef.current = setTimeout(() => {
+        loadData(forceRefresh);
+      }, 500);
+      
+      return;
+    }
+
     const now = Date.now();
     // Get the actual cached timestamp for this specific team
     const cacheKey = `team_data_refresh_${teamId}`;
@@ -82,13 +102,9 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
       return;
     }
     
-    if (isLoading) {
-      console.log("useCachedTeamData: Already loading, skipping");
-      return;
-    }
-    
     try {
       setIsLoading(true);
+      isLoadingRef.current = true;
       resetErrors();
       setLoadAttempts(prev => prev + 1);
       
@@ -186,9 +202,22 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
         }
       }
     } finally {
-      setIsLoading(false);
+      // Add small delay before setting loading state to false to prevent UI flashing
+      setTimeout(() => {
+        setIsLoading(false);
+        isLoadingRef.current = false;
+      }, 300);
     }
-  }, [teamId, refreshTeamData, isInitialized, isLoading, loadAttempts, resetErrors, loadDataWithRPC]);
+  }, [teamId, refreshTeamData, isInitialized, loadAttempts, resetErrors, loadDataWithRPC]);
+
+  // Cleanup function
+  useEffect(() => {
+    return () => {
+      if (pendingRefreshTimerRef.current) {
+        clearTimeout(pendingRefreshTimerRef.current);
+      }
+    };
+  }, []);
 
   // Handle database recursion error by clearing cached data and refreshing
   const handleDatabaseRecursionError = useCallback(() => {
@@ -246,7 +275,12 @@ export function useCachedTeamData(refreshTeamData: () => Promise<void>) {
     }
     
     if (teamId && mounted && !isInitialized) {
-      loadData();
+      // Add slight delay before initial load to allow UI to render first
+      setTimeout(() => {
+        if (mounted) {
+          loadData();
+        }
+      }, 100);
     }
     
     return () => {

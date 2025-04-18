@@ -19,9 +19,13 @@ const Team: React.FC = () => {
   const [needsTeamIdRefresh, setNeedsTeamIdRefresh] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   const statusChangedRef = useRef(false);
+  const isMountedRef = useRef(false);
   
   // Use a more efficient way to get URL params
   useEffect(() => {
+    if (isMountedRef.current) return; // Only run once
+    isMountedRef.current = true;
+    
     const urlParams = new URLSearchParams(location.search);
     const showSummary = urlParams.get('payoutSummary') === 'true';
     const isRecovery = urlParams.get('recover') === 'true';
@@ -86,9 +90,9 @@ const Team: React.FC = () => {
     };
   }, [realtimeStatus, setupRealtimeConnection]);
   
-  // Only show toast when status actually changes
+  // Only show toast when status actually changes and not on initial mount
   useEffect(() => {
-    if (!statusChangedRef.current) return;
+    if (!statusChangedRef.current || !isMountedRef.current) return;
     
     if (realtimeStatus === 'disconnected') {
       toast({
@@ -187,9 +191,10 @@ const Team: React.FC = () => {
 
   console.log("Team.tsx: Rendering Team component with TeamProvider");
   
+  // Use a simpler loading indicator to prevent flashing
   if (teamIdLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
+      <div className="flex flex-col items-center justify-center h-64 gap-4 transition-opacity duration-300">
         <div className="text-center">
           <h2 className="text-lg font-medium mb-2">Team ophalen...</h2>
           <p className="text-muted-foreground mb-4">We zijn bezig je gegevens te laden</p>
@@ -201,7 +206,7 @@ const Team: React.FC = () => {
   
   if (!teamId && !teamIdLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
+      <div className="flex flex-col items-center justify-center h-64 gap-4 transition-opacity duration-300">
         <div className="text-center">
           <h2 className="text-lg font-medium mb-2">Geen team gevonden</h2>
           <p className="text-muted-foreground mb-4">We konden je team niet vinden. Probeer het opnieuw.</p>
@@ -216,25 +221,27 @@ const Team: React.FC = () => {
   
   return (
     <TeamProvider>
-      {realtimeStatus === 'disconnected' && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3 flex items-center justify-between">
-          <div className="flex items-center">
-            <WifiOff className="h-5 w-5 text-red-500 mr-2" />
-            <span className="text-red-700">Je bent offline. Wijzigingen worden pas zichtbaar als je weer online bent.</span>
+      <div className="transition-opacity duration-300">
+        {realtimeStatus === 'disconnected' && (
+          <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3 flex items-center justify-between">
+            <div className="flex items-center">
+              <WifiOff className="h-5 w-5 text-red-500 mr-2" />
+              <span className="text-red-700">Je bent offline. Wijzigingen worden pas zichtbaar als je weer online bent.</span>
+            </div>
+            <Button size="sm" variant="outline" onClick={handleReconnect}>
+              <RefreshCw className="h-4 w-4 mr-1" /> Verbind opnieuw
+            </Button>
           </div>
-          <Button size="sm" variant="outline" onClick={handleReconnect}>
-            <RefreshCw className="h-4 w-4 mr-1" /> Verbind opnieuw
-          </Button>
-        </div>
-      )}
-      
-      {showPayoutSummary ? (
-        <div className="pb-16">
-          <PayoutSummary />
-        </div>
-      ) : (
-        <TeamContent />
-      )}
+        )}
+        
+        {showPayoutSummary ? (
+          <div className="pb-16">
+            <PayoutSummary />
+          </div>
+        ) : (
+          <TeamContent />
+        )}
+      </div>
     </TeamProvider>
   );
 };

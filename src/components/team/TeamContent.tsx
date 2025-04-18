@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
 import { useTeam } from '@/contexts/TeamContext';
@@ -45,8 +45,14 @@ const TeamContent: React.FC = () => {
   
   const { teamId } = useTeamId();
   const { toast } = useToast();
+  const loadingRef = useRef(loading);
 
-  // Fix: Pass handleRefresh properly to useTeamRealtimeUpdates
+  // Update the ref when loading state changes to prevent unnecessary renders
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
+
+  // Properly pass handleRefresh to useTeamRealtimeUpdates
   const { 
     connectionState, 
     lastError 
@@ -54,10 +60,11 @@ const TeamContent: React.FC = () => {
     teamId || contextTeamId, 
     periods, 
     teamMembers,
-    handleRefresh // This was causing the error - passing the right function now
+    handleRefresh
   );
 
-  if (loading && !dataInitialized) {
+  // Replace the conditional rendering with a more stable approach using CSS transitions
+  if (!dataInitialized && loadingRef.current) {
     return <LoadingIndicator />;
   }
   

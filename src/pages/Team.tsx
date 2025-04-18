@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PayoutSummary } from '@/components/PayoutSummary';
@@ -42,12 +43,12 @@ const Team: React.FC = () => {
     if (channels.length === 0) return undefined;
     
     const channel = channels[0];
-    const isConnected = channel?.state === 'SUBSCRIBED';
+    const isConnected = channel && channel.state === 'SUBSCRIBED';
     
     if (isConnected) {
       setRealtimeStatus('connected');
       return 1;
-    } else if (channel?.state === 'SUBSCRIBING') {
+    } else if (channel && channel.state === 'SUBSCRIBING') {
       setRealtimeStatus('connecting');
       return 0;
     } else {

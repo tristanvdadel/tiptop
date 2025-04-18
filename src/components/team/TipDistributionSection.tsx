@@ -15,7 +15,7 @@ const TipDistributionSection: React.FC = () => {
     
     return selectedPeriods.some(periodId => {
       const period = periods.find(p => p.id === periodId);
-      return period?.is_paid === true;
+      return period?.isPaid === true; // Changed from is_paid to isPaid
     });
   }, [selectedPeriods, periods]);
 

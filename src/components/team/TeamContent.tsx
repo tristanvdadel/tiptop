@@ -55,7 +55,7 @@ const TeamContent: React.FC = () => {
   // If there are serious errors, show error screen
   if (hasError || showRecursionAlert) {
     return (
-      <div className="container mx-auto py-8 transition-opacity duration-300">
+      <div className="container mx-auto py-8 transition-opacity duration-500 animate-fade-in">
         <StatusIndicator 
           type="error"
           title={showRecursionAlert ? "Database beveiligingsprobleem" : "Fout bij laden"}
@@ -68,12 +68,12 @@ const TeamContent: React.FC = () => {
   }
 
   return (
-    <div className="pb-16 transition-opacity duration-300">
+    <div className="pb-16 transition-opacity duration-500 animate-fade-in">
       <TeamHeader />
       
       {/* Only show offline status if there's an actual connection problem */}
       {connectionState === 'disconnected' && (
-        <div className="mb-4">
+        <div className="mb-4 transition-opacity duration-300 animate-fade-in">
           <StatusIndicator 
             type="offline"
             message="De pagina wordt automatisch bijgewerkt wanneer er wijzigingen plaatsvinden zodra je weer online bent."
@@ -85,7 +85,7 @@ const TeamContent: React.FC = () => {
       
       {/* Show recursion warning if needed */}
       {lastError && lastError.includes('recursion') && (
-        <div className="mb-4">
+        <div className="mb-4 transition-opacity duration-300 animate-fade-in">
           <StatusIndicator 
             type="warning"
             title="Beveiligingsprobleem gedetecteerd"
@@ -99,11 +99,11 @@ const TeamContent: React.FC = () => {
       <LoadingState 
         isLoading={loading && !dataInitialized} 
         minDuration={1000} 
-        delay={200}
+        delay={500}
         instant={dataInitialized}
       >
         {sortedTeamMembers.length === 0 && dataInitialized ? (
-          <div className="text-center py-8">
+          <div className="text-center py-8 transition-opacity duration-300 animate-fade-in">
             <StatusIndicator 
               type="empty"
               title="Nog geen teamleden toegevoegd"
@@ -111,7 +111,7 @@ const TeamContent: React.FC = () => {
             />
           </div>
         ) : (
-          <>
+          <div className="transition-opacity duration-500 animate-fade-in">
             <TeamMemberList 
               teamMembers={sortedTeamMembers}
               addTeamMember={addTeamMember}
@@ -132,7 +132,7 @@ const TeamContent: React.FC = () => {
             {periods.filter(period => !period.isActive).length > 0 && 
               <TipDistributionSection />
             }
-          </>
+          </div>
         )}
       </LoadingState>
     </div>

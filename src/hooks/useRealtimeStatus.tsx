@@ -8,7 +8,7 @@ export const useRealtimeStatus = () => {
   const previousStatusRef = useRef<string>('connecting');
   const statusChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Geef statusveranderingen een debounce effect om flikkering te voorkomen
+  // Geef statusveranderingen een sterker debounce effect om flikkering te voorkomen (verhoogd naar 1000ms)
   const setDebouncedStatus = useCallback((newStatus: 'connected' | 'disconnected' | 'connecting') => {
     if (newStatus === previousStatusRef.current) return;
     
@@ -17,12 +17,12 @@ export const useRealtimeStatus = () => {
       clearTimeout(statusChangeTimeoutRef.current);
     }
     
-    // Wacht 500ms voordat we de status daadwerkelijk updaten
+    // Wacht 1000ms voordat we de status daadwerkelijk updaten
     statusChangeTimeoutRef.current = setTimeout(() => {
       setRealtimeStatus(newStatus);
       previousStatusRef.current = newStatus;
       statusChangeTimeoutRef.current = null;
-    }, 500);
+    }, 1000);
   }, []);
   
   const checkConnectionStatus = useCallback(() => {

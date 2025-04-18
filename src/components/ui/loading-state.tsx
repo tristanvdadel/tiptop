@@ -16,8 +16,8 @@ interface LoadingStateProps {
 export const LoadingState: React.FC<LoadingStateProps> = ({
   isLoading,
   children,
-  delay = 300,
-  minDuration = 500,
+  delay = 500, // Verhoogd naar 500ms om flikkering te verminderen
+  minDuration = 800, // Verhoogd naar 800ms voor betere UX
   className,
   loadingComponent,
   instant = false
@@ -89,7 +89,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   }, [isLoading, showLoading, delay, minDuration, loadStartTime, instant]);
 
   const defaultLoader = (
-    <div className="flex flex-col items-center justify-center py-8 opacity-100 transition-opacity duration-500">
+    <div className="flex flex-col items-center justify-center py-8 opacity-100 transition-opacity duration-700">
       <RefreshCw size={32} className="animate-spin text-primary mb-4" />
       <p className="text-lg font-medium">Gegevens laden...</p>
       <p className="text-sm text-muted-foreground">Even geduld a.u.b.</p>
@@ -98,17 +98,17 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
 
   return (
     <div className={cn(
-      "transition-opacity duration-500", 
+      "transition-opacity duration-700", 
       isTransitioning ? "opacity-90" : "opacity-100",
       className
     )}>
       {showLoading && (
-        <div className="opacity-100 transition-opacity duration-500">
+        <div className="opacity-100 transition-opacity duration-700">
           {loadingComponent || defaultLoader}
         </div>
       )}
       <div className={cn(
-        "transition-opacity duration-500",
+        "transition-opacity duration-700",
         showLoading ? "opacity-0 h-0 overflow-hidden" : "opacity-100"
       )}>
         {shouldRender && children}

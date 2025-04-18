@@ -41,16 +41,18 @@ export const useTeamChannels = (
       clearTimeout(pendingRefreshRef.current);
     }
     
+    // Verhoogd naar 800ms voor betere debounce en minder flikkering
     debounceTimeoutRef.current = setTimeout(() => {
       const now = Date.now();
       const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
       
-      if (timeSinceLastRefresh < 1000) {
+      // Verhoogd naar 2000ms om meerdere snelle updates te groeperen
+      if (timeSinceLastRefresh < 2000) {
         console.log('Debouncing refresh, too soon after last refresh:', timeSinceLastRefresh, 'ms');
         
         pendingRefreshRef.current = setTimeout(() => {
           handleDataChange();
-        }, 1000 - timeSinceLastRefresh);
+        }, 2000 - timeSinceLastRefresh);
         
         return;
       }
@@ -60,22 +62,24 @@ export const useTeamChannels = (
       lastRefreshTimeRef.current = now;
       
       try {
+        // Verhoogd naar 800ms voor betere visuele stabiliteit
         pendingRefreshRef.current = setTimeout(async () => {
           try {
             await onDataChange();
           } catch (error) {
             console.error('Error refreshing data after realtime update:', error);
           } finally {
+            // Verhoogd naar 2000ms om herhaalde updates uit te stellen
             setTimeout(() => {
               refreshingRef.current = false;
-            }, 1000);
+            }, 2000);
           }
-        }, 500);
+        }, 800);
       } catch (error) {
         console.error('Error setting up refresh:', error);
         refreshingRef.current = false;
       }
-    }, 300);
+    }, 800);  // Verhoogd naar 800ms
   }, [onDataChange]);
 
   const setupChannels = useCallback(() => {

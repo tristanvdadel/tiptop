@@ -14,6 +14,23 @@ export const RealtimeConnection: React.FC = () => {
   const toastDisplayedRef = useRef<boolean>(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Functie om statusveranderingen te debounce - verhoogd naar 1500ms om flikkering te verminderen
+  const handleStatusChange = useCallback((newStatus: 'connected' | 'disconnected' | 'connecting') => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    // Langere debounce tijd om flikkering te voorkomen
+    debounceTimerRef.current = setTimeout(() => {
+      if (isMountedRef.current) {
+        setRealtimeStatus(newStatus);
+        statusChangedRef.current = true;
+        toastDisplayedRef.current = false;
+      }
+      debounceTimerRef.current = null;
+    }, 1500);
+  }, [setRealtimeStatus]);
+
   const setupRealtimeConnection = useCallback(() => {
     console.log('Team.tsx: Setting up realtime connection');
     
@@ -60,21 +77,7 @@ export const RealtimeConnection: React.FC = () => {
       });
       
     return channel;
-  }, [realtimeStatus, setRealtimeStatus]);
-
-  // Functie om statusveranderingen te debounce
-  const handleStatusChange = useCallback((newStatus: 'connected' | 'disconnected' | 'connecting') => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    
-    debounceTimerRef.current = setTimeout(() => {
-      setRealtimeStatus(newStatus);
-      statusChangedRef.current = true;
-      toastDisplayedRef.current = false;
-      debounceTimerRef.current = null;
-    }, 1000);
-  }, [setRealtimeStatus]);
+  }, [realtimeStatus, handleStatusChange]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -100,6 +103,7 @@ export const RealtimeConnection: React.FC = () => {
     };
   }, [setupRealtimeConnection]);
 
+  // Toon toasts minder vaak - alleen weergeven bij het eerste optreden van een status
   useEffect(() => {
     if (!statusChangedRef.current || !isMountedRef.current || toastDisplayedRef.current) return;
     

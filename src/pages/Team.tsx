@@ -44,10 +44,10 @@ const Team: React.FC = () => {
     
     const channel = channels[0] as RealtimeChannel;
     
-    if (channel && channel.state === "SUBSCRIBED") {
+    if (channel && channel.state === 'SUBSCRIBED') {
       setRealtimeStatus('connected');
       return 1;
-    } else if (channel && channel.state === "SUBSCRIBING") {
+    } else if (channel && channel.state === 'SUBSCRIBING') {
       setRealtimeStatus('connecting');
       return 0;
     } else {
@@ -78,13 +78,13 @@ const Team: React.FC = () => {
       .subscribe((status) => {
         console.log('Team.tsx: Subscription status:', status);
         
-        if (status === "SUBSCRIBED") {
+        if (status === 'SUBSCRIBED') {
           if (realtimeStatus !== 'connected') {
             setRealtimeStatus('connected');
             statusChangedRef.current = true;
             reconnectionAttemptsRef.current = 0;
           }
-        } else if (status === "CLOSED" || status === "CHANNEL_ERROR") {
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
           if (realtimeStatus !== 'disconnected') {
             setRealtimeStatus('disconnected');
             statusChangedRef.current = true;

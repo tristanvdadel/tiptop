@@ -1,6 +1,5 @@
 
 import React, { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
 import { useTeam } from '@/contexts/TeamContext';
 import { checkTeamMembersWithAccounts } from '@/services/teamDataService';
@@ -9,14 +8,10 @@ import TeamHeader from '@/components/team/TeamHeader';
 import ImportActions from '@/components/team/ImportActions';
 import PeriodSelector from '@/components/team/PeriodSelector';
 import TipDistributionSection from '@/components/team/TipDistributionSection';
-import LoadingIndicator from '@/components/team/LoadingIndicator';
 import { useTeamRealtimeUpdates } from '@/hooks/useTeamRealtimeUpdates';
-import ErrorCard from '@/components/analytics/ErrorCard';
 import { useTeamId } from '@/hooks/useTeamId';
-import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { AlertTriangle } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { LoadingState } from '@/components/ui/loading-state';
+import { StatusIndicator } from '@/components/ui/status-indicator';
 
 const TeamContent: React.FC = () => {
   const {
@@ -44,84 +39,97 @@ const TeamContent: React.FC = () => {
   } = useTeam();
   
   const { teamId } = useTeamId();
-  const { toast } = useToast();
-  const loadingRef = useRef(loading);
-
-  // Update the ref when loading state changes to prevent unnecessary renders
-  useEffect(() => {
-    loadingRef.current = loading;
-  }, [loading]);
-
+  
   // Properly pass handleRefresh to useTeamRealtimeUpdates
   const { 
     connectionState, 
-    lastError 
+    lastError, 
+    reconnect
   } = useTeamRealtimeUpdates(
     teamId || contextTeamId, 
     periods, 
     teamMembers,
     handleRefresh
   );
-
-  // Replace the conditional rendering with a more stable approach using CSS transitions
-  if (!dataInitialized && loadingRef.current) {
-    return <LoadingIndicator />;
-  }
   
+  // If there are serious errors, show error screen
   if (hasError || showRecursionAlert) {
     return (
-      <div className="container mx-auto py-8">
-        <ErrorCard 
-          type={showRecursionAlert ? 'dbPolicy' : 'error'} 
+      <div className="container mx-auto py-8 transition-opacity duration-300">
+        <StatusIndicator 
+          type="error"
+          title={showRecursionAlert ? "Database beveiligingsprobleem" : "Fout bij laden"}
           message={errorMessage || "Er is een fout opgetreden bij het laden van teamgegevens"}
-          onRetry={showRecursionAlert ? handleDatabaseRecursionError : handleRefresh}
+          actionLabel={showRecursionAlert ? "Beveiligingsprobleem Oplossen" : "Probeer opnieuw"}
+          onAction={showRecursionAlert ? handleDatabaseRecursionError : handleRefresh}
         />
       </div>
     );
   }
 
   return (
-    <div className="pb-16">
+    <div className="pb-16 transition-opacity duration-300">
       <TeamHeader />
       
-      {lastError && lastError.includes('recursion') && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertTriangle className="h-4 w-4 mr-2" />
-          <AlertDescription>
-            Er is een probleem met de database beveiliging gedetecteerd. 
-            De pagina wordt automatisch bijgewerkt wanneer er wijzigingen plaatsvinden.
-          </AlertDescription>
-        </Alert>
+      {/* Show offline status if needed */}
+      {connectionState === 'disconnected' && (
+        <div className="mb-4">
+          <StatusIndicator 
+            type="offline"
+            message="De pagina wordt automatisch bijgewerkt wanneer er wijzigingen plaatsvinden zodra je weer online bent."
+            actionLabel="Verbind opnieuw"
+            onAction={reconnect}
+          />
+        </div>
       )}
       
-      {sortedTeamMembers.length === 0 && dataInitialized ? (
-        <div className="text-center py-8 text-muted-foreground">
-          Nog geen teamleden toegevoegd
+      {/* Show recursion warning if needed */}
+      {lastError && lastError.includes('recursion') && (
+        <div className="mb-4">
+          <StatusIndicator 
+            type="warning"
+            title="Beveiligingsprobleem gedetecteerd"
+            message="Er is een probleem met de database beveiliging gedetecteerd. De pagina wordt automatisch bijgewerkt wanneer er wijzigingen plaatsvinden."
+            actionLabel="Probleem oplossen"
+            onAction={handleDatabaseRecursionError}
+          />
         </div>
-      ) : (
-        <>
-          <TeamMemberList 
-            teamMembers={sortedTeamMembers}
-            addTeamMember={addTeamMember}
-            removeTeamMember={removeTeamMember}
-            updateTeamMemberHours={updateTeamMemberHours}
-            deleteHourRegistration={deleteHourRegistration}
-            updateTeamMemberName={updateTeamMemberName}
-          />
-          
-          <ImportActions />
-          
-          <PeriodSelector 
-            periods={periods}
-            selectedPeriods={selectedPeriods}
-            onTogglePeriodSelection={togglePeriodSelection}
-          />
-          
-          {periods.filter(period => !period.isActive).length > 0 && 
-            <TipDistributionSection />
-          }
-        </>
       )}
+      
+      <LoadingState isLoading={loading && !dataInitialized}>
+        {sortedTeamMembers.length === 0 && dataInitialized ? (
+          <div className="text-center py-8">
+            <StatusIndicator 
+              type="empty"
+              title="Nog geen teamleden toegevoegd"
+              message="Voeg teamleden toe om te beginnen met fooi registreren"
+            />
+          </div>
+        ) : (
+          <>
+            <TeamMemberList 
+              teamMembers={sortedTeamMembers}
+              addTeamMember={addTeamMember}
+              removeTeamMember={removeTeamMember}
+              updateTeamMemberHours={updateTeamMemberHours}
+              deleteHourRegistration={deleteHourRegistration}
+              updateTeamMemberName={updateTeamMemberName}
+            />
+            
+            <ImportActions />
+            
+            <PeriodSelector 
+              periods={periods}
+              selectedPeriods={selectedPeriods}
+              onTogglePeriodSelection={togglePeriodSelection}
+            />
+            
+            {periods.filter(period => !period.isActive).length > 0 && 
+              <TipDistributionSection />
+            }
+          </>
+        )}
+      </LoadingState>
     </div>
   );
 };

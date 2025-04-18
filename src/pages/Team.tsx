@@ -1,14 +1,13 @@
-
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PayoutSummary } from '@/components/PayoutSummary';
 import { TeamProvider } from '@/contexts/TeamContext';
 import TeamContent from '@/components/team/TeamContent';
 import { useTeamId } from '@/hooks/useTeamId';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { RefreshCw, WifiOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { StatusIndicator } from '@/components/ui/status-indicator';
+import { LoadingState } from '@/components/ui/loading-state';
 
 const Team: React.FC = () => {
   const location = useLocation();
@@ -21,9 +20,8 @@ const Team: React.FC = () => {
   const statusChangedRef = useRef(false);
   const isMountedRef = useRef(false);
   
-  // Use a more efficient way to get URL params
   useEffect(() => {
-    if (isMountedRef.current) return; // Only run once
+    if (isMountedRef.current) return;
     isMountedRef.current = true;
     
     const urlParams = new URLSearchParams(location.search);
@@ -90,7 +88,6 @@ const Team: React.FC = () => {
     };
   }, [realtimeStatus, setupRealtimeConnection]);
   
-  // Only show toast when status actually changes and not on initial mount
   useEffect(() => {
     if (!statusChangedRef.current || !isMountedRef.current) return;
     
@@ -141,7 +138,6 @@ const Team: React.FC = () => {
           description: "Je teamgegevens worden geladen.",
         });
         
-        // Use more subtle reload to avoid flashing
         navigate('/team', { replace: true });
       } else {
         toast({
@@ -167,7 +163,6 @@ const Team: React.FC = () => {
     channel.subscribe((status) => {
       console.log('Team.tsx: Reconnection attempt status:', status);
       if (status === 'SUBSCRIBED') {
-        // Just refresh data instead of full page reload
         setRealtimeStatus('connected');
         
         toast({
@@ -180,7 +175,6 @@ const Team: React.FC = () => {
       }
     });
     
-    // Timeout in case reconnection attempt doesn't complete
     setTimeout(() => {
       supabase.removeChannel(channel);
       if (realtimeStatus !== 'connected') {
@@ -191,30 +185,28 @@ const Team: React.FC = () => {
 
   console.log("Team.tsx: Rendering Team component with TeamProvider");
   
-  // Use a simpler loading indicator to prevent flashing
   if (teamIdLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4 transition-opacity duration-300">
-        <div className="text-center">
-          <h2 className="text-lg font-medium mb-2">Team ophalen...</h2>
-          <p className="text-muted-foreground mb-4">We zijn bezig je gegevens te laden</p>
-        </div>
-        <RefreshCw className="animate-spin h-8 w-8 text-amber-500" />
+      <div className="transition-opacity duration-300">
+        <StatusIndicator
+          type="loading"
+          title="Team ophalen..."
+          message="We zijn bezig je gegevens te laden"
+        />
       </div>
     );
   }
   
   if (!teamId && !teamIdLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4 transition-opacity duration-300">
-        <div className="text-center">
-          <h2 className="text-lg font-medium mb-2">Geen team gevonden</h2>
-          <p className="text-muted-foreground mb-4">We konden je team niet vinden. Probeer het opnieuw.</p>
-        </div>
-        <Button onClick={handleRefreshTeamId}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Team opnieuw ophalen
-        </Button>
+      <div className="transition-opacity duration-300">
+        <StatusIndicator
+          type="error"
+          title="Geen team gevonden"
+          message="We konden je team niet vinden. Probeer het opnieuw."
+          actionLabel="Team opnieuw ophalen"
+          onAction={handleRefreshTeamId}
+        />
       </div>
     );
   }
@@ -223,24 +215,23 @@ const Team: React.FC = () => {
     <TeamProvider>
       <div className="transition-opacity duration-300">
         {realtimeStatus === 'disconnected' && (
-          <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3 flex items-center justify-between">
-            <div className="flex items-center">
-              <WifiOff className="h-5 w-5 text-red-500 mr-2" />
-              <span className="text-red-700">Je bent offline. Wijzigingen worden pas zichtbaar als je weer online bent.</span>
-            </div>
-            <Button size="sm" variant="outline" onClick={handleReconnect}>
-              <RefreshCw className="h-4 w-4 mr-1" /> Verbind opnieuw
-            </Button>
-          </div>
+          <StatusIndicator
+            type="offline"
+            message="Wijzigingen worden pas zichtbaar als je weer online bent."
+            actionLabel="Verbind opnieuw"
+            onAction={handleReconnect}
+          />
         )}
         
-        {showPayoutSummary ? (
-          <div className="pb-16">
-            <PayoutSummary />
-          </div>
-        ) : (
-          <TeamContent />
-        )}
+        <LoadingState isLoading={false}>
+          {showPayoutSummary ? (
+            <div className="pb-16">
+              <PayoutSummary />
+            </div>
+          ) : (
+            <TeamContent />
+          )}
+        </LoadingState>
       </div>
     </TeamProvider>
   );

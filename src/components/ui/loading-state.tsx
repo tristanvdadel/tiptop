@@ -11,6 +11,7 @@ interface LoadingStateProps {
   className?: string;
   loadingComponent?: React.ReactNode;
   instant?: boolean;
+  backgroundLoad?: boolean;
 }
 
 export const LoadingState: React.FC<LoadingStateProps> = ({
@@ -20,7 +21,8 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   minDuration = 1000, // Verhoogd naar 1000ms voor soepelere UX
   className,
   loadingComponent,
-  instant = false
+  instant = false,
+  backgroundLoad = false // Nieuwe optie voor achtergrond laden
 }) => {
   const [showLoading, setShowLoading] = useState(false);
   const [shouldRender, setShouldRender] = useState(!isLoading);
@@ -40,6 +42,11 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   }, []);
 
   useEffect(() => {
+    // Skip loading indicator for background loading
+    if (backgroundLoad && isLoading) {
+      return;
+    }
+    
     if (isLoading && !showLoading) {
       if (instant) {
         setShowLoading(true);
@@ -89,7 +96,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
         setIsTransitioning(false);
       }, 500); // Langere transitieduur voor vloeiendere overgang
     }
-  }, [isLoading, showLoading, delay, minDuration, loadStartTime, instant]);
+  }, [isLoading, showLoading, delay, minDuration, loadStartTime, instant, backgroundLoad]);
 
   const defaultLoader = (
     <div className="flex flex-col items-center justify-center py-8 opacity-100 transition-opacity duration-700">
@@ -98,6 +105,11 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
       <p className="text-sm text-muted-foreground">Even geduld a.u.b.</p>
     </div>
   );
+
+  // For background loading, just render children with no visual change
+  if (backgroundLoad) {
+    return <div className={className}>{children}</div>;
+  }
 
   return (
     <div className={cn(

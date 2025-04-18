@@ -57,6 +57,7 @@ export interface Payout {
   totalHours?: number; // Added for payout calculations
   distribution?: DistributionData[]; // Added for payout distribution
   periodIds?: string[]; // Added for linking to multiple periods
+  totalAmount?: number; // Add to make compatible with PayoutData
 }
 
 export interface TeamSettings {
@@ -83,6 +84,7 @@ export interface PayoutData {
   totalHours?: number;
   periodIds: string[];
   distribution: DistributionData[];
+  totalAmount?: number;
 }
 
 export interface DistributionData {
@@ -120,7 +122,7 @@ export interface AppContextType {
   fetchData: () => Promise<void>;
   startNewPeriod: () => Promise<void>;
   endCurrentPeriod: () => Promise<void>;
-  createTip: (amount: number, teamMemberId: string) => Promise<void>;
+  createTip: (amount: number, teamMemberId: string, note?: string) => Promise<void>;
   updatePeriod: (periodId: string, updates: Partial<Period>) => Promise<void>;
   createTeamMember: (name: string, hourlyRate: number) => Promise<void>;
   updateTeamMember: (teamMemberId: string, updates: Partial<TeamMember>) => Promise<void>;
@@ -138,6 +140,11 @@ export interface AppContextType {
   updateTip: (periodId: string, tipId: string, amount: number, note?: string, date?: string) => void;
   deleteTip: (periodId: string, tipId: string) => void;
   
+  // Add missing functions
+  getUnpaidPeriodsCount: () => number;
+  deletePaidPeriods: () => Promise<void>;
+  deletePeriod: (periodId: string) => Promise<void>;
+  
   // Additional properties used in components
   isLoading?: boolean;
   error?: Error | null;
@@ -150,9 +157,6 @@ export interface AppContextType {
   updateTeamMemberName?: (id: string, name: string) => boolean;
   calculateTipDistribution?: (periodIds: string[]) => TeamMember[];
   markPeriodsAsPaid?: (periodIds: string[], distribution: DistributionData[], totalHours: number) => void;
-  getUnpaidPeriodsCount?: () => number;
-  deletePaidPeriods?: () => Promise<void>;
-  deletePeriod?: (periodId: string) => Promise<void>;
   mostRecentPayout?: Payout | null;
   updateTeamMemberBalance?: (teamMemberId: string, balance: number) => void;
   clearTeamMemberHours?: (teamMemberId: string) => void;

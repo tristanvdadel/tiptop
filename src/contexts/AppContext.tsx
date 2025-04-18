@@ -17,7 +17,8 @@ import {
   TipEntry,
   HourRegistration,
   PayoutData,
-  AppContextType
+  AppContextType,
+  DistributionData
 } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -110,16 +111,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       setTeamMembers(teamMembersData);
       setPayouts(payoutsData);
       
-      // Set most recent payout
       if (payoutsData && payoutsData.length > 0) {
         setMostRecentPayout(payoutsData[0]);
       }
 
-      // Find and set current period
       const activePeriod = periodsData.find((period) => period.isCurrent) || null;
       setCurrentPeriod(activePeriod);
 
-      // Set team settings
       if (teamSettingsData) {
         const closingTimeValue = typeof teamSettingsData.closing_time === 'object' 
           ? teamSettingsData.closing_time as unknown as ClosingTime
@@ -156,12 +154,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
 
     try {
-      // End current period if there is one
       if (currentPeriod) {
         await endCurrentPeriod();
       }
 
-      // Calculate start date based on settings
       let startDate = new Date();
       if (alignWithCalendar) {
         if (periodDuration === 'week') {
@@ -173,7 +169,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
       const formattedStartDate = format(startDate, 'yyyy-MM-dd', { locale: nl });
 
-      // Create new period
       const newPeriod = await createPeriod(teamId, {
         startDate: formattedStartDate,
         isCurrent: true,
@@ -232,11 +227,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
 
     try {
-      // Placeholder for tip creation logic
-      console.log(`Tip of ${amount} created for team member ${teamMemberId} with note: ${note || 'No note'}`);
+      const date = new Date().toISOString();
+      addTip(amount, note, date);
+      
       toast({
         title: "Fooi aangemaakt",
-        description: `Fooi van €${amount.toFixed(2)} aangemaakt voor teamlid ${teamMemberId}.`,
+        description: `Fooi van €${amount.toFixed(2)} aangemaakt.`,
       });
     } catch (error) {
       console.error('Error creating tip:', error);
@@ -414,13 +410,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
 
     try {
-      // Optimistic update
       setTeamSettings((prevSettings) => ({ ...prevSettings, ...settings } as TeamSettings));
 
-      // Persist to database
       await saveTeamSettings(teamId, settings);
 
-      // Update local state
       setPeriodDuration(settings.periodDuration || 'week');
       setAutoClosePeriods(settings.autoClosePeriods || false);
       setAlignWithCalendar(settings.alignWithCalendar || true);
@@ -443,7 +436,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   };
 
   const hasReachedPeriodLimit = () => {
-    // Placeholder for period limit check logic
     return false;
   };
 
@@ -471,16 +463,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   };
 
   const scheduleAutoClose = (autoCloseDate: string) => {
-    // Placeholder for auto close scheduling logic
     console.log(`Auto close scheduled for ${autoCloseDate}`);
   };
 
   const calculateAverageTipPerHour = () => {
-    // Placeholder for average tip per hour calculation logic
     return 0;
   };
 
-  // Add tip management functions
   const addTip = (amount: number, note?: string, date?: string) => {
     if (!currentPeriod) {
       console.error('No current period to add tip to.');
@@ -501,7 +490,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       const tipDate = date || new Date().toISOString();
       const tipId = Math.random().toString(36).substring(2, 11);
       
-      // Create tip in database
       supabase.from('tips').insert({
         id: tipId,
         amount: amount,
@@ -518,7 +506,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
             variant: "destructive",
           });
         } else {
-          // Update local state after successful save
           const newTip: TipEntry = {
             id: tipId,
             amount: amount,
@@ -555,7 +542,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   const updateTip = (periodId: string, tipId: string, amount: number, note?: string, date?: string) => {
     try {
-      // Update tip in database
       supabase.from('tips').update({
         amount: amount,
         date: date,
@@ -569,7 +555,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
             variant: "destructive",
           });
         } else {
-          // Update local state
           setPeriods(prevPeriods => 
             prevPeriods.map(period => {
               if (period.id === periodId) {
@@ -618,7 +603,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   const deleteTip = (periodId: string, tipId: string) => {
     try {
-      // Delete tip from database
       supabase.from('tips').delete().eq('id', tipId).then(({ error }) => {
         if (error) {
           console.error('Error deleting tip:', error);
@@ -628,7 +612,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
             variant: "destructive",
           });
         } else {
-          // Update local state
           setPeriods(prevPeriods => 
             prevPeriods.map(period => {
               if (period.id === periodId) {
@@ -673,11 +656,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     return `${hour}:${minute}`;
   };
 
-  // Team Member management functions
   const addTeamMember = (name: string) => {
     if (!teamId || !name) return;
     
-    // Default hourly rate
     const hourlyRate = 10; 
     createTeamMember(name, hourlyRate);
   };
@@ -690,7 +671,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const updateTeamMemberHours = (id: string, hours: number) => {
     if (!id) return;
     
-    // Update the team member with new hours
     setTeamMembers(prev => 
       prev.map(member => 
         member.id === id 
@@ -698,8 +678,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           : member
       )
     );
-    
-    // Add hour registration if needed
   };
   
   const updateTeamMemberBalance = (teamMemberId: string, balance: number) => {
@@ -723,14 +701,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   };
   
   const deleteHourRegistration = (memberId: string, registrationId: string) => {
-    // Logic to delete hour registration
     console.log(`Deleting hour registration ${registrationId} for member ${memberId}`);
   };
   
   const updateTeamMemberName = (id: string, name: string): boolean => {
     if (!id || !name) return false;
     
-    // Check if name exists
     const nameExists = teamMembers.some(m => 
       m.id !== id && m.name.toLowerCase() === name.toLowerCase()
     );
@@ -744,22 +720,18 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       return false;
     }
     
-    // Update name
     updateTeamMember(id, { name });
     return true;
   };
   
   const calculateTipDistribution = (selectedPeriodIds: string[]) => {
-    // Calculate tip distribution for selected periods
-    // This is a placeholder implementation
     return teamMembers.map(member => ({
       ...member,
-      tipAmount: Math.random() * 100 // Random amount for example
+      tipAmount: Math.random() * 100
     }));
   };
   
   const markPeriodsAsPaid = (periodIds: string[], distribution: any[], totalHours: number) => {
-    // Logic to mark periods as paid and create payout records
     console.log(`Marking periods as paid: ${periodIds.join(', ')}`);
   };
   
@@ -767,7 +739,88 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     return fetchData();
   };
 
-  // Update the value object to include our new methods
+  const getUnpaidPeriodsCount = useCallback(() => {
+    return periods.filter(p => !p.isPaid && !p.isCurrent).length;
+  }, [periods]);
+
+  const deletePaidPeriods = useCallback(async () => {
+    if (!teamId) {
+      console.warn('No team ID available.');
+      return;
+    }
+
+    try {
+      const paidPeriodIds = periods
+        .filter(period => period.isPaid)
+        .map(period => period.id);
+
+      if (paidPeriodIds.length === 0) {
+        return;
+      }
+
+      const { error } = await supabase
+        .from('periods')
+        .delete()
+        .in('id', paidPeriodIds);
+
+      if (error) {
+        throw error;
+      }
+
+      setPeriods(prevPeriods => 
+        prevPeriods.filter(period => !period.isPaid)
+      );
+
+      toast({
+        title: "Periodes verwijderd",
+        description: "Alle uitbetaalde periodes zijn verwijderd.",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('Error deleting paid periods:', error);
+      toast({
+        title: "Fout bij verwijderen",
+        description: "Er is een fout opgetreden bij het verwijderen van de periodes.",
+        variant: "destructive"
+      });
+    }
+  }, [periods, teamId, toast]);
+
+  const deletePeriod = useCallback(async (periodId: string) => {
+    if (!teamId) {
+      console.warn('No team ID available.');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('periods')
+        .delete()
+        .eq('id', periodId);
+
+      if (error) {
+        throw error;
+      }
+
+      setPeriods(prevPeriods => 
+        prevPeriods.filter(period => period.id !== periodId)
+      );
+
+      toast({
+        title: "Periode verwijderd",
+        description: "De periode is verwijderd.",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('Error deleting period:', error);
+      toast({
+        title: "Fout bij verwijderen",
+        description: "Er is een fout opgetreden bij het verwijderen van de periode.",
+        variant: "destructive"
+      });
+    }
+  }, [teamId, toast]);
+
   const value: AppContextType = {
     periods,
     currentPeriod,
@@ -800,11 +853,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     getNextAutoCloseDate,
     scheduleAutoClose,
     calculateAverageTipPerHour,
-    // Add the new methods to the context value
     addTip,
     updateTip,
     deleteTip,
-    // Add team member management functions
+    getUnpaidPeriodsCount,
+    deletePaidPeriods,
+    deletePeriod,
     addTeamMember,
     removeTeamMember,
     updateTeamMemberHours,
@@ -814,15 +868,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     markPeriodsAsPaid,
     refreshTeamData,
     teamId,
-    // Payout related functions
     mostRecentPayout,
     setMostRecentPayout,
     updateTeamMemberBalance,
-    clearTeamMemberHours
+    clearTeamMemberHours,
+    isLoading: false,
+    error: null
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
 
-// Fix the type exports by using export type for all interfaces
 export type { Period, TeamMember, Tip, TipEntry, Payout, TeamSettings, PeriodDuration, ClosingTime, HourRegistration, PayoutData };

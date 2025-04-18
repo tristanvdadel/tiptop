@@ -29,7 +29,8 @@ const Index = () => {
   const { teamId, fetchTeamId } = useTeamId();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+
   // Monitor realtime connection status
   useEffect(() => {
     const channel = supabase.channel('global-index');

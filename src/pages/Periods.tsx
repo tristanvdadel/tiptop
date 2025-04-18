@@ -515,7 +515,7 @@ const Periods = () => {
               <AlertCircle className="h-10 w-10 text-destructive" />
               <div>
                 <h3 className="text-lg font-medium">Fout bij laden</h3>
-                <p className="text-muted-foreground mt-1">{error instanceof Error ? error.message : String(error || "Unknown error")}</p>
+                <p className="text-muted-foreground mt-1">{errorMessage || (teamIdError instanceof Error ? teamIdError.message : String(teamIdError || "Unknown error"))}</p>
               </div>
               <Button onClick={loadData}>
                 Opnieuw proberen

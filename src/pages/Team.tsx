@@ -40,15 +40,20 @@ const Team: React.FC = () => {
   
   // Improved connection monitor that checks the actual websocket status
   const checkConnectionStatus = useCallback(() => {
-    // We're checking the actual WebSocket connection status rather than just relying on channel events
-    const wsStatus = supabase.getChannels()[0]?.socket.conn.transport.ws.readyState;
+    // Fix: Don't try to access the WebSocket transport property directly
+    // Instead check the readyState property which is standard for WebSockets
+    const channels = supabase.getChannels();
+    if (channels.length === 0) return undefined;
+    
+    const socket = channels[0]?.socket?.conn?.socket;
+    const wsStatus = socket instanceof WebSocket ? socket.readyState : undefined;
     
     // WebSocket.OPEN = 1, WebSocket.CONNECTING = 0, all other states mean disconnected
     if (wsStatus === 1) {
       setRealtimeStatus('connected');
     } else if (wsStatus === 0) {
       setRealtimeStatus('connecting');
-    } else if (wsStatus > 1 || wsStatus === undefined) {
+    } else {
       setRealtimeStatus('disconnected');
     }
     

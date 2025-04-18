@@ -7,11 +7,14 @@ interface LoadingProps {
   minimal?: boolean;
 }
 
-const Loading: React.FC<LoadingProps> = ({ message, minimal = false }) => {
+const Loading: React.FC<LoadingProps> = ({ 
+  message = "Gegevens laden...", 
+  minimal = false 
+}) => {
   return (
     <StatusIndicator
       type="loading"
-      title={message || "Gegevens laden..."}
+      title={message}
       message={minimal ? undefined : "Even geduld terwijl we de statistieken ophalen."}
       minimal={minimal}
     />

@@ -287,10 +287,12 @@ export const useTeamRealtimeUpdates = (
         if (timeSinceLastActivity > 5 * 60 * 1000) {
           console.log('Connection may be stale, checking status...');
           
-          // Check actual WebSocket connection status directly
+          // Check actual WebSocket connection status directly, but safely
           const isAnyChannelConnected = channelsRef.current.some(channel => {
-            if (!channel.socket?.conn?.transport?.ws) return false;
-            return channel.socket.conn.transport.ws.readyState === WebSocket.OPEN;
+            // Safely check WebSocket state without assuming structure
+            const socket = channel.socket?.conn?.socket;
+            if (!(socket instanceof WebSocket)) return false;
+            return socket.readyState === WebSocket.OPEN;
           });
           
           if (!isAnyChannelConnected) {

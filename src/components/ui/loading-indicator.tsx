@@ -9,8 +9,8 @@ interface LoadingIndicatorProps {
 }
 
 const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({ 
-  message = "Teamgegevens laden...",
-  description = "Dit kan even duren als er veel gegevens zijn.",
+  message = "Gegevens laden...",
+  description = "Even geduld terwijl we je gegevens ophalen.",
   minimal = false
 }) => {
   return (

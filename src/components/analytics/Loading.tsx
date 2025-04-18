@@ -1,11 +1,20 @@
 
 import React from 'react';
+import { StatusIndicator } from '@/components/ui/status-indicator';
 
-const Loading: React.FC = () => {
+interface LoadingProps {
+  message?: string;
+  minimal?: boolean;
+}
+
+const Loading: React.FC<LoadingProps> = ({ message, minimal = false }) => {
   return (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#9b87f5]"></div>
-    </div>
+    <StatusIndicator
+      type="loading"
+      title={message || "Gegevens laden..."}
+      message={minimal ? undefined : "Even geduld terwijl we de statistieken ophalen."}
+      minimal={minimal}
+    />
   );
 };
 

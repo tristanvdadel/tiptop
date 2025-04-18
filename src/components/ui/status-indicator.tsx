@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { RefreshCw, WifiOff, AlertTriangle, CheckCircle } from 'lucide-react';
+import { RefreshCw, WifiOff, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -28,7 +28,7 @@ export const StatusIndicator: React.FC<StatusIndicatorProps> = ({
   const getIcon = () => {
     switch (type) {
       case 'loading':
-        return <RefreshCw className={cn("animate-spin", minimal ? "h-4 w-4" : "h-6 w-6")} />;
+        return <Loader2 className={cn("animate-spin", minimal ? "h-4 w-4" : "h-6 w-6")} />;
       case 'offline':
         return <WifiOff className={cn(minimal ? "h-4 w-4" : "h-6 w-6", "text-red-500")} />;
       case 'error':
@@ -57,7 +57,7 @@ export const StatusIndicator: React.FC<StatusIndicatorProps> = ({
   const getDefaultMessage = () => {
     switch (type) {
       case 'loading': return 'Even geduld, we laden je gegevens.';
-      case 'offline': return 'Wijzigingen worden pas zichtbaar als je weer online bent.';
+      case 'offline': return 'Wijzigingen worden automatisch verwerkt wanneer je weer online bent.';
       case 'error': return 'Probeer het later opnieuw of ververs de pagina.';
       case 'empty': return 'Er zijn nog geen gegevens beschikbaar.';
       default: return '';

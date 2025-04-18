@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -10,6 +9,7 @@ interface LoadingStateProps {
   minDuration?: number;
   className?: string;
   loadingComponent?: React.ReactNode;
+  instant?: boolean;
 }
 
 export const LoadingState: React.FC<LoadingStateProps> = ({
@@ -18,7 +18,8 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   delay = 300,
   minDuration = 500,
   className,
-  loadingComponent
+  loadingComponent,
+  instant = false
 }) => {
   const [showLoading, setShowLoading] = useState(false);
   const [shouldRender, setShouldRender] = useState(!isLoading);
@@ -29,24 +30,31 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
     let minDurationTimer: NodeJS.Timeout | null = null;
 
     if (isLoading && !showLoading) {
-      // Start the delay timer to show loading state
-      delayTimer = setTimeout(() => {
+      if (instant) {
         setShowLoading(true);
         setShouldRender(false);
         setLoadStartTime(Date.now());
-      }, delay);
+      } else {
+        delayTimer = setTimeout(() => {
+          setShowLoading(true);
+          setShouldRender(false);
+          setLoadStartTime(Date.now());
+        }, delay);
+      }
     } else if (!isLoading && showLoading) {
-      // Calculate how long we've been in loading state
       const timeInLoadingState = loadStartTime ? Date.now() - loadStartTime : 0;
       const remainingTime = Math.max(0, minDuration - timeInLoadingState);
       
-      // Ensure the loading state is shown for at least minDuration
-      minDurationTimer = setTimeout(() => {
+      if (instant) {
         setShowLoading(false);
         setShouldRender(true);
-      }, remainingTime);
+      } else {
+        minDurationTimer = setTimeout(() => {
+          setShowLoading(false);
+          setShouldRender(true);
+        }, remainingTime);
+      }
     } else if (!isLoading && !showLoading) {
-      // If we're not loading and not showing loading, make sure content is rendered
       setShouldRender(true);
     }
 
@@ -54,7 +62,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
       if (delayTimer) clearTimeout(delayTimer);
       if (minDurationTimer) clearTimeout(minDurationTimer);
     };
-  }, [isLoading, showLoading, delay, minDuration, loadStartTime]);
+  }, [isLoading, showLoading, delay, minDuration, loadStartTime, instant]);
 
   const defaultLoader = (
     <div className="flex flex-col items-center justify-center py-8 opacity-100 transition-opacity duration-300">

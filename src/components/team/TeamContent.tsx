@@ -40,7 +40,7 @@ const TeamContent: React.FC = () => {
   
   const { teamId } = useTeamId();
   
-  // Properly pass handleRefresh to useTeamRealtimeUpdates
+  // Pass teamId and handleRefresh to useTeamRealtimeUpdates
   const { 
     connectionState, 
     lastError, 
@@ -71,7 +71,7 @@ const TeamContent: React.FC = () => {
     <div className="pb-16 transition-opacity duration-300">
       <TeamHeader />
       
-      {/* Show offline status if needed */}
+      {/* Only show offline status if there's an actual connection problem */}
       {connectionState === 'disconnected' && (
         <div className="mb-4">
           <StatusIndicator 
@@ -96,7 +96,12 @@ const TeamContent: React.FC = () => {
         </div>
       )}
       
-      <LoadingState isLoading={loading && !dataInitialized}>
+      <LoadingState 
+        isLoading={loading && !dataInitialized} 
+        minDuration={1000} 
+        delay={200}
+        instant={dataInitialized}
+      >
         {sortedTeamMembers.length === 0 && dataInitialized ? (
           <div className="text-center py-8">
             <StatusIndicator 

@@ -21,6 +21,7 @@ export const useTeamRealtimeUpdates = (
   const teamMembersRef = useRef(teamMembers);
   const lastRefreshTimeRef = useRef<number>(Date.now());
   const pendingRefreshRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); 
   
   // Update refs when props change
   useEffect(() => {
@@ -37,24 +38,42 @@ export const useTeamRealtimeUpdates = (
       if (pendingRefreshRef.current) {
         clearTimeout(pendingRefreshRef.current);
       }
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
     };
   }, []);
 
-  // Debounced data refresh function to prevent rapid UI updates
+  // Improved debounced data refresh function to better prevent UI flashing
   const handleDataChange = useCallback(() => {
-    if (refreshingRef.current) return;
+    if (refreshingRef.current) {
+      console.log('Already refreshing, skipping refresh request');
+      return;
+    }
     
-    // Cancel any pending refresh
+    // Cancel any pending refresh/debounce
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
     if (pendingRefreshRef.current) {
       clearTimeout(pendingRefreshRef.current);
     }
     
-    // Debounce refresh to prevent flashing
-    pendingRefreshRef.current = setTimeout(async () => {
+    // Implement an improved debounce that collects changes over a short period
+    // to prevent multiple rapid refreshes
+    debounceTimeoutRef.current = setTimeout(() => {
       // Check if we should refresh based on time since last refresh
       const now = Date.now();
-      if (now - lastRefreshTimeRef.current < 2000) {
-        console.log('Skipping refresh, too soon after last refresh');
+      const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
+      
+      if (timeSinceLastRefresh < 1000) {
+        console.log('Debouncing refresh, too soon after last refresh:', timeSinceLastRefresh, 'ms');
+        
+        // Schedule a refresh for after minimum interval has passed
+        pendingRefreshRef.current = setTimeout(() => {
+          handleDataChange();
+        }, 1000 - timeSinceLastRefresh);
+        
         return;
       }
       
@@ -64,32 +83,41 @@ export const useTeamRealtimeUpdates = (
       lastRefreshTimeRef.current = now;
       
       try {
-        await refreshData();
-        setLastError(null);
+        // Set a minimum time for showing loading state to prevent flashing
+        pendingRefreshRef.current = setTimeout(async () => {
+          try {
+            await refreshData();
+            setLastError(null);
+          } catch (error: any) {
+            console.error('Error refreshing data after realtime update:', error);
+            
+            if (error.message && (
+                error.message.includes('recursion') || 
+                error.message.includes('infinity') ||
+                error.code === '42P17'
+            )) {
+              setLastError(error.message);
+              
+              // Don't immediately reconnect on recursion errors
+              setTimeout(() => {
+                reconnect();
+              }, 5000);
+            } else {
+              setLastError(error.message || 'Unknown error refreshing data');
+            }
+          } finally {
+            // Add a minimum delay before allowing new refreshes to prevent flashing
+            setTimeout(() => {
+              refreshingRef.current = false;
+            }, 1000);
+          }
+        }, 500); // Ensure loading state shows for at least 500ms
       } catch (error: any) {
-        console.error('Error refreshing data after realtime update:', error);
-        
-        if (error.message && (
-            error.message.includes('recursion') || 
-            error.message.includes('infinity') ||
-            error.code === '42P17'
-        )) {
-          setLastError(error.message);
-          
-          // Don't immediately reconnect on recursion errors
-          setTimeout(() => {
-            reconnect();
-          }, 5000);
-        } else {
-          setLastError(error.message || 'Unknown error refreshing data');
-        }
-      } finally {
-        // Add a delay before allowing new refreshes
-        setTimeout(() => {
-          refreshingRef.current = false;
-        }, 1000);
+        console.error('Error setting up refresh:', error);
+        refreshingRef.current = false;
+        setLastError(error.message || 'Unknown error setting up refresh');
       }
-    }, 300); // Short debounce delay for responsiveness while preventing flashing
+    }, 300); // Short initial debounce delay
   }, [refreshData]);
 
   const setupChannels = useCallback(() => {
@@ -111,7 +139,7 @@ export const useTeamRealtimeUpdates = (
     console.log(`Setting up realtime channels for team ${teamId}...`);
     
     try {
-      // Create a single channel for all events to reduce connections
+      // Create a single channel for all events to reduce connections and improve reliability
       const mainChannel = supabase.channel('team-realtime-all')
         .on('presence', { event: 'sync' }, () => {
           console.log('Connection synced');
@@ -173,11 +201,13 @@ export const useTeamRealtimeUpdates = (
           console.log(`Channel status: ${status}`);
           if (status === 'SUBSCRIBED') {
             setConnectionState('connected');
+            setRetryCount(0); // Reset retry count on successful connection
           } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
             setConnectionState('disconnected');
             
+            // Use exponential backoff for reconnection attempts
             const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
-            console.log(`Will auto-reconnect in ${delay}ms`);
+            console.log(`Will auto-reconnect in ${delay}ms (retry #${retryCount + 1})`);
             
             if (reconnectTimerRef.current) {
               clearTimeout(reconnectTimerRef.current);
@@ -202,6 +232,18 @@ export const useTeamRealtimeUpdates = (
   const reconnect = useCallback(() => {
     console.log('Attempting to reconnect realtime channels...');
     setConnectionState('connecting');
+    
+    // First, clean up existing channels
+    channelsRef.current.forEach(channel => {
+      try {
+        supabase.removeChannel(channel);
+      } catch (e) {
+        console.error('Error removing channel during reconnect:', e);
+      }
+    });
+    channelsRef.current = [];
+    
+    // Then set up new channels
     setupChannels();
   }, [setupChannels]);
 
@@ -227,30 +269,41 @@ export const useTeamRealtimeUpdates = (
       if (pendingRefreshRef.current) {
         clearTimeout(pendingRefreshRef.current);
       }
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
     };
   }, [teamId, setupChannels]);
 
-  // Heartbeat check for connection
+  // Improved heartbeat check for connection with WebSocket readyState check
   useEffect(() => {
     const heartbeatInterval = setInterval(() => {
-      const now = new Date();
-      const timeSinceLastActivity = now.getTime() - lastActivity.getTime();
-      
-      if (timeSinceLastActivity > 5 * 60 * 1000 && connectionState === 'connected') {
-        console.log('Connection may be stale, checking status...');
+      // Only check if we think we're still connected to avoid unnecessary reconnects
+      if (connectionState === 'connected') {
+        const now = new Date();
+        const timeSinceLastActivity = now.getTime() - lastActivity.getTime();
         
-        const testChannel = supabase.channel('heartbeat-test');
-        testChannel.subscribe(status => {
-          if (status !== 'SUBSCRIBED') {
+        // Check if we're still connected after 5 minutes of inactivity
+        if (timeSinceLastActivity > 5 * 60 * 1000) {
+          console.log('Connection may be stale, checking status...');
+          
+          // Check actual WebSocket connection status directly
+          const isAnyChannelConnected = channelsRef.current.some(channel => {
+            if (!channel.socket?.conn?.transport?.ws) return false;
+            return channel.socket.conn.transport.ws.readyState === WebSocket.OPEN;
+          });
+          
+          if (!isAnyChannelConnected) {
             console.log('Heartbeat detected connection issue, reconnecting...');
             setConnectionState('disconnected');
             reconnect();
+          } else {
+            // If still connected, update the last activity time
+            setLastActivity(now);
           }
-          
-          setTimeout(() => supabase.removeChannel(testChannel), 1000);
-        });
+        }
       }
-    }, 60000);
+    }, 60000); // Check every minute
     
     return () => clearInterval(heartbeatInterval);
   }, [connectionState, lastActivity, reconnect]);

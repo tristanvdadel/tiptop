@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PayoutSummary } from '@/components/PayoutSummary';
@@ -19,6 +20,7 @@ const Team: React.FC = () => {
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   const statusChangedRef = useRef(false);
   const isMountedRef = useRef(false);
+  const reconnectionAttemptsRef = useRef(0);
   
   useEffect(() => {
     if (isMountedRef.current) return;
@@ -36,57 +38,102 @@ const Team: React.FC = () => {
     }
   }, [location.search]);
   
+  // Improved connection monitor that checks the actual websocket status
+  const checkConnectionStatus = useCallback(() => {
+    // We're checking the actual WebSocket connection status rather than just relying on channel events
+    const wsStatus = supabase.getChannels()[0]?.socket.conn.transport.ws.readyState;
+    
+    // WebSocket.OPEN = 1, WebSocket.CONNECTING = 0, all other states mean disconnected
+    if (wsStatus === 1) {
+      setRealtimeStatus('connected');
+    } else if (wsStatus === 0) {
+      setRealtimeStatus('connecting');
+    } else if (wsStatus > 1 || wsStatus === undefined) {
+      setRealtimeStatus('disconnected');
+    }
+    
+    return wsStatus;
+  }, []);
+  
   const setupRealtimeConnection = useCallback(() => {
+    console.log('Team.tsx: Setting up realtime connection');
     const channel = supabase.channel('global');
     
     channel
       .on('presence', { event: 'sync' }, () => {
         console.log('Team.tsx: Realtime connection synced');
-        setRealtimeStatus('connected');
-        statusChangedRef.current = true;
+        if (realtimeStatus !== 'connected') {
+          setRealtimeStatus('connected');
+          statusChangedRef.current = true;
+        }
       })
       .on('system', { event: 'disconnect' }, () => {
         console.log('Team.tsx: Realtime disconnected');
-        setRealtimeStatus('disconnected');
-        statusChangedRef.current = true;
+        if (realtimeStatus !== 'disconnected') {
+          setRealtimeStatus('disconnected');
+          statusChangedRef.current = true;
+        }
       })
       .subscribe((status) => {
         console.log('Team.tsx: Subscription status:', status);
         
         if (status === 'SUBSCRIBED') {
-          setRealtimeStatus('connected');
-          statusChangedRef.current = true;
+          if (realtimeStatus !== 'connected') {
+            setRealtimeStatus('connected');
+            statusChangedRef.current = true;
+            reconnectionAttemptsRef.current = 0; // Reset counter on successful connection
+          }
         } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          setRealtimeStatus('disconnected');
-          statusChangedRef.current = true;
-        } else {
+          if (realtimeStatus !== 'disconnected') {
+            setRealtimeStatus('disconnected');
+            statusChangedRef.current = true;
+          }
+        } else if (realtimeStatus !== 'connecting') {
           setRealtimeStatus('connecting');
         }
       });
       
     return channel;
-  }, []);
+  }, [realtimeStatus]);
   
   useEffect(() => {
     statusChangedRef.current = false;
     const channel = setupRealtimeConnection();
     
+    // More aggressive ping check to improve connection status detection
     const connectionMonitor = setInterval(() => {
-      if (realtimeStatus === 'disconnected') {
-        console.log('Team.tsx: Detected disconnected state, attempting auto-recovery');
-        try {
-          channel.subscribe();
-        } catch (error) {
-          console.error('Team.tsx: Error trying to resubscribe:', error);
+      const wsStatus = checkConnectionStatus();
+      
+      if (wsStatus !== 1) { // Not connected (1 = WebSocket.OPEN)
+        console.log('Team.tsx: Connection monitor detected possible disconnection, status:', wsStatus);
+        
+        if (reconnectionAttemptsRef.current < 3) {
+          console.log('Team.tsx: Attempting auto-recovery');
+          reconnectionAttemptsRef.current++;
+          try {
+            supabase.removeChannel(channel);
+            const newChannel = setupRealtimeConnection();
+          } catch (error) {
+            console.error('Team.tsx: Error during auto-recovery:', error);
+          }
+        } else if (reconnectionAttemptsRef.current === 3) {
+          // On third attempt, notify user of persistent connection issues
+          toast({
+            title: "Verbindingsproblemen",
+            description: "We hebben problemen om verbinding te maken. Probeer de pagina te verversen.",
+            variant: "destructive",
+            duration: 0, // Don't auto-dismiss
+          });
+          reconnectionAttemptsRef.current++;
         }
       }
-    }, 30000);
+    }, 20000); // Every 20 seconds
     
     return () => {
       clearInterval(connectionMonitor);
       supabase.removeChannel(channel);
     };
-  }, [realtimeStatus, setupRealtimeConnection]);
+  }, [setupRealtimeConnection, checkConnectionStatus, toast]);
   
   useEffect(() => {
     if (!statusChangedRef.current || !isMountedRef.current) return;
@@ -96,7 +143,7 @@ const Team: React.FC = () => {
         title: "Verbinding verbroken",
         description: "Je bent offline. Wijzigingen worden mogelijk niet direct zichtbaar.",
         variant: "destructive",
-        duration: 5000,
+        duration: 0, // Don't auto-dismiss critical errors
       });
     } else if (realtimeStatus === 'connected') {
       toast({
@@ -158,29 +205,71 @@ const Team: React.FC = () => {
 
   const handleReconnect = useCallback(() => {
     setRealtimeStatus('connecting');
-    
-    const channel = supabase.channel('reconnect-attempt');
-    channel.subscribe((status) => {
-      console.log('Team.tsx: Reconnection attempt status:', status);
-      if (status === 'SUBSCRIBED') {
-        setRealtimeStatus('connected');
-        
-        toast({
-          title: "Verbinding hersteld",
-          description: "Je bent weer online.",
-        });
-      } else if (status === 'CHANNEL_ERROR') {
-        console.log('Team.tsx: Soft reconnect failed, attempting full reload');
-        window.location.reload();
-      }
+    toast({
+      title: "Verbinding herstellen",
+      description: "We proberen de verbinding te herstellen...",
     });
     
-    setTimeout(() => {
-      supabase.removeChannel(channel);
-      if (realtimeStatus !== 'connected') {
+    // More aggressive connection reset approach
+    try {
+      // Close all existing channels first
+      supabase.getChannels().forEach(channel => {
+        supabase.removeChannel(channel);
+      });
+      
+      // Create a fresh channel
+      const channel = supabase.channel('reconnect-attempt');
+      channel.subscribe((status) => {
+        console.log('Team.tsx: Reconnection attempt status:', status);
+        if (status === 'SUBSCRIBED') {
+          setRealtimeStatus('connected');
+          
+          toast({
+            title: "Verbinding hersteld",
+            description: "Je bent weer online.",
+          });
+        } else if (status === 'CHANNEL_ERROR') {
+          console.log('Team.tsx: Manual reconnect failed, attempting full reload');
+          toast({
+            title: "Verbinding herstellen mislukt",
+            description: "We laden de pagina opnieuw om je verbinding te herstellen.",
+            variant: "destructive"
+          });
+          
+          // Give toast time to show before reload
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
+      });
+      
+      // Set a timeout to force reload if reconnection is taking too long
+      setTimeout(() => {
+        if (realtimeStatus !== 'connected') {
+          toast({
+            title: "Verbinding herstellen duurt te lang",
+            description: "We laden de pagina opnieuw...",
+            variant: "destructive"
+          });
+          
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }
+      }, 5000);
+    } catch (error) {
+      console.error('Team.tsx: Error during reconnection:', error);
+      // Fall back to page reload after showing error
+      toast({
+        title: "Fout bij verbinden",
+        description: "Er is een fout opgetreden. We laden de pagina opnieuw.",
+        variant: "destructive"
+      });
+      
+      setTimeout(() => {
         window.location.reload();
-      }
-    }, 5000);
+      }, 2000);
+    }
   }, [toast, realtimeStatus]);
 
   console.log("Team.tsx: Rendering Team component with TeamProvider");
@@ -217,13 +306,16 @@ const Team: React.FC = () => {
         {realtimeStatus === 'disconnected' && (
           <StatusIndicator
             type="offline"
-            message="Wijzigingen worden pas zichtbaar als je weer online bent."
+            message="Wijzigingen worden automatisch verwerkt wanneer je weer online bent."
             actionLabel="Verbind opnieuw"
             onAction={handleReconnect}
           />
         )}
         
-        <LoadingState isLoading={false}>
+        <LoadingState 
+          isLoading={false}
+          instant={true}
+        >
           {showPayoutSummary ? (
             <div className="pb-16">
               <PayoutSummary />

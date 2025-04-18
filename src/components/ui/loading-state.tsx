@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -16,8 +16,8 @@ interface LoadingStateProps {
 export const LoadingState: React.FC<LoadingStateProps> = ({
   isLoading,
   children,
-  delay = 500, // Verhoogd naar 500ms om flikkering te verminderen
-  minDuration = 800, // Verhoogd naar 800ms voor betere UX
+  delay = 700, // Verhoogd naar 700ms om flikkering te minimaliseren
+  minDuration = 1000, // Verhoogd naar 1000ms voor soepelere UX
   className,
   loadingComponent,
   instant = false
@@ -26,12 +26,20 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   const [shouldRender, setShouldRender] = useState(!isLoading);
   const [loadStartTime, setLoadStartTime] = useState<number | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const delayTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const minDurationTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const transitionTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    let delayTimer: NodeJS.Timeout | null = null;
-    let minDurationTimer: NodeJS.Timeout | null = null;
-    let transitionTimer: NodeJS.Timeout | null = null;
+    // Cleanup alle timers bij unmount
+    return () => {
+      if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
+      if (minDurationTimerRef.current) clearTimeout(minDurationTimerRef.current);
+      if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+    };
+  }, []);
 
+  useEffect(() => {
     if (isLoading && !showLoading) {
       if (instant) {
         setShowLoading(true);
@@ -41,15 +49,16 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
         // Bereid de transitie voor
         setIsTransitioning(true);
         
-        delayTimer = setTimeout(() => {
+        // Gebruik refs voor timers om cleanup te vergemakkelijken
+        delayTimerRef.current = setTimeout(() => {
           setShowLoading(true);
           setShouldRender(false);
           setLoadStartTime(Date.now());
           
-          // Geef de transitie tijd om af te ronden
-          transitionTimer = setTimeout(() => {
+          // Geef de transitie tijd om af te ronden (langere duur voor soepelere overgang)
+          transitionTimerRef.current = setTimeout(() => {
             setIsTransitioning(false);
-          }, 300);
+          }, 500); // Langere transitieduur voor vloeiendere overgang
         }, delay);
       }
     } else if (!isLoading && showLoading) {
@@ -63,29 +72,23 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
         // Bereid de transitie voor
         setIsTransitioning(true);
         
-        minDurationTimer = setTimeout(() => {
+        minDurationTimerRef.current = setTimeout(() => {
           setShowLoading(false);
           setShouldRender(true);
           
-          // Geef de transitie tijd om af te ronden
-          transitionTimer = setTimeout(() => {
+          // Geef de transitie tijd om af te ronden (langere duur voor soepelere overgang)
+          transitionTimerRef.current = setTimeout(() => {
             setIsTransitioning(false);
-          }, 300);
+          }, 500); // Langere transitieduur voor vloeiendere overgang
         }, remainingTime);
       }
     } else if (!isLoading && !showLoading) {
       setShouldRender(true);
       // Reset transitiestatus na een korte vertraging
-      transitionTimer = setTimeout(() => {
+      transitionTimerRef.current = setTimeout(() => {
         setIsTransitioning(false);
-      }, 300);
+      }, 500); // Langere transitieduur voor vloeiendere overgang
     }
-
-    return () => {
-      if (delayTimer) clearTimeout(delayTimer);
-      if (minDurationTimer) clearTimeout(minDurationTimer);
-      if (transitionTimer) clearTimeout(transitionTimer);
-    };
   }, [isLoading, showLoading, delay, minDuration, loadStartTime, instant]);
 
   const defaultLoader = (
@@ -98,17 +101,17 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
 
   return (
     <div className={cn(
-      "transition-opacity duration-700", 
-      isTransitioning ? "opacity-90" : "opacity-100",
+      "transition-all duration-700", 
+      isTransitioning ? "opacity-95" : "opacity-100",
       className
     )}>
       {showLoading && (
-        <div className="opacity-100 transition-opacity duration-700">
+        <div className="opacity-100 transition-opacity duration-700 animate-fade-in">
           {loadingComponent || defaultLoader}
         </div>
       )}
       <div className={cn(
-        "transition-opacity duration-700",
+        "transition-all duration-700",
         showLoading ? "opacity-0 h-0 overflow-hidden" : "opacity-100"
       )}>
         {shouldRender && children}

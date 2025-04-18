@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import TipInput from '@/components/TipInput';
 import TipCard from '@/components/TipCard';
@@ -18,16 +19,29 @@ import { StatusIndicator } from '@/components/ui/status-indicator';
 const Index = () => {
   const { currentPeriod, refreshTeamData, addTip, updatePeriod, updateTip } = useApp();
   const [hasTeam, setHasTeam] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [checkingTeam, setCheckingTeam] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false to prevent initial flashing
+  const [checkingTeam, setCheckingTeam] = useState(false); // Start with false to prevent initial flashing
   const [periodLoading, setPeriodLoading] = useState(false);
   const [recursionError, setRecursionError] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
+  const [initialized, setInitialized] = useState(false);
+  const [contentVisible, setContentVisible] = useState(true);
   const channelsRef = useRef<any[]>([]);
   const { teamId, fetchTeamId } = useTeamId();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const initialLoadDoneRef = useRef(false);
+
+  useEffect(() => {
+    // Fade in content once initially rendered
+    const timer = setTimeout(() => {
+      setContentVisible(true);
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const channel = supabase.channel('global-index');
@@ -59,8 +73,10 @@ const Index = () => {
   
   const checkTeamMembership = useCallback(async () => {
     try {
-      console.log('Index: Team Membership Check Starting');
-      setCheckingTeam(true);
+      // Only show loading for first load, not for background refreshes
+      if (!initialLoadDoneRef.current) {
+        setCheckingTeam(true);
+      }
       
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -103,7 +119,10 @@ const Index = () => {
       
       if (hasTeam || teamId) {
         console.log('Index: Refreshing team data');
-        setPeriodLoading(true);
+        if (!initialLoadDoneRef.current) {
+          setPeriodLoading(true);
+        }
+        
         try {
           await refreshTeamData();
           console.log('Index: Team data refreshed successfully');
@@ -115,26 +134,57 @@ const Index = () => {
             setRecursionError(true);
           }
           
-          toast({
-            title: "Fout bij laden",
-            description: "Kon teamgegevens niet vernieuwen",
-            variant: "destructive"
-          });
+          if (!initialLoadDoneRef.current) {
+            toast({
+              title: "Fout bij laden",
+              description: "Kon teamgegevens niet vernieuwen",
+              variant: "destructive"
+            });
+          }
         } finally {
-          setPeriodLoading(false);
+          // Only delay hiding loading if this is the first load
+          if (!initialLoadDoneRef.current) {
+            // Add minimum loading time to prevent flickering
+            if (loadingTimeoutRef.current) {
+              clearTimeout(loadingTimeoutRef.current);
+            }
+            
+            loadingTimeoutRef.current = setTimeout(() => {
+              setPeriodLoading(false);
+              setCheckingTeam(false);
+              setLoading(false);
+              initialLoadDoneRef.current = true;
+              setInitialized(true);
+            }, 1000); // Minimum loading time to prevent visual flickering
+          } else {
+            // For background refreshes, don't show loading indicators
+            setPeriodLoading(false);
+            setCheckingTeam(false);
+            setLoading(false);
+          }
         }
+      } else {
+        setCheckingTeam(false);
+        setLoading(false);
+        initialLoadDoneRef.current = true;
+        setInitialized(true);
       }
     } catch (err) {
       console.error('Index: Team membership check error:', err);
       setHasTeam(false);
-      toast({
-        title: "Fout",
-        description: "Kon teamlidmaatschap niet controleren",
-        variant: "destructive"
-      });
-    } finally {
+      
+      if (!initialLoadDoneRef.current) {
+        toast({
+          title: "Fout",
+          description: "Kon teamlidmaatschap niet controleren",
+          variant: "destructive"
+        });
+      }
+      
       setCheckingTeam(false);
       setLoading(false);
+      initialLoadDoneRef.current = true;
+      setInitialized(true);
     }
   }, [refreshTeamData, toast, teamId, fetchTeamId, hasTeam]);
   
@@ -159,8 +209,28 @@ const Index = () => {
   }, [toast]);
   
   useEffect(() => {
+    // Cleanup timeout on unmount
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, []);
+  
+  useEffect(() => {
     console.log('Index: Component mounted, checking team membership');
+    // First check without loading indicators to try to get cached data first
     checkTeamMembership();
+    
+    // Set up periodic background refresh
+    const backgroundRefreshInterval = setInterval(() => {
+      if (initialLoadDoneRef.current) {
+        // This will run without showing loading indicators
+        checkTeamMembership();
+      }
+    }, 60000); // Refresh every minute in the background
+    
+    return () => clearInterval(backgroundRefreshInterval);
   }, [checkTeamMembership]);
 
   useEffect(() => {
@@ -192,13 +262,11 @@ const Index = () => {
           console.log('Index: Real-time tip update received');
           (async () => {
             try {
-              setPeriodLoading(true);
+              // Hide the loading animation for real-time updates
               await refreshTeamData();
               console.log('Index: Team data refreshed after real-time tip update');
             } catch (error) {
               console.error('Index: Error refreshing data after real-time tip update:', error);
-            } finally {
-              setPeriodLoading(false);
             }
           })();
         }
@@ -223,13 +291,11 @@ const Index = () => {
           console.log('Index: Real-time period update received');
           (async () => {
             try {
-              setPeriodLoading(true);
+              // Hide the loading animation for real-time updates
               await refreshTeamData();
               console.log('Index: Team data refreshed after real-time period update');
             } catch (error) {
               console.error('Index: Error refreshing data after real-time period update:', error);
-            } finally {
-              setPeriodLoading(false);
             }
           })();
         }
@@ -267,9 +333,16 @@ const Index = () => {
     window.location.reload();
   };
   
+  const handleRefresh = () => {
+    // Quietly refresh data in the background without showing loading spinners
+    refreshTeamData().catch(error => {
+      console.error("Error during manual refresh:", error);
+    });
+  };
+  
   if (recursionError) {
     return (
-      <div className="container mx-auto py-8">
+      <div className="container mx-auto py-8 animate-fade-in">
         <StatusIndicator 
           type="error" 
           title="Database beveiligingsprobleem"
@@ -281,19 +354,21 @@ const Index = () => {
     );
   }
   
-  if (checkingTeam) {
+  if (checkingTeam && !initialized) {
     return (
-      <StatusIndicator 
-        type="loading"
-        title="Gegevens laden..."
-        message="We bereiden je dashboard voor"
-      />
+      <div className="animate-fade-in">
+        <StatusIndicator 
+          type="loading"
+          title="Gegevens laden..."
+          message="We bereiden je dashboard voor"
+        />
+      </div>
     );
   }
   
   if (!hasTeam) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] p-4">
+      <div className="flex flex-col items-center justify-center min-h-[50vh] p-4 animate-fade-in">
         <StatusIndicator 
           type="warning"
           title="Je moet eerst een team aanmaken"
@@ -315,19 +390,24 @@ const Index = () => {
   };
 
   return (
-    <div className="space-y-6 transition-opacity duration-300">
+    <div className={`space-y-6 transition-opacity duration-500 ${contentVisible ? 'opacity-100' : 'opacity-0'}`}>
       {realtimeStatus === 'disconnected' && (
-        <StatusIndicator 
-          type="offline"
-          message="Wijzigingen worden pas zichtbaar als je weer online bent."
-          actionLabel="Verbind opnieuw"
-          onAction={handleReconnect}
-        />
+        <div className="animate-fade-in">
+          <StatusIndicator 
+            type="offline"
+            message="Wijzigingen worden pas zichtbaar als je weer online bent."
+            actionLabel="Verbind opnieuw"
+            onAction={handleReconnect}
+          />
+        </div>
       )}
       
       <div className="grid md:grid-cols-2 gap-6">
         <div>
-          <LoadingState isLoading={loading || periodLoading}>
+          <LoadingState 
+            isLoading={false} 
+            instant={true}
+          >
             <PeriodSummary />
             <div className="mt-6">
               <TipInput />
@@ -339,29 +419,37 @@ const Index = () => {
           <h2 className="text-lg font-medium mb-4 flex items-center justify-between">
             <div>
               Recente fooi
-              {currentPeriod && !loading && !periodLoading && (
+              {currentPeriod && (
                 <span className="text-sm font-normal text-muted-foreground ml-2">
                   {currentPeriod.name ? currentPeriod.name : `Periode ${formatPeriodDate(currentPeriod.startDate)}`}
                 </span>
               )}
             </div>
             
-            {!loading && !periodLoading && (
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                className="h-8" 
-                onClick={() => {
-                  setPeriodLoading(true);
-                  refreshTeamData().finally(() => setPeriodLoading(false));
-                }}
-              >
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="h-8" 
+              onClick={handleRefresh}
+            >
+              <span className="sr-only">Vernieuwen</span>
+              {periodLoading ? (
                 <StatusIndicator type="loading" minimal />
-              </Button>
-            )}
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-refresh-cw">
+                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                  <path d="M21 3v5h-5"></path>
+                  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                  <path d="M3 21v-5h5"></path>
+                </svg>
+              )}
+            </Button>
           </h2>
           
-          <LoadingState isLoading={loading || periodLoading}>
+          <LoadingState 
+            isLoading={false}
+            instant={true}
+          >
             {currentPeriod && currentPeriod.tips && currentPeriod.tips.length > 0 ? (
               <div className="space-y-2 transition-all duration-300">
                 {[...currentPeriod.tips]

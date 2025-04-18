@@ -1,11 +1,12 @@
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
 import { usePeriodSelection } from '@/hooks/usePeriodSelection';
 import { useTeamMemberSort } from '@/hooks/useTeamMemberSort';
 import { ImportProvider } from '@/contexts/ImportContext';
 import { useCachedTeamData } from '@/hooks/useCachedTeamData';
+import { TeamMember, Period } from '@/types';
 
 interface TeamContextType {
   selectedPeriods: string[];
@@ -22,7 +23,7 @@ interface TeamContextType {
   togglePeriodSelection: (periodId: string) => void;
   handlePayout: () => void;
   handleRefresh: () => Promise<void>;
-  periods: any[];
+  periods: Period[];
 }
 
 const TeamContext = createContext<TeamContextType | undefined>(undefined);

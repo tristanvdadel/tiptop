@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { StatusIndicator } from '@/components/ui/status-indicator';
 
 interface LoadingStateProps {
   isLoading: boolean;
@@ -12,28 +13,33 @@ interface LoadingStateProps {
   loadingComponent?: React.ReactNode;
   instant?: boolean;
   backgroundLoad?: boolean;
+  errorMessage?: string | null;
+  onRetry?: () => void;
 }
 
 export const LoadingState: React.FC<LoadingStateProps> = ({
   isLoading,
   children,
-  delay = 700, // Verhoogd naar 700ms om flikkering te minimaliseren
-  minDuration = 1000, // Verhoogd naar 1000ms voor soepelere UX
+  delay = 700,
+  minDuration = 1000,
   className,
   loadingComponent,
   instant = false,
-  backgroundLoad = false // Nieuwe optie voor achtergrond laden
+  backgroundLoad = false,
+  errorMessage = null,
+  onRetry
 }) => {
   const [showLoading, setShowLoading] = useState(false);
   const [shouldRender, setShouldRender] = useState(!isLoading);
   const [loadStartTime, setLoadStartTime] = useState<number | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [showError, setShowError] = useState(false);
   const delayTimerRef = useRef<NodeJS.Timeout | null>(null);
   const minDurationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const transitionTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Cleanup alle timers bij unmount
+    // Cleanup all timers on unmount
     return () => {
       if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
       if (minDurationTimerRef.current) clearTimeout(minDurationTimerRef.current);
@@ -41,34 +47,45 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
     };
   }, []);
 
+  // Handle error state
+  useEffect(() => {
+    if (errorMessage) {
+      setShowError(true);
+      setShowLoading(false);
+      setShouldRender(false);
+    } else {
+      setShowError(false);
+    }
+  }, [errorMessage]);
+
   useEffect(() => {
     // Skip loading indicator for background loading
     if (backgroundLoad && isLoading) {
       return;
     }
     
-    if (isLoading && !showLoading) {
+    if (isLoading && !showLoading && !showError) {
       if (instant) {
         setShowLoading(true);
         setShouldRender(false);
         setLoadStartTime(Date.now());
       } else {
-        // Bereid de transitie voor
+        // Prepare the transition
         setIsTransitioning(true);
         
-        // Gebruik refs voor timers om cleanup te vergemakkelijken
+        // Use refs for timers to facilitate cleanup
         delayTimerRef.current = setTimeout(() => {
           setShowLoading(true);
           setShouldRender(false);
           setLoadStartTime(Date.now());
           
-          // Geef de transitie tijd om af te ronden (langere duur voor soepelere overgang)
+          // Give the transition time to complete (longer duration for smoother transition)
           transitionTimerRef.current = setTimeout(() => {
             setIsTransitioning(false);
-          }, 500); // Langere transitieduur voor vloeiendere overgang
+          }, 500); // Longer transition duration for smoother transition
         }, delay);
       }
-    } else if (!isLoading && showLoading) {
+    } else if (!isLoading && showLoading && !showError) {
       const timeInLoadingState = loadStartTime ? Date.now() - loadStartTime : 0;
       const remainingTime = Math.max(0, minDuration - timeInLoadingState);
       
@@ -76,27 +93,27 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
         setShowLoading(false);
         setShouldRender(true);
       } else {
-        // Bereid de transitie voor
+        // Prepare the transition
         setIsTransitioning(true);
         
         minDurationTimerRef.current = setTimeout(() => {
           setShowLoading(false);
           setShouldRender(true);
           
-          // Geef de transitie tijd om af te ronden (langere duur voor soepelere overgang)
+          // Give the transition time to complete (longer duration for smoother transition)
           transitionTimerRef.current = setTimeout(() => {
             setIsTransitioning(false);
-          }, 500); // Langere transitieduur voor vloeiendere overgang
+          }, 500); // Longer transition duration for smoother transition
         }, remainingTime);
       }
-    } else if (!isLoading && !showLoading) {
+    } else if (!isLoading && !showLoading && !showError) {
       setShouldRender(true);
-      // Reset transitiestatus na een korte vertraging
+      // Reset transition status after a short delay
       transitionTimerRef.current = setTimeout(() => {
         setIsTransitioning(false);
-      }, 500); // Langere transitieduur voor vloeiendere overgang
+      }, 500); // Longer transition duration for smoother transition
     }
-  }, [isLoading, showLoading, delay, minDuration, loadStartTime, instant, backgroundLoad]);
+  }, [isLoading, showLoading, delay, minDuration, loadStartTime, instant, backgroundLoad, showError]);
 
   const defaultLoader = (
     <div className="flex flex-col items-center justify-center py-8 opacity-100 transition-opacity duration-700">
@@ -109,6 +126,21 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   // For background loading, just render children with no visual change
   if (backgroundLoad) {
     return <div className={className}>{children}</div>;
+  }
+  
+  // Show error message if there is one
+  if (showError && errorMessage) {
+    return (
+      <div className={className}>
+        <StatusIndicator
+          type="error"
+          title="Fout bij laden van gegevens"
+          message={errorMessage}
+          actionLabel={onRetry ? "Probeer opnieuw" : undefined}
+          onAction={onRetry}
+        />
+      </div>
+    );
   }
 
   return (

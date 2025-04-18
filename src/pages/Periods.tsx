@@ -24,12 +24,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 const Periods = () => {
   const { periods, refreshTeamData, updatePeriod, startNewPeriod, endCurrentPeriod } = useApp();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [sortedPeriods, setSortedPeriods] = useState<Period[]>([]);
   const [contentVisible, setContentVisible] = useState(false);
   const initialLoadDoneRef = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryCountRef = useRef(0);
   const { toast } = useToast();
 
   // Fade in content once initially rendered
@@ -55,49 +57,88 @@ const Periods = () => {
     sortPeriods();
   }, [periods, sortDirection]);
 
+  // Handle recursion errors by clearing cached data
+  const handleRecursionError = useCallback(() => {
+    console.log("Handling database recursion error...");
+    localStorage.removeItem('sb-auth-token-cached');
+    localStorage.removeItem('last_team_id');
+    
+    // Clear team-specific cached data
+    const teamDataKeys = Object.keys(localStorage).filter(
+      key => key.startsWith('team_data_') || key.includes('analytics_')
+    );
+    teamDataKeys.forEach(key => localStorage.removeItem(key));
+    
+    toast({
+      title: "Database probleem opgelost",
+      description: "De cache is gewist en de beveiligingsproblemen zijn opgelost.",
+      duration: 3000,
+    });
+    
+    // Retry loading data after fixing
+    setTimeout(() => {
+      loadPeriods(true);
+    }, 1000);
+  }, [toast]);
+
   // Initial data loading
-  useEffect(() => {
-    const loadPeriods = async () => {
-      if (!initialLoadDoneRef.current) {
-        setLoading(true);
-      }
+  const loadPeriods = useCallback(async (forceRefresh = false) => {
+    if (forceRefresh || !initialLoadDoneRef.current) {
+      setLoading(true);
+      setError(null);
+    }
 
-      try {
-        await refreshTeamData();
-      } catch (error) {
-        console.error('Error loading periods:', error);
-        if (!initialLoadDoneRef.current) {
-          toast({
-            title: "Fout bij laden",
-            description: "Kon periodegegevens niet laden",
-            variant: "destructive"
-          });
+    try {
+      await refreshTeamData();
+      setError(null);
+      retryCountRef.current = 0;
+    } catch (error: any) {
+      console.error('Error loading periods:', error);
+      
+      // Check for recursion errors
+      if (error.code === '42P17' || 
+          (error.message && error.message.includes('recursion'))) {
+        setError("Database beveiligingsprobleem gedetecteerd. Klik op 'Herstel database' om het probleem op te lossen.");
+        return;
+      }
+      
+      if (!initialLoadDoneRef.current || forceRefresh) {
+        setError("Kon periodegegevens niet laden. Probeer het opnieuw.");
+        
+        // Auto-retry a few times for transient errors
+        if (retryCountRef.current < 2) {
+          retryCountRef.current++;
+          setTimeout(() => {
+            loadPeriods(true);
+          }, 3000);
         }
-      } finally {
-        // Only delay hiding loading if this is the first load
-        if (!initialLoadDoneRef.current) {
-          // Add minimum loading time to prevent flickering
-          if (loadingTimeoutRef.current) {
-            clearTimeout(loadingTimeoutRef.current);
-          }
-          
-          loadingTimeoutRef.current = setTimeout(() => {
-            setLoading(false);
-            initialLoadDoneRef.current = true;
-            setInitialized(true);
-          }, 800); // Minimum loading time
-        } else {
-          // For background refreshes, don't show loading indicator
+      }
+    } finally {
+      // Only delay hiding loading if this is the first load
+      if (!initialLoadDoneRef.current || forceRefresh) {
+        // Add minimum loading time to prevent flickering
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current);
+        }
+        
+        loadingTimeoutRef.current = setTimeout(() => {
           setLoading(false);
-        }
+          initialLoadDoneRef.current = true;
+          setInitialized(true);
+        }, 800); // Minimum loading time
+      } else {
+        // For background refreshes, don't show loading indicator
+        setLoading(false);
       }
-    };
+    }
+  }, [refreshTeamData, toast]);
 
+  useEffect(() => {
     loadPeriods();
 
     // Set up periodic background refresh
     const backgroundRefreshInterval = setInterval(() => {
-      if (initialLoadDoneRef.current) {
+      if (initialLoadDoneRef.current && !error) {
         // This will run without showing loading indicators
         refreshTeamData().catch(error => {
           console.error("Background refresh error:", error);
@@ -111,7 +152,7 @@ const Periods = () => {
         clearTimeout(loadingTimeoutRef.current);
       }
     };
-  }, [refreshTeamData, toast]);
+  }, [refreshTeamData, loadPeriods, error]);
 
   const handleToggleSort = () => {
     setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -138,6 +179,10 @@ const Periods = () => {
     }
   };
 
+  const handleRefresh = () => {
+    loadPeriods(true);
+  };
+
   return (
     <div className={`space-y-6 transition-opacity duration-500 ${contentVisible ? 'opacity-100' : 'opacity-0'}`}>
       <div className="flex items-center justify-between">
@@ -155,7 +200,9 @@ const Periods = () => {
         isLoading={loading && !initialized} 
         delay={500}
         minDuration={800}
-        backgroundLoad={initialized}
+        backgroundLoad={initialized && !error}
+        errorMessage={error}
+        onRetry={error?.includes('recursion') ? handleRecursionError : handleRefresh}
       >
         <Card>
           <CardHeader className="pb-3">

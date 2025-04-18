@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { RealtimeChannel, REALTIME_LISTEN_TYPES, REALTIME_PRESENCE_LISTEN_EVENTS, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
@@ -269,7 +268,7 @@ export const useTeamRealtimeUpdates = (
           console.log('Connection may be stale, checking status...');
           
           const isAnyChannelConnected = channelsRef.current.some(channel => {
-            return channel.state === 'SUBSCRIBED';
+            return channel.state as string === 'SUBSCRIBED';
           });
           
           if (!isAnyChannelConnected) {

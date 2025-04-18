@@ -44,10 +44,10 @@ const Team: React.FC = () => {
     
     const channel = channels[0] as RealtimeChannel;
     
-    if (channel && channel.state === 'SUBSCRIBED') {
+    if (channel && channel.state as string === 'SUBSCRIBED') {
       setRealtimeStatus('connected');
       return 1;
-    } else if (channel && channel.state === 'SUBSCRIBING') {
+    } else if (channel && channel.state as string === 'SUBSCRIBING') {
       setRealtimeStatus('connecting');
       return 0;
     } else {

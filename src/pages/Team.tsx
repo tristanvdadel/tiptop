@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PayoutSummary } from '@/components/PayoutSummary';
 import { TeamProvider } from '@/contexts/TeamContext';
@@ -17,41 +18,56 @@ const Team: React.FC = () => {
   const [showPayoutSummary, setShowPayoutSummary] = useState(false);
   const [needsTeamIdRefresh, setNeedsTeamIdRefresh] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
+  const statusChangedRef = useRef(false);
   
-  React.useEffect(() => {
+  // Use a more efficient way to get URL params
+  useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const showSummary = urlParams.get('payoutSummary') === 'true';
+    const isRecovery = urlParams.get('recover') === 'true';
+    
     console.log("Team.tsx: URL param 'payoutSummary':", showSummary);
     setShowPayoutSummary(showSummary);
     
-    const isRecovery = urlParams.get('recover') === 'true';
     if (isRecovery) {
       setNeedsTeamIdRefresh(true);
     }
   }, [location.search]);
   
-  useEffect(() => {
+  const setupRealtimeConnection = useCallback(() => {
     const channel = supabase.channel('global');
     
-    const subscription = channel
+    channel
       .on('presence', { event: 'sync' }, () => {
         console.log('Team.tsx: Realtime connection synced');
         setRealtimeStatus('connected');
+        statusChangedRef.current = true;
       })
       .on('system', { event: 'disconnect' }, () => {
         console.log('Team.tsx: Realtime disconnected');
         setRealtimeStatus('disconnected');
+        statusChangedRef.current = true;
       })
       .subscribe((status) => {
         console.log('Team.tsx: Subscription status:', status);
+        
         if (status === 'SUBSCRIBED') {
           setRealtimeStatus('connected');
+          statusChangedRef.current = true;
         } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
           setRealtimeStatus('disconnected');
+          statusChangedRef.current = true;
         } else {
           setRealtimeStatus('connecting');
         }
       });
+      
+    return channel;
+  }, []);
+  
+  useEffect(() => {
+    statusChangedRef.current = false;
+    const channel = setupRealtimeConnection();
     
     const connectionMonitor = setInterval(() => {
       if (realtimeStatus === 'disconnected') {
@@ -68,9 +84,12 @@ const Team: React.FC = () => {
       clearInterval(connectionMonitor);
       supabase.removeChannel(channel);
     };
-  }, [realtimeStatus]);
+  }, [realtimeStatus, setupRealtimeConnection]);
   
+  // Only show toast when status actually changes
   useEffect(() => {
+    if (!statusChangedRef.current) return;
+    
     if (realtimeStatus === 'disconnected') {
       toast({
         title: "Verbinding verbroken",
@@ -85,22 +104,24 @@ const Team: React.FC = () => {
         duration: 3000,
       });
     }
+    
+    statusChangedRef.current = false;
   }, [realtimeStatus, toast]);
   
-  useEffect(() => {
+  const handleTeamIdRefresh = useCallback(async () => {
     if (needsTeamIdRefresh) {
-      const retryTeamId = async () => {
-        try {
-          await fetchTeamId();
-          setNeedsTeamIdRefresh(false);
-        } catch (error) {
-          console.error("Failed to refresh team ID:", error);
-        }
-      };
-      
-      retryTeamId();
+      try {
+        await fetchTeamId();
+        setNeedsTeamIdRefresh(false);
+      } catch (error) {
+        console.error("Failed to refresh team ID:", error);
+      }
     }
   }, [needsTeamIdRefresh, fetchTeamId]);
+  
+  useEffect(() => {
+    handleTeamIdRefresh();
+  }, [handleTeamIdRefresh]);
   
   const handleRefreshTeamId = async () => {
     toast({
@@ -115,7 +136,9 @@ const Team: React.FC = () => {
           title: "Team gevonden",
           description: "Je teamgegevens worden geladen.",
         });
-        window.location.reload();
+        
+        // Use more subtle reload to avoid flashing
+        navigate('/team', { replace: true });
       } else {
         toast({
           title: "Geen team gevonden",
@@ -133,27 +156,34 @@ const Team: React.FC = () => {
     }
   };
 
-  const handleReconnect = () => {
+  const handleReconnect = useCallback(() => {
     setRealtimeStatus('connecting');
     
     const channel = supabase.channel('reconnect-attempt');
     channel.subscribe((status) => {
       console.log('Team.tsx: Reconnection attempt status:', status);
       if (status === 'SUBSCRIBED') {
-        window.location.reload();
+        // Just refresh data instead of full page reload
+        setRealtimeStatus('connected');
+        
+        toast({
+          title: "Verbinding hersteld",
+          description: "Je bent weer online.",
+        });
       } else if (status === 'CHANNEL_ERROR') {
         console.log('Team.tsx: Soft reconnect failed, attempting full reload');
         window.location.reload();
       }
     });
     
+    // Timeout in case reconnection attempt doesn't complete
     setTimeout(() => {
       supabase.removeChannel(channel);
       if (realtimeStatus !== 'connected') {
         window.location.reload();
       }
     }, 5000);
-  };
+  }, [toast, realtimeStatus]);
 
   console.log("Team.tsx: Rendering Team component with TeamProvider");
   

@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
 import { TeamMember } from '@/types';
 import { useApp } from '@/contexts/AppContext';
@@ -82,7 +83,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importedHours, setImportedHours] = useState<ImportedHour[]>([]);
   const [sortedTeamMembers, setSortedTeamMembers] = useState<TeamMember[]>([]);
-  const [lastRefreshTime, setLastRefreshTime] = useState(0);
+  const [refreshCount, setRefreshCount] = useState(0);
   const navigate = useNavigate();
   
   // Use the cached team data hook for improved loading and error handling
@@ -120,7 +121,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           return [...prev, periodId];
         }
       });
-    }, 100),
+    }, 300), // Increased debounce time
     []
   );
 
@@ -132,27 +133,37 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [debouncedTogglePeriod]);
 
-  React.useEffect(() => {
+  // Use memo to prevent unnecessary recalculations
+  const calculatedDistribution = useMemo(() => {
     if (selectedPeriods.length === 0 || teamMembers.length === 0) {
-      setDistribution([]);
-      return;
+      return [];
     }
     
-    const calculatedDistribution = calculateTipDistribution(selectedPeriods);
-    setDistribution(calculatedDistribution);
+    return calculateTipDistribution(selectedPeriods);
   }, [selectedPeriods, calculateTipDistribution, teamMembers.length]);
 
-  React.useEffect(() => {
+  // Only update distribution state when it actually changes
+  useEffect(() => {
+    if (JSON.stringify(distribution) !== JSON.stringify(calculatedDistribution)) {
+      setDistribution(calculatedDistribution);
+    }
+  }, [calculatedDistribution, distribution]);
+
+  // Memoize sortedTeamMembers
+  useEffect(() => {
     if (teamMembers.length === 0) return;
     
     const sorted = [...teamMembers].sort((a, b) => 
       a.name.toLowerCase().localeCompare(b.name.toLowerCase())
     );
     
-    setSortedTeamMembers(sorted);
-  }, [teamMembers]);
+    // Only update state if the sorted list actually changed
+    if (JSON.stringify(sortedTeamMembers) !== JSON.stringify(sorted)) {
+      setSortedTeamMembers(sorted);
+    }
+  }, [teamMembers, sortedTeamMembers]);
 
-  const handlePayout = () => {
+  const handlePayout = useCallback(() => {
     if (selectedPeriods.length === 0) {
       return;
     }
@@ -174,19 +185,19 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     markPeriodsAsPaid(selectedPeriods, customDistribution, totalHours);
     navigate('/team?payoutSummary=true');
-  };
+  }, [selectedPeriods, distribution, totalTips, totalHours, markPeriodsAsPaid, navigate]);
 
-  const handleImportHours = () => {
+  const handleImportHours = useCallback(() => {
     console.log('Opening import hours dialog');
     setShowImportDialog(true);
-  };
+  }, []);
 
-  const closeImportDialog = () => {
+  const closeImportDialog = useCallback(() => {
     console.log('Closing import hours dialog');
     setShowImportDialog(false);
-  };
+  }, []);
 
-  const handleFileImport = async (file: File) => {
+  const handleFileImport = useCallback(async (file: File) => {
     try {
       console.log('Starting file import process:', file.name);
       setImportedHours([]); // Reset previous hours
@@ -215,9 +226,9 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error("Error processing file:", error);
       return Promise.reject(error);
     }
-  };
+  }, [teamMembers]);
 
-  const handleConfirmImportedHours = (confirmedHours: ImportedHour[]) => {
+  const handleConfirmImportedHours = useCallback((confirmedHours: ImportedHour[]) => {
     console.log(`Confirming import of ${confirmedHours.length} hour entries`);
     const { processImportedHours } = require('@/services/teamDataService');
     
@@ -240,27 +251,36 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       description: `${confirmedHours.length} uurregistraties succesvol geïmporteerd.`,
       duration: 3000,
     });
-  };
+  }, [teamMembers, addTeamMember, updateTeamMemberHours, toast]);
 
   const handleRefresh = useCallback(async () => {
     try {
       setLoading(true);
+      setRefreshCount(prev => prev + 1); // This helps avoid duplicate refreshes
       await refreshData(true);  // Force refresh the data
-      setLastRefreshTime(Date.now());
       return Promise.resolve();
     } catch (error) {
       console.error("Error refreshing team data:", error);
       return Promise.reject(error);
     } finally {
-      setLoading(false);
+      // Add a small delay before turning off loading state to prevent flicker
+      setTimeout(() => {
+        setLoading(false);
+      }, 300);
     }
   }, [refreshData]);
 
-  // Auto-refresh on mount if needed
+  // Auto-refresh on mount only if needed
   useEffect(() => {
-    if (!dataInitialized && teamId) {
+    let mounted = true;
+    
+    if (!dataInitialized && teamId && mounted) {
       handleRefresh();
     }
+    
+    return () => {
+      mounted = false;
+    };
   }, [dataInitialized, teamId, handleRefresh]);
 
   const value = {

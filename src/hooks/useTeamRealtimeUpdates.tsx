@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -18,6 +19,7 @@ export const useTeamRealtimeUpdates = (
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const periodsRef = useRef(periods);
   const teamMembersRef = useRef(teamMembers);
+  const lastRefreshTimeRef = useRef<number>(Date.now());
   
   useEffect(() => {
     periodsRef.current = periods;
@@ -35,9 +37,17 @@ export const useTeamRealtimeUpdates = (
   const handleDataChange = useCallback(async () => {
     if (refreshingRef.current) return;
     
+    // Add debounce to prevent multiple refreshes in quick succession
+    const now = Date.now();
+    if (now - lastRefreshTimeRef.current < 2000) {
+      console.log('Skipping refresh, too soon after last refresh');
+      return;
+    }
+    
     console.log('Realtime update received, refreshing data...');
     setLastActivity(new Date());
     refreshingRef.current = true;
+    lastRefreshTimeRef.current = now;
     
     try {
       await refreshData();
@@ -52,12 +62,19 @@ export const useTeamRealtimeUpdates = (
       )) {
         setLastError(error.message);
         
-        reconnect();
+        // Don't immediately reconnect on recursion errors, 
+        // wait for the server to recover
+        setTimeout(() => {
+          reconnect();
+        }, 5000);
       } else {
         setLastError(error.message || 'Unknown error refreshing data');
       }
     } finally {
-      refreshingRef.current = false;
+      // Add a small delay before allowing new refreshes
+      setTimeout(() => {
+        refreshingRef.current = false;
+      }, 1000);
     }
   }, [refreshData]);
 
@@ -111,7 +128,8 @@ export const useTeamRealtimeUpdates = (
       
       channelsRef.current.push(statusChannel);
       
-      const teamMembersChannel = supabase.channel('team-members-changes')
+      // Use a single channel with multiple event listeners to reduce the number of connections
+      const dataChannel = supabase.channel('team-data-changes')
         .on(
           'postgres_changes',
           {
@@ -122,11 +140,6 @@ export const useTeamRealtimeUpdates = (
           },
           () => handleDataChange()
         )
-        .subscribe();
-      
-      channelsRef.current.push(teamMembersChannel);
-      
-      const periodsChannel = supabase.channel('periods-changes')
         .on(
           'postgres_changes',
           {
@@ -137,9 +150,6 @@ export const useTeamRealtimeUpdates = (
           },
           () => handleDataChange()
         )
-        .subscribe();
-      
-      const tipsChannel = supabase.channel('tips-changes')
         .on(
           'postgres_changes',
           {
@@ -154,9 +164,6 @@ export const useTeamRealtimeUpdates = (
             }
           }
         )
-        .subscribe();
-      
-      const hoursChannel = supabase.channel('hours-changes')
         .on(
           'postgres_changes',
           {
@@ -173,9 +180,7 @@ export const useTeamRealtimeUpdates = (
         )
         .subscribe();
       
-      channelsRef.current.push(tipsChannel);
-      
-      channelsRef.current.push(hoursChannel);
+      channelsRef.current.push(dataChannel);
       
       console.log('All realtime channels set up successfully');
     } catch (error) {

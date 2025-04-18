@@ -46,6 +46,7 @@ const TeamContent: React.FC = () => {
   const { teamId } = useTeamId();
   const { toast } = useToast();
 
+  // Fix: Pass handleRefresh properly to useTeamRealtimeUpdates instead of toast
   const { 
     connectionState, 
     lastError 
@@ -53,7 +54,7 @@ const TeamContent: React.FC = () => {
     teamId || contextTeamId, 
     periods, 
     teamMembers,
-    toast
+    handleRefresh // This was causing the error - needed to be a function returning Promise<void>
   );
 
   if (loading && !dataInitialized) {

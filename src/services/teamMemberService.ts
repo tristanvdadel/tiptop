@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { TeamMember } from '@/types';
 
@@ -17,11 +16,7 @@ export const fetchAllTeamMembers = async (teamId: string) => {
         balance,
         hours,
         role,
-        user_id,
-        profiles:user_id (
-          first_name,
-          last_name
-        )
+        user_id
       `)
       .eq('team_id', teamId);
     
@@ -32,12 +27,8 @@ export const fetchAllTeamMembers = async (teamId: string) => {
     
     // Transform to application format
     return data.map(member => {
-      // Generate a name from the profile if available, or use a placeholder
-      const firstName = member.profiles?.first_name || '';
-      const lastName = member.profiles?.last_name || '';
-      const displayName = firstName && lastName 
-        ? `${firstName} ${lastName}` 
-        : firstName || lastName || `Member ${member.id.slice(0, 4)}`;
+      // Generate placeholder name since we can't join with profiles
+      const displayName = `Member ${member.id.slice(0, 4)}`;
       
       return {
         id: member.id,

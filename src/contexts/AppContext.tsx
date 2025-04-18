@@ -275,7 +275,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
 
     try {
-      const newTeamMember = await createTeamMemberService(teamId, { name, hourlyRate });
+      const newTeamMember = await createTeamMemberService(teamId, name, hourlyRate);
       setTeamMembers((prevTeamMembers) => [...prevTeamMembers, newTeamMember]);
 
       toast({

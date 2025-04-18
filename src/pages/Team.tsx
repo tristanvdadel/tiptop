@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PayoutSummary } from '@/components/PayoutSummary';
@@ -19,21 +18,18 @@ const Team: React.FC = () => {
   const [needsTeamIdRefresh, setNeedsTeamIdRefresh] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   
-  // Check URL parameters for showing the payout summary
   React.useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const showSummary = urlParams.get('payoutSummary') === 'true';
     console.log("Team.tsx: URL param 'payoutSummary':", showSummary);
     setShowPayoutSummary(showSummary);
     
-    // Check if we need to refresh team ID (from recovery attempt)
     const isRecovery = urlParams.get('recover') === 'true';
     if (isRecovery) {
       setNeedsTeamIdRefresh(true);
     }
   }, [location.search]);
   
-  // Monitor realtime connection status
   useEffect(() => {
     const channel = supabase.channel('global');
     
@@ -57,18 +53,16 @@ const Team: React.FC = () => {
         }
       });
     
-    // Setup connection monitor with auto-recovery
     const connectionMonitor = setInterval(() => {
       if (realtimeStatus === 'disconnected') {
         console.log('Team.tsx: Detected disconnected state, attempting auto-recovery');
-        // Instead of immediately refreshing, try to resubscribe first
         try {
           channel.subscribe();
         } catch (error) {
           console.error('Team.tsx: Error trying to resubscribe:', error);
         }
       }
-    }, 30000); // Check every 30 seconds
+    }, 30000);
     
     return () => {
       clearInterval(connectionMonitor);
@@ -76,7 +70,6 @@ const Team: React.FC = () => {
     };
   }, [realtimeStatus]);
   
-  // Show toast when realtime status changes
   useEffect(() => {
     if (realtimeStatus === 'disconnected') {
       toast({
@@ -94,7 +87,6 @@ const Team: React.FC = () => {
     }
   }, [realtimeStatus, toast]);
   
-  // Retry fetching team ID if needed (for recovery)
   useEffect(() => {
     if (needsTeamIdRefresh) {
       const retryTeamId = async () => {
@@ -109,8 +101,7 @@ const Team: React.FC = () => {
       retryTeamId();
     }
   }, [needsTeamIdRefresh, fetchTeamId]);
-
-  // Handle case where team ID is missing but user is logged in
+  
   const handleRefreshTeamId = async () => {
     toast({
       title: "Bezig met laden",
@@ -124,7 +115,6 @@ const Team: React.FC = () => {
           title: "Team gevonden",
           description: "Je teamgegevens worden geladen.",
         });
-        // Force reload to get a fresh start
         window.location.reload();
       } else {
         toast({
@@ -143,28 +133,22 @@ const Team: React.FC = () => {
     }
   };
 
-  // Handle reconnection attempt when disconnected
   const handleReconnect = () => {
     setRealtimeStatus('connecting');
     
-    // Try a soft reconnect first
     const channel = supabase.channel('reconnect-attempt');
     channel.subscribe((status) => {
       console.log('Team.tsx: Reconnection attempt status:', status);
       if (status === 'SUBSCRIBED') {
-        // Successfully reconnected - refresh the data
-        window.location.reload(); 
+        window.location.reload();
       } else if (status === 'CHANNEL_ERROR') {
-        // If soft reconnect fails, try a full page reload
         console.log('Team.tsx: Soft reconnect failed, attempting full reload');
         window.location.reload();
       }
     });
     
-    // Set a timeout for the reconnection attempt
     setTimeout(() => {
       supabase.removeChannel(channel);
-      // If we still haven't reconnected, force a full reload
       if (realtimeStatus !== 'connected') {
         window.location.reload();
       }
@@ -173,7 +157,6 @@ const Team: React.FC = () => {
 
   console.log("Team.tsx: Rendering Team component with TeamProvider");
   
-  // If we're still loading the team ID, show a loading state
   if (teamIdLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
@@ -186,7 +169,6 @@ const Team: React.FC = () => {
     );
   }
   
-  // If we don't have a team ID but we're not loading, show an error
   if (!teamId && !teamIdLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
@@ -218,11 +200,7 @@ const Team: React.FC = () => {
       
       {showPayoutSummary ? (
         <div className="pb-16">
-          <PayoutSummary onClose={() => {
-            console.log("Team.tsx: Closing payout summary");
-            setShowPayoutSummary(false);
-            location.pathname = '/team';
-          }} />
+          <PayoutSummary />
         </div>
       ) : (
         <TeamContent />

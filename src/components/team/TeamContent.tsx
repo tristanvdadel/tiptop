@@ -22,7 +22,12 @@ const TeamContent: React.FC = () => {
   const {
     teamMembers,
     periods,
-    teamId: contextTeamId
+    teamId: contextTeamId,
+    addTeamMember,
+    removeTeamMember,
+    updateTeamMemberHours,
+    deleteHourRegistration,
+    updateTeamMemberName
   } = useApp();
   
   const { 
@@ -47,10 +52,9 @@ const TeamContent: React.FC = () => {
   } = useTeamRealtimeUpdates(
     teamId || contextTeamId, 
     periods, 
-    teamMembers
+    teamMembers,
+    toast
   );
-
-  // Remove manual refresh methods and consolidate logic
 
   if (loading && !dataInitialized) {
     return <LoadingIndicator />;
@@ -90,6 +94,11 @@ const TeamContent: React.FC = () => {
         <>
           <TeamMemberList 
             teamMembers={sortedTeamMembers}
+            addTeamMember={addTeamMember}
+            removeTeamMember={removeTeamMember}
+            updateTeamMemberHours={updateTeamMemberHours}
+            deleteHourRegistration={deleteHourRegistration}
+            updateTeamMemberName={updateTeamMemberName}
           />
           
           <ImportActions />

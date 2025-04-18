@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -7,30 +6,31 @@ import { supabase } from '@/integrations/supabase/client';
 
 export const getUserTeamsSafe = async (userId?: string) => {
   try {
-    // If no userId is provided, fetch the current user
+    console.log('🔍 Attempting to get user teams', { userId });
+    
     if (!userId) {
       const { data: { user } } = await supabase.auth.getUser();
       userId = user?.id;
       
       if (!userId) {
-        console.error('getUserTeamsSafe: No userId provided and no authenticated user found');
+        console.error('❌ getUserTeamsSafe: No authenticated user found');
         return [];
       }
     }
     
-    // Use RPC function to avoid row-level security recursion issues
+    console.log('🚀 Calling RPC function to get teams safely', { userId });
     const { data, error } = await supabase
       .rpc('get_user_teams_safe', { user_id_param: userId });
     
     if (error) {
-      console.error('getUserTeamsSafe Error:', error);
+      console.error('❌ getUserTeamsSafe RPC Error:', error);
       throw error;
     }
     
+    console.log('✅ Teams retrieved successfully:', data?.length || 0);
     return data || [];
   } catch (error) {
-    console.error('getUserTeamsSafe Unexpected Error:', error);
-    // Return empty array instead of throwing to improve UX with partial data
+    console.error('❌ Unexpected getUserTeamsSafe Error:', error);
     return [];
   }
 };
@@ -42,7 +42,7 @@ export const getTeamMembersSafe = async (teamId: string) => {
       return [];
     }
     
-    // Use RPC function to avoid row-level security recursion issues
+    console.log('🚀 Calling RPC function to get team members safely', { teamId });
     const { data, error } = await supabase
       .rpc('get_team_members_safe', { team_id_param: teamId });
     
@@ -51,6 +51,7 @@ export const getTeamMembersSafe = async (teamId: string) => {
       throw error;
     }
     
+    console.log('✅ Team members retrieved successfully:', data?.length || 0);
     return data || [];
   } catch (error) {
     console.error('getTeamMembersSafe Unexpected Error:', error);
@@ -66,7 +67,7 @@ export const checkTeamMembershipSafe = async (userId: string, teamId: string) =>
       return false;
     }
     
-    // Use RPC function to avoid row-level security recursion issues
+    console.log('🚀 Calling RPC function to check team membership safely', { userId, teamId });
     const { data, error } = await supabase
       .rpc('check_team_membership_safe', { 
         user_id_param: userId,
@@ -78,6 +79,7 @@ export const checkTeamMembershipSafe = async (userId: string, teamId: string) =>
       throw error;
     }
     
+    console.log('✅ Team membership check result:', !!data);
     return !!data;
   } catch (error) {
     console.error('checkTeamMembershipSafe Unexpected Error:', error);
@@ -92,7 +94,7 @@ export const checkTeamAdminSafe = async (userId: string, teamId: string) => {
       return false;
     }
     
-    // Use RPC function to avoid row-level security recursion issues
+    console.log('🚀 Calling RPC function to check team admin safely', { userId, teamId });
     const { data, error } = await supabase
       .rpc('check_team_admin_safe', { 
         user_id_param: userId,
@@ -104,6 +106,7 @@ export const checkTeamAdminSafe = async (userId: string, teamId: string) => {
       throw error;
     }
     
+    console.log('✅ Team admin check result:', !!data);
     return !!data;
   } catch (error) {
     console.error('checkTeamAdminSafe Unexpected Error:', error);

@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTeamChannels } from './useTeamChannels';
 import { useTeamConnection } from './useTeamConnection';
 import type { ConnectionState } from './useTeamConnection';
@@ -19,11 +19,8 @@ export const useTeamRealtimeUpdates = (
     setConnectionState,
     lastError,
     setLastError,
-    retryCount,
-    setRetryCount,
     lastActivity,
     setLastActivity,
-    handleDatabaseRecursionError,
     reconnect: triggerReconnect
   } = useTeamConnection(() => {
     setupChannels();
@@ -34,21 +31,10 @@ export const useTeamRealtimeUpdates = (
       setLastActivity(new Date());
       await refreshData();
       setLastError(null);
+      setRefreshCount(prev => prev + 1);
     } catch (error: any) {
       console.error('Error refreshing data:', error);
-      
-      if (error.message && (
-          error.message.includes('recursion') || 
-          error.message.includes('infinity') ||
-          error.code === '42P17'
-      )) {
-        setLastError(error.message);
-        setTimeout(() => {
-          reconnect();
-        }, 5000);
-      } else {
-        setLastError(error.message || 'Unknown error refreshing data');
-      }
+      setLastError(error.message || 'Unknown error refreshing data');
     }
   }, [refreshData, setLastActivity, setLastError]);
 
@@ -60,7 +46,7 @@ export const useTeamRealtimeUpdates = (
   );
 
   const reconnect = useCallback(() => {
-    console.log('Attempting to reconnect realtime channels...');
+    console.log('Reconnecting realtime channels...');
     setConnectionState('connecting');
     cleanupChannels();
     triggerReconnect();
@@ -73,35 +59,25 @@ export const useTeamRealtimeUpdates = (
     
     return () => {
       cleanupChannels();
-      
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-      }
     };
   }, [teamId, setupChannels, cleanupChannels]);
 
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
+  // Gezondheidscheck om connectie te bevestigen
   useEffect(() => {
     const heartbeatInterval = setInterval(() => {
       if (connectionState === 'connected') {
-        const now = new Date();
-        const timeSinceLastActivity = now.getTime() - lastActivity.getTime();
-        
-        if (timeSinceLastActivity > 5 * 60 * 1000) {
-          console.log('Connection may be stale, reconnecting...');
-          reconnect();
-        }
+        setLastActivity(new Date());
       }
     }, 60000);
     
     return () => clearInterval(heartbeatInterval);
-  }, [connectionState, lastActivity, reconnect]);
+  }, [connectionState, setLastActivity]);
 
   return {
     connectionState,
     reconnect,
     lastError,
-    lastActivity
+    lastActivity,
+    refreshCount
   };
 };

@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { StatusIndicator } from '@/components/ui/status-indicator';
 
 interface LoadingStateProps {
   isLoading: boolean;
@@ -21,15 +20,14 @@ interface LoadingStateProps {
 export const LoadingState: React.FC<LoadingStateProps> = ({
   isLoading,
   children,
-  delay = 700,
-  minDuration = 1000,
+  delay = 300,
+  minDuration = 500,
   className,
   loadingComponent,
   instant = false,
   backgroundLoad = false,
   errorMessage = null,
-  onRetry,
-  retryButtonText
+  onRetry
 }) => {
   const [showLoading, setShowLoading] = useState(false);
   const [shouldRender, setShouldRender] = useState(!isLoading);
@@ -92,21 +90,6 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   // For background loading, just render children with no visual change
   if (backgroundLoad) {
     return <div className={className}>{children}</div>;
-  }
-  
-  // Show error message if there is one
-  if (errorMessage) {
-    return (
-      <div className={className}>
-        <StatusIndicator
-          type="error"
-          title="Fout bij laden van gegevens"
-          message={errorMessage}
-          actionLabel={retryButtonText || (onRetry ? "Probeer opnieuw" : undefined)}
-          onAction={onRetry}
-        />
-      </div>
-    );
   }
 
   return (

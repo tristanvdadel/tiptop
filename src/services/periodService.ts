@@ -4,35 +4,52 @@ import { Period } from '@/types';
 
 export const fetchTeamPeriods = async (teamId: string): Promise<Period[]> => {
   try {
-    const { data, error } = await supabase
-      .from('periods')
-      .select('*')
-      .eq('team_id', teamId)
-      .order('start_date', { ascending: false });
+    // Retry mechanisme toevoegen voor betere stabiliteit
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { data, error } = await supabase
+          .from('periods')
+          .select('*')
+          .eq('team_id', teamId)
+          .order('start_date', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching periods:', error);
-      return [];
+        if (error) {
+          console.error(`Error fetching periods (attempt ${attempt + 1}):`, error);
+          // Bij eerste poging even wachten en opnieuw proberen
+          if (attempt === 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            continue;
+          }
+          return [];
+        }
+
+        return data.map(p => ({
+          id: p.id,
+          name: p.name || `Period ${p.id.slice(0, 4)}`,
+          startDate: p.start_date,
+          endDate: p.end_date || undefined,
+          isCurrent: p.is_active === true,
+          isPaid: p.is_paid === true,
+          tips: [],
+          autoCloseDate: p.auto_close_date,
+          averageTipPerHour: p.average_tip_per_hour || 0,
+          isActive: p.is_active
+        }));
+      } catch (innerError) {
+        console.error(`Unexpected error in fetchTeamPeriods (attempt ${attempt + 1}):`, innerError);
+        if (attempt === 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
     }
-
-    return data.map(p => ({
-      id: p.id,
-      name: p.name || `Period ${p.id.slice(0, 4)}`,
-      startDate: p.start_date,
-      endDate: p.end_date || undefined,
-      isCurrent: p.is_active === true,
-      isPaid: p.is_paid === true,
-      tips: [],
-      autoCloseDate: p.auto_close_date,
-      averageTipPerHour: p.average_tip_per_hour || 0,
-      isActive: p.is_active
-    }));
+    return [];
   } catch (error) {
-    console.error('Error in fetchTeamPeriods:', error);
+    console.error('Critical error in fetchTeamPeriods:', error);
     return [];
   }
 };
 
+// Voeg de rest van de functies toe zonder wijzigingen
 export const savePeriod = async (teamId: string, periodData: Partial<Period>): Promise<Period> => {
   try {
     const { data, error } = await supabase

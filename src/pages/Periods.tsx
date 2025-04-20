@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Period } from '@/types';
 import { format } from 'date-fns';
@@ -17,19 +17,17 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/loading-state';
 import { StatusIndicator } from '@/components/ui/status-indicator';
-import { CalendarDays, ArrowUpDown, Check, Clock, RefreshCcw } from 'lucide-react';
+import { CalendarDays, ArrowUpDown, Check, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const Periods = () => {
   const { periods, refreshTeamData, updatePeriod } = useApp();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [sortedPeriods, setSortedPeriods] = useState<Period[]>([]);
   const [contentVisible, setContentVisible] = useState(false);
-  const initialLoadDoneRef = useRef(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -53,50 +51,48 @@ const Periods = () => {
     sortPeriods();
   }, [periods, sortDirection]);
 
-  const loadPeriods = useCallback(async (forceRefresh = false) => {
-    if (!initialLoadDoneRef.current || forceRefresh) {
-      setLoading(true);
-      setError(null);
-    }
-
+  // Verbeterde laadmethode die automatisch laadt en vernieuwt
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    
     try {
       await refreshTeamData();
-      setError(null);
-      initialLoadDoneRef.current = true;
       setInitialized(true);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error loading periods:', error);
-      setError("Kon periodegegevens niet laden. Probeer het opnieuw.");
     } finally {
       setLoading(false);
     }
   }, [refreshTeamData]);
 
+  // Automatisch periodiek verversen op de achtergrond
   useEffect(() => {
-    loadPeriods();
+    // Eerste keer laden
+    loadData();
     
-    // Set up periodic background refresh
+    // Automatisch verversen elke 2 minuten
     const refreshInterval = setInterval(() => {
-      if (initialLoadDoneRef.current) {
-        refreshTeamData().catch(error => {
-          console.error("Background refresh error:", error);
-        });
-      }
-    }, 60000);
+      refreshTeamData().catch(error => {
+        console.error("Background refresh error:", error);
+      });
+    }, 120000);
     
     return () => {
       clearInterval(refreshInterval);
     };
-  }, [refreshTeamData, loadPeriods]);
-
+  }, [refreshTeamData, loadData]);
+  
+  // Verandert de sortering
   const handleToggleSort = () => {
     setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
   };
 
+  // Formatteert een datum
   const formatPeriodDate = (date: string) => {
     return format(new Date(date), 'd MMMM yyyy', { locale: nl });
   };
 
+  // Markeert een periode als uitbetaald
   const handleMarkAsPaid = async (periodId: string) => {
     try {
       await updatePeriod(periodId, { isPaid: true });
@@ -114,10 +110,6 @@ const Periods = () => {
     }
   };
 
-  const handleRefresh = () => {
-    loadPeriods(true);
-  };
-
   return (
     <div className={`space-y-6 transition-opacity duration-500 ${contentVisible ? 'opacity-100' : 'opacity-0'}`}>
       <div className="flex items-center justify-between">
@@ -125,16 +117,10 @@ const Periods = () => {
         
         <div className="flex gap-2">
           <Button 
-            onClick={handleRefresh} 
+            onClick={handleToggleSort} 
             variant="outline" 
-            size="sm" 
-            className="flex items-center gap-1"
-            disabled={loading}
+            size="sm"
           >
-            <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            {loading ? 'Laden...' : 'Vernieuwen'}
-          </Button>
-          <Button onClick={handleToggleSort} variant="outline" size="sm">
             <ArrowUpDown className="h-4 w-4 mr-2" />
             {sortDirection === 'asc' ? 'Oudste eerst' : 'Nieuwste eerst'}
           </Button>
@@ -145,10 +131,7 @@ const Periods = () => {
         isLoading={loading && !initialized} 
         delay={500}
         minDuration={800}
-        backgroundLoad={initialized && !error}
-        errorMessage={error}
-        onRetry={handleRefresh}
-        retryButtonText="Probeer opnieuw"
+        backgroundLoad={initialized}
       >
         <Card>
           <CardHeader className="pb-3">

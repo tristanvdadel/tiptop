@@ -10,11 +10,7 @@ export const useTeamChannels = (
   onDataChange: () => Promise<void>
 ) => {
   const channelsRef = useRef<RealtimeChannel[]>([]);
-  const refreshingRef = useRef<boolean>(false);
-  const periodsRef = useRef(periods);
-  const teamMembersRef = useRef(teamMembers);
   const lastRefreshTimeRef = useRef<number>(Date.now());
-  const pendingRefreshRef = useRef<NodeJS.Timeout | null>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const cleanupChannels = useCallback(() => {
@@ -29,57 +25,28 @@ export const useTeamChannels = (
   }, []);
 
   const handleDataChange = useCallback(() => {
-    if (refreshingRef.current) {
-      console.log('Already refreshing, skipping refresh request');
-      return;
-    }
-    
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
-    if (pendingRefreshRef.current) {
-      clearTimeout(pendingRefreshRef.current);
-    }
     
-    // Verhoogd naar 800ms voor betere debounce en minder flikkering
-    debounceTimeoutRef.current = setTimeout(() => {
+    // Gebruik een korte debounce om te voorkomen dat we te veel updates tegelijk doen
+    debounceTimeoutRef.current = setTimeout(async () => {
       const now = Date.now();
       const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
       
-      // Verhoogd naar 2000ms om meerdere snelle updates te groeperen
+      // Voorkom te snelle updates (minimaal 2 seconden tussen updates)
       if (timeSinceLastRefresh < 2000) {
-        console.log('Debouncing refresh, too soon after last refresh:', timeSinceLastRefresh, 'ms');
-        
-        pendingRefreshRef.current = setTimeout(() => {
-          handleDataChange();
-        }, 2000 - timeSinceLastRefresh);
-        
         return;
       }
       
-      console.log('Realtime update received, refreshing data...');
-      refreshingRef.current = true;
       lastRefreshTimeRef.current = now;
       
       try {
-        // Verhoogd naar 800ms voor betere visuele stabiliteit
-        pendingRefreshRef.current = setTimeout(async () => {
-          try {
-            await onDataChange();
-          } catch (error) {
-            console.error('Error refreshing data after realtime update:', error);
-          } finally {
-            // Verhoogd naar 2000ms om herhaalde updates uit te stellen
-            setTimeout(() => {
-              refreshingRef.current = false;
-            }, 2000);
-          }
-        }, 800);
+        await onDataChange();
       } catch (error) {
-        console.error('Error setting up refresh:', error);
-        refreshingRef.current = false;
+        console.error('Error refreshing data after realtime update:', error);
       }
-    }, 800);  // Verhoogd naar 800ms
+    }, 500);
   }, [onDataChange]);
 
   const setupChannels = useCallback(() => {
@@ -89,15 +56,11 @@ export const useTeamChannels = (
     }
 
     cleanupChannels();
-    console.log(`Setting up realtime channels for team ${teamId}...`);
     
     try {
       const mainChannel = supabase.channel('team-realtime-all')
         .on('presence', { event: 'sync' }, () => {
           console.log('Connection synced');
-        })
-        .on('system', { event: 'disconnect' }, () => {
-          console.log('Disconnected from Supabase realtime');
         })
         .on(
           'postgres_changes',
@@ -128,7 +91,7 @@ export const useTeamChannels = (
           },
           async (payload) => {
             const periodId = payload.new && 'period_id' in payload.new ? payload.new.period_id : undefined;
-            if (periodId && periodsRef.current.some(p => p.id === periodId)) {
+            if (periodId && periods.some(p => p.id === periodId)) {
               handleDataChange();
             }
           }
@@ -142,21 +105,18 @@ export const useTeamChannels = (
           },
           async (payload) => {
             const teamMemberId = payload.new && 'team_member_id' in payload.new ? payload.new.team_member_id : undefined;
-            if (teamMemberId && teamMembersRef.current.some(m => m.id === teamMemberId)) {
+            if (teamMemberId && teamMembers.some(m => m.id === teamMemberId)) {
               handleDataChange();
             }
           }
         )
-        .subscribe(status => {
-          console.log(`Channel status: ${status}`);
-        });
+        .subscribe();
       
       channelsRef.current.push(mainChannel);
-      console.log('Realtime channel set up successfully');
     } catch (error) {
       console.error('Error setting up realtime channels:', error);
     }
-  }, [teamId, handleDataChange, cleanupChannels]);
+  }, [teamId, handleDataChange, cleanupChannels, periods, teamMembers]);
 
   return {
     setupChannels,

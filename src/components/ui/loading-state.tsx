@@ -15,6 +15,7 @@ interface LoadingStateProps {
   backgroundLoad?: boolean;
   errorMessage?: string | null;
   onRetry?: () => void;
+  retryButtonText?: string; // Added missing prop
 }
 
 export const LoadingState: React.FC<LoadingStateProps> = ({
@@ -27,7 +28,8 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   instant = false,
   backgroundLoad = false,
   errorMessage = null,
-  onRetry
+  onRetry,
+  retryButtonText // Add the new prop
 }) => {
   const [showLoading, setShowLoading] = useState(false);
   const [shouldRender, setShouldRender] = useState(!isLoading);
@@ -136,7 +138,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
           type="error"
           title="Fout bij laden van gegevens"
           message={errorMessage}
-          actionLabel={onRetry ? "Probeer opnieuw" : undefined}
+          actionLabel={retryButtonText || (onRetry ? "Probeer opnieuw" : undefined)}
           onAction={onRetry}
         />
       </div>

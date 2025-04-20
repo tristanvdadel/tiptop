@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Period } from '@/types';
@@ -37,7 +36,6 @@ const Periods = () => {
   const retryCountRef = useRef(0);
   const { toast } = useToast();
 
-  // Fade in content once initially rendered
   useEffect(() => {
     const timer = setTimeout(() => {
       setContentVisible(true);
@@ -46,7 +44,6 @@ const Periods = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Sort periods
   useEffect(() => {
     const sortPeriods = () => {
       const sorted = [...periods].sort((a, b) => {
@@ -60,13 +57,11 @@ const Periods = () => {
     sortPeriods();
   }, [periods, sortDirection]);
 
-  // Handle recursion errors by clearing cached data
   const handleDatabaseRecursionError = useCallback(() => {
     console.log("Handling database recursion error...");
     localStorage.removeItem('sb-auth-token-cached');
     localStorage.removeItem('last_team_id');
     
-    // Clear team-specific cached data
     const teamDataKeys = Object.keys(localStorage).filter(
       key => key.startsWith('team_data_') || key.includes('analytics_')
     );
@@ -78,13 +73,11 @@ const Periods = () => {
       duration: 3000,
     });
     
-    // Delay before reload to allow toast to show
     setTimeout(() => {
       window.location.reload();
     }, 1500);
   }, [toast]);
 
-  // Initial data loading
   const loadPeriods = useCallback(async (forceRefresh = false) => {
     if (forceRefresh || !initialLoadDoneRef.current) {
       setLoading(true);
@@ -99,7 +92,6 @@ const Periods = () => {
     } catch (error: any) {
       console.error('Error loading periods:', error);
       
-      // Check for recursion errors
       if (error.code === '42P17' || 
           (error.message && (
             error.message.includes('recursion') || 
@@ -114,7 +106,6 @@ const Periods = () => {
       if (!initialLoadDoneRef.current || forceRefresh) {
         setError("Kon periodegegevens niet laden. Probeer het opnieuw.");
         
-        // Auto-retry a few times for transient errors
         if (retryCountRef.current < 2) {
           retryCountRef.current++;
           setTimeout(() => {
@@ -123,9 +114,7 @@ const Periods = () => {
         }
       }
     } finally {
-      // Only delay hiding loading if this is the first load
       if (!initialLoadDoneRef.current || forceRefresh) {
-        // Add minimum loading time to prevent flickering
         if (loadingTimeoutRef.current) {
           clearTimeout(loadingTimeoutRef.current);
         }
@@ -134,9 +123,8 @@ const Periods = () => {
           setLoading(false);
           initialLoadDoneRef.current = true;
           setInitialized(true);
-        }, 800); // Minimum loading time
+        }, 800);
       } else {
-        // For background refreshes, don't show loading indicator
         setLoading(false);
       }
     }
@@ -145,14 +133,11 @@ const Periods = () => {
   useEffect(() => {
     loadPeriods();
 
-    // Set up periodic background refresh
     const backgroundRefreshInterval = setInterval(() => {
       if (initialLoadDoneRef.current && !error && !showRecursionAlert) {
-        // This will run without showing loading indicators
         refreshTeamData().catch(error => {
           console.error("Background refresh error:", error);
           
-          // Check for recursion errors during background refresh
           if (error.code === '42P17' || 
               (error.message && error.message.includes('recursion'))) {
             setShowRecursionAlert(true);
@@ -160,8 +145,8 @@ const Periods = () => {
           }
         });
       }
-    }, 60000); // Refresh every minute in the background
-    
+    }, 60000);
+
     return () => {
       clearInterval(backgroundRefreshInterval);
       if (loadingTimeoutRef.current) {
@@ -199,7 +184,6 @@ const Periods = () => {
     loadPeriods(true);
   };
 
-  // If there's a recursion error, show a prominent alert
   if (showRecursionAlert) {
     return (
       <div className="space-y-6 transition-opacity duration-300 opacity-100">

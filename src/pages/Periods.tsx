@@ -17,14 +17,17 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/loading-state';
 import { StatusIndicator } from '@/components/ui/status-indicator';
-import { CalendarDays, ArrowUpDown, Check, Clock } from 'lucide-react';
+import { CalendarDays, ArrowUpDown, Check, Clock, Database, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const Periods = () => {
-  const { periods, refreshTeamData, updatePeriod, startNewPeriod, endCurrentPeriod } = useApp();
+  const { periods, refreshTeamData, updatePeriod } = useApp();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRecursionAlert, setShowRecursionAlert] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [sortedPeriods, setSortedPeriods] = useState<Period[]>([]);
@@ -58,7 +61,7 @@ const Periods = () => {
   }, [periods, sortDirection]);
 
   // Handle recursion errors by clearing cached data
-  const handleRecursionError = useCallback(() => {
+  const handleDatabaseRecursionError = useCallback(() => {
     console.log("Handling database recursion error...");
     localStorage.removeItem('sb-auth-token-cached');
     localStorage.removeItem('last_team_id');
@@ -71,14 +74,14 @@ const Periods = () => {
     
     toast({
       title: "Database probleem opgelost",
-      description: "De cache is gewist en de beveiligingsproblemen zijn opgelost.",
+      description: "De cache is gewist en de beveiligingsproblemen zijn opgelost. De pagina wordt opnieuw geladen.",
       duration: 3000,
     });
     
-    // Retry loading data after fixing
+    // Delay before reload to allow toast to show
     setTimeout(() => {
-      loadPeriods(true);
-    }, 1000);
+      window.location.reload();
+    }, 1500);
   }, [toast]);
 
   // Initial data loading
@@ -86,6 +89,7 @@ const Periods = () => {
     if (forceRefresh || !initialLoadDoneRef.current) {
       setLoading(true);
       setError(null);
+      setShowRecursionAlert(false);
     }
 
     try {
@@ -97,7 +101,12 @@ const Periods = () => {
       
       // Check for recursion errors
       if (error.code === '42P17' || 
-          (error.message && error.message.includes('recursion'))) {
+          (error.message && (
+            error.message.includes('recursion') || 
+            error.message.includes('infinity') ||
+            error.message.includes('RLS')
+          ))) {
+        setShowRecursionAlert(true);
         setError("Database beveiligingsprobleem gedetecteerd. Klik op 'Herstel database' om het probleem op te lossen.");
         return;
       }
@@ -131,17 +140,24 @@ const Periods = () => {
         setLoading(false);
       }
     }
-  }, [refreshTeamData, toast]);
+  }, [refreshTeamData]);
 
   useEffect(() => {
     loadPeriods();
 
     // Set up periodic background refresh
     const backgroundRefreshInterval = setInterval(() => {
-      if (initialLoadDoneRef.current && !error) {
+      if (initialLoadDoneRef.current && !error && !showRecursionAlert) {
         // This will run without showing loading indicators
         refreshTeamData().catch(error => {
           console.error("Background refresh error:", error);
+          
+          // Check for recursion errors during background refresh
+          if (error.code === '42P17' || 
+              (error.message && error.message.includes('recursion'))) {
+            setShowRecursionAlert(true);
+            setError("Database beveiligingsprobleem gedetecteerd. Klik op 'Herstel database' om het probleem op te lossen.");
+          }
         });
       }
     }, 60000); // Refresh every minute in the background
@@ -152,7 +168,7 @@ const Periods = () => {
         clearTimeout(loadingTimeoutRef.current);
       }
     };
-  }, [refreshTeamData, loadPeriods, error]);
+  }, [refreshTeamData, loadPeriods, error, showRecursionAlert]);
 
   const handleToggleSort = () => {
     setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -183,12 +199,47 @@ const Periods = () => {
     loadPeriods(true);
   };
 
+  // If there's a recursion error, show a prominent alert
+  if (showRecursionAlert) {
+    return (
+      <div className="space-y-6 transition-opacity duration-300 opacity-100">
+        <h1 className="text-2xl font-bold tracking-tight">Periodes</h1>
+        
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-5 w-5" />
+          <AlertTitle>Database beveiligingsprobleem</AlertTitle>
+          <AlertDescription className="space-y-4">
+            <p>Er is een probleem met de database beveiliging gedetecteerd (recursie in RLS policy). Dit probleem kan het laden van gegevens blokkeren.</p>
+            <Button 
+              onClick={handleDatabaseRecursionError} 
+              variant="outline" 
+              className="flex items-center gap-2"
+            >
+              <Database className="h-4 w-4" />
+              Herstel Database
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className={`space-y-6 transition-opacity duration-500 ${contentVisible ? 'opacity-100' : 'opacity-0'}`}>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Periodes</h1>
         
         <div className="flex gap-2">
+          <Button 
+            onClick={handleRefresh} 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center gap-1"
+            disabled={loading}
+          >
+            <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? 'Laden...' : 'Vernieuwen'}
+          </Button>
           <Button onClick={handleToggleSort} variant="outline" size="sm">
             <ArrowUpDown className="h-4 w-4 mr-2" />
             {sortDirection === 'asc' ? 'Oudste eerst' : 'Nieuwste eerst'}
@@ -202,7 +253,8 @@ const Periods = () => {
         minDuration={800}
         backgroundLoad={initialized && !error}
         errorMessage={error}
-        onRetry={error?.includes('recursion') ? handleRecursionError : handleRefresh}
+        onRetry={error && error.includes('beveiligingsprobleem') ? handleDatabaseRecursionError : handleRefresh}
+        retryButtonText={error && error.includes('beveiligingsprobleem') ? 'Herstel Database' : 'Probeer opnieuw'}
       >
         <Card>
           <CardHeader className="pb-3">

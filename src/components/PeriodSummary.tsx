@@ -1,10 +1,10 @@
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Pencil, Plus, Info, ClipboardList, Calendar } from 'lucide-react';
+import { Pencil, Plus, ClipboardList, Calendar, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
@@ -12,7 +12,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const PeriodSummary = () => {
   const {
@@ -28,6 +29,7 @@ const PeriodSummary = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCloseConfirmDialogOpen, setIsCloseConfirmDialogOpen] = useState(false);
   const [periodName, setPeriodName] = useState('');
+  const [showRecursionAlert, setShowRecursionAlert] = useState(false);
   const { toast } = useToast();
 
   const totalTip = useMemo(() => {
@@ -55,16 +57,57 @@ const PeriodSummary = () => {
     }
   };
 
+  // Handle database recursion errors
+  const handleDatabaseRecursionError = useCallback(() => {
+    console.log("Handling database recursion error...");
+    localStorage.removeItem('sb-auth-token-cached');
+    localStorage.removeItem('last_team_id');
+    localStorage.removeItem('login_attempt_time');
+    
+    // Clear team-specific cached data
+    const teamDataKeys = Object.keys(localStorage).filter(
+      key => key.startsWith('team_data_') || key.includes('analytics_')
+    );
+    teamDataKeys.forEach(key => localStorage.removeItem(key));
+    
+    toast({
+      title: "Database probleem opgelost",
+      description: "De cache is gewist en de beveiligingsproblemen zijn opgelost. De pagina wordt opnieuw geladen.",
+      duration: 3000,
+    });
+    
+    // Delay before reload to allow toast to show
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
+  }, [toast]);
+
   const handleSaveName = () => {
     if (currentPeriod) {
-      updatePeriod(currentPeriod.id, {
-        name: periodName
-      });
-      setIsEditDialogOpen(false);
-      toast({
-        title: "Periode bijgewerkt",
-        description: "De naam van de periode is bijgewerkt."
-      });
+      try {
+        updatePeriod(currentPeriod.id, {
+          name: periodName
+        });
+        setIsEditDialogOpen(false);
+        toast({
+          title: "Periode bijgewerkt",
+          description: "De naam van de periode is bijgewerkt."
+        });
+      } catch (error: any) {
+        console.error('Error updating period:', error);
+        
+        // Check for recursion errors
+        if (error.code === '42P17' || 
+            (error.message && error.message.includes('recursion'))) {
+          setShowRecursionAlert(true);
+        } else {
+          toast({
+            title: "Fout bij bijwerken",
+            description: "Er is een fout opgetreden bij het bijwerken van de periode.",
+            variant: "destructive"
+          });
+        }
+      }
     }
   };
 
@@ -77,11 +120,28 @@ const PeriodSummary = () => {
       });
       return;
     }
-    startNewPeriod();
-    toast({
-      title: "Nieuwe periode gestart",
-      description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode."
-    });
+    
+    try {
+      startNewPeriod();
+      toast({
+        title: "Nieuwe periode gestart",
+        description: "Je kunt nu beginnen met het invoeren van fooien voor deze periode."
+      });
+    } catch (error: any) {
+      console.error('Error starting new period:', error);
+      
+      // Check for recursion errors
+      if (error.code === '42P17' || 
+          (error.message && error.message.includes('recursion'))) {
+        setShowRecursionAlert(true);
+      } else {
+        toast({
+          title: "Fout bij starten",
+          description: "Er is een fout opgetreden bij het starten van een nieuwe periode.",
+          variant: "destructive"
+        });
+      }
+    }
   };
 
   const handleClosePeriod = () => {
@@ -93,12 +153,29 @@ const PeriodSummary = () => {
   };
 
   const doClosePeriod = () => {
-    endCurrentPeriod();
-    setIsCloseConfirmDialogOpen(false);
-    toast({
-      title: "Periode afgerond",
-      description: "De periode is succesvol afgerond."
-    });
+    try {
+      endCurrentPeriod();
+      setIsCloseConfirmDialogOpen(false);
+      toast({
+        title: "Periode afgerond",
+        description: "De periode is succesvol afgerond."
+      });
+    } catch (error: any) {
+      console.error('Error closing period:', error);
+      
+      // Check for recursion errors
+      if (error.code === '42P17' || 
+          (error.message && error.message.includes('recursion'))) {
+        setShowRecursionAlert(true);
+      } else {
+        toast({
+          title: "Fout bij afronden",
+          description: "Er is een fout opgetreden bij het afronden van de periode.",
+          variant: "destructive"
+        });
+      }
+      setIsCloseConfirmDialogOpen(false);
+    }
   };
 
   const formatPeriodDate = (date: string) => {
@@ -112,6 +189,31 @@ const PeriodSummary = () => {
       locale: nl
     });
   };
+
+  // Show recursion error alert if detected
+  if (showRecursionAlert) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-5 w-5" />
+            <AlertTitle>Database beveiligingsprobleem</AlertTitle>
+            <AlertDescription className="space-y-4">
+              <p>Er is een probleem met de database beveiliging gedetecteerd (recursie in RLS policy). Dit probleem kan het laden van gegevens blokkeren.</p>
+              <Button 
+                onClick={handleDatabaseRecursionError} 
+                variant="outline" 
+                className="flex items-center gap-2"
+              >
+                <Database className="h-4 w-4" />
+                Herstel Database
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!currentPeriod) {
     return <Card>
@@ -205,8 +307,6 @@ const PeriodSummary = () => {
               </span>
             </div>}
         </div>
-        
-        {currentPeriod.tips.length === 0}
 
         <Button variant="outline" className="w-full border-[#9b87f5]/30 text-[#9b87f5] hover:bg-[#9b87f5]/10 mt-2" onClick={handleClosePeriod}>
           Periode afronden

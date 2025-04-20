@@ -1,10 +1,10 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTeamId } from '@/hooks/useTeamId';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface TeamMemberDataProps {
@@ -36,7 +36,7 @@ export const TeamMemberData = ({
   const { toast } = useToast();
 
   // Function to handle database recursion error
-  const handleDatabaseRecursionError = () => {
+  const handleDatabaseRecursionError = useCallback(() => {
     console.log("Handling database recursion error...");
     localStorage.removeItem('sb-auth-token-cached');
     localStorage.removeItem('last_team_id');
@@ -56,9 +56,9 @@ export const TeamMemberData = ({
     
     // Delay before reload to allow toast to show
     setTimeout(() => {
-      window.location.href = '/team';
-    }, 1000);
-  };
+      window.location.reload();
+    }, 1500);
+  }, [toast]);
 
   // Attempt to load teams using the RPC safe function
   const loadTeamsSafely = async (userId: string) => {
@@ -105,6 +105,7 @@ export const TeamMemberData = ({
         // Check if we got a recursion error and try the safe RPC function
         if (teamsError && (
           teamsError.message.includes('recursion') || 
+          teamsError.message.includes('infinity') ||
           teamsError.code === '42P17'
         )) {
           console.log('Detected recursion error, trying RPC function');
@@ -239,7 +240,8 @@ export const TeamMemberData = ({
         <AlertTitle>Database beveiligingsprobleem</AlertTitle>
         <AlertDescription className="space-y-4">
           <p>Er is een probleem met de database beveiliging gedetecteerd (recursie in RLS policy). Dit probleem kan het laden van gegevens blokkeren.</p>
-          <Button onClick={handleDatabaseRecursionError} variant="outline">
+          <Button onClick={handleDatabaseRecursionError} variant="outline" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
             Herstel Database
           </Button>
         </AlertDescription>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Period } from '@/types';
@@ -16,24 +17,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/loading-state';
 import { StatusIndicator } from '@/components/ui/status-indicator';
-import { CalendarDays, ArrowUpDown, Check, Clock, Database, RefreshCcw } from 'lucide-react';
+import { CalendarDays, ArrowUpDown, Check, Clock, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
 
 const Periods = () => {
   const { periods, refreshTeamData, updatePeriod } = useApp();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showRecursionAlert, setShowRecursionAlert] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [sortedPeriods, setSortedPeriods] = useState<Period[]>([]);
   const [contentVisible, setContentVisible] = useState(false);
   const initialLoadDoneRef = useRef(false);
-  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const retryCountRef = useRef(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -57,103 +53,41 @@ const Periods = () => {
     sortPeriods();
   }, [periods, sortDirection]);
 
-  const handleDatabaseRecursionError = useCallback(() => {
-    console.log("Handling database recursion error...");
-    localStorage.removeItem('sb-auth-token-cached');
-    localStorage.removeItem('last_team_id');
-    
-    const teamDataKeys = Object.keys(localStorage).filter(
-      key => key.startsWith('team_data_') || key.includes('analytics_')
-    );
-    teamDataKeys.forEach(key => localStorage.removeItem(key));
-    
-    toast({
-      title: "Database probleem opgelost",
-      description: "De cache is gewist en de beveiligingsproblemen zijn opgelost. De pagina wordt opnieuw geladen.",
-      duration: 3000,
-    });
-    
-    setTimeout(() => {
-      window.location.reload();
-    }, 1500);
-  }, [toast]);
-
   const loadPeriods = useCallback(async (forceRefresh = false) => {
-    if (forceRefresh || !initialLoadDoneRef.current) {
+    if (!initialLoadDoneRef.current || forceRefresh) {
       setLoading(true);
       setError(null);
-      setShowRecursionAlert(false);
     }
 
     try {
       await refreshTeamData();
       setError(null);
-      retryCountRef.current = 0;
+      initialLoadDoneRef.current = true;
+      setInitialized(true);
     } catch (error: any) {
       console.error('Error loading periods:', error);
-      
-      if (error.code === '42P17' || 
-          (error.message && (
-            error.message.includes('recursion') || 
-            error.message.includes('infinity') ||
-            error.message.includes('RLS')
-          ))) {
-        setShowRecursionAlert(true);
-        setError("Database beveiligingsprobleem gedetecteerd. Klik op 'Herstel database' om het probleem op te lossen.");
-        return;
-      }
-      
-      if (!initialLoadDoneRef.current || forceRefresh) {
-        setError("Kon periodegegevens niet laden. Probeer het opnieuw.");
-        
-        if (retryCountRef.current < 2) {
-          retryCountRef.current++;
-          setTimeout(() => {
-            loadPeriods(true);
-          }, 3000);
-        }
-      }
+      setError("Kon periodegegevens niet laden. Probeer het opnieuw.");
     } finally {
-      if (!initialLoadDoneRef.current || forceRefresh) {
-        if (loadingTimeoutRef.current) {
-          clearTimeout(loadingTimeoutRef.current);
-        }
-        
-        loadingTimeoutRef.current = setTimeout(() => {
-          setLoading(false);
-          initialLoadDoneRef.current = true;
-          setInitialized(true);
-        }, 800);
-      } else {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   }, [refreshTeamData]);
 
   useEffect(() => {
     loadPeriods();
-
-    const backgroundRefreshInterval = setInterval(() => {
-      if (initialLoadDoneRef.current && !error && !showRecursionAlert) {
+    
+    // Set up periodic background refresh
+    const refreshInterval = setInterval(() => {
+      if (initialLoadDoneRef.current) {
         refreshTeamData().catch(error => {
           console.error("Background refresh error:", error);
-          
-          if (error.code === '42P17' || 
-              (error.message && error.message.includes('recursion'))) {
-            setShowRecursionAlert(true);
-            setError("Database beveiligingsprobleem gedetecteerd. Klik op 'Herstel database' om het probleem op te lossen.");
-          }
         });
       }
     }, 60000);
-
+    
     return () => {
-      clearInterval(backgroundRefreshInterval);
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
+      clearInterval(refreshInterval);
     };
-  }, [refreshTeamData, loadPeriods, error, showRecursionAlert]);
+  }, [refreshTeamData, loadPeriods]);
 
   const handleToggleSort = () => {
     setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -184,30 +118,6 @@ const Periods = () => {
     loadPeriods(true);
   };
 
-  if (showRecursionAlert) {
-    return (
-      <div className="space-y-6 transition-opacity duration-300 opacity-100">
-        <h1 className="text-2xl font-bold tracking-tight">Periodes</h1>
-        
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-5 w-5" />
-          <AlertTitle>Database beveiligingsprobleem</AlertTitle>
-          <AlertDescription className="space-y-4">
-            <p>Er is een probleem met de database beveiliging gedetecteerd (recursie in RLS policy). Dit probleem kan het laden van gegevens blokkeren.</p>
-            <Button 
-              onClick={handleDatabaseRecursionError} 
-              variant="outline" 
-              className="flex items-center gap-2"
-            >
-              <Database className="h-4 w-4" />
-              Herstel Database
-            </Button>
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
   return (
     <div className={`space-y-6 transition-opacity duration-500 ${contentVisible ? 'opacity-100' : 'opacity-0'}`}>
       <div className="flex items-center justify-between">
@@ -237,8 +147,8 @@ const Periods = () => {
         minDuration={800}
         backgroundLoad={initialized && !error}
         errorMessage={error}
-        onRetry={error && error.includes('beveiligingsprobleem') ? handleDatabaseRecursionError : handleRefresh}
-        retryButtonText={error && error.includes('beveiligingsprobleem') ? 'Herstel Database' : 'Probeer opnieuw'}
+        onRetry={handleRefresh}
+        retryButtonText="Probeer opnieuw"
       >
         <Card>
           <CardHeader className="pb-3">

@@ -15,7 +15,7 @@ interface LoadingStateProps {
   backgroundLoad?: boolean;
   errorMessage?: string | null;
   onRetry?: () => void;
-  retryButtonText?: string; // Added missing prop
+  retryButtonText?: string;
 }
 
 export const LoadingState: React.FC<LoadingStateProps> = ({
@@ -29,36 +29,21 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   backgroundLoad = false,
   errorMessage = null,
   onRetry,
-  retryButtonText // Add the new prop
+  retryButtonText
 }) => {
   const [showLoading, setShowLoading] = useState(false);
   const [shouldRender, setShouldRender] = useState(!isLoading);
   const [loadStartTime, setLoadStartTime] = useState<number | null>(null);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [showError, setShowError] = useState(false);
   const delayTimerRef = useRef<NodeJS.Timeout | null>(null);
   const minDurationTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const transitionTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Cleanup all timers on unmount
     return () => {
       if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
       if (minDurationTimerRef.current) clearTimeout(minDurationTimerRef.current);
-      if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
     };
   }, []);
-
-  // Handle error state
-  useEffect(() => {
-    if (errorMessage) {
-      setShowError(true);
-      setShowLoading(false);
-      setShouldRender(false);
-    } else {
-      setShowError(false);
-    }
-  }, [errorMessage]);
 
   useEffect(() => {
     // Skip loading indicator for background loading
@@ -66,28 +51,19 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
       return;
     }
     
-    if (isLoading && !showLoading && !showError) {
+    if (isLoading && !showLoading) {
       if (instant) {
         setShowLoading(true);
         setShouldRender(false);
         setLoadStartTime(Date.now());
       } else {
-        // Prepare the transition
-        setIsTransitioning(true);
-        
-        // Use refs for timers to facilitate cleanup
         delayTimerRef.current = setTimeout(() => {
           setShowLoading(true);
           setShouldRender(false);
           setLoadStartTime(Date.now());
-          
-          // Give the transition time to complete (longer duration for smoother transition)
-          transitionTimerRef.current = setTimeout(() => {
-            setIsTransitioning(false);
-          }, 500); // Longer transition duration for smoother transition
         }, delay);
       }
-    } else if (!isLoading && showLoading && !showError) {
+    } else if (!isLoading && showLoading) {
       const timeInLoadingState = loadStartTime ? Date.now() - loadStartTime : 0;
       const remainingTime = Math.max(0, minDuration - timeInLoadingState);
       
@@ -95,27 +71,15 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
         setShowLoading(false);
         setShouldRender(true);
       } else {
-        // Prepare the transition
-        setIsTransitioning(true);
-        
         minDurationTimerRef.current = setTimeout(() => {
           setShowLoading(false);
           setShouldRender(true);
-          
-          // Give the transition time to complete (longer duration for smoother transition)
-          transitionTimerRef.current = setTimeout(() => {
-            setIsTransitioning(false);
-          }, 500); // Longer transition duration for smoother transition
         }, remainingTime);
       }
-    } else if (!isLoading && !showLoading && !showError) {
+    } else if (!isLoading && !showLoading) {
       setShouldRender(true);
-      // Reset transition status after a short delay
-      transitionTimerRef.current = setTimeout(() => {
-        setIsTransitioning(false);
-      }, 500); // Longer transition duration for smoother transition
     }
-  }, [isLoading, showLoading, delay, minDuration, loadStartTime, instant, backgroundLoad, showError]);
+  }, [isLoading, showLoading, delay, minDuration, loadStartTime, instant, backgroundLoad]);
 
   const defaultLoader = (
     <div className="flex flex-col items-center justify-center py-8 opacity-100 transition-opacity duration-700">
@@ -131,7 +95,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   }
   
   // Show error message if there is one
-  if (showError && errorMessage) {
+  if (errorMessage) {
     return (
       <div className={className}>
         <StatusIndicator
@@ -146,11 +110,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   }
 
   return (
-    <div className={cn(
-      "transition-all duration-700", 
-      isTransitioning ? "opacity-95" : "opacity-100",
-      className
-    )}>
+    <div className={cn("transition-all duration-700", className)}>
       {showLoading && (
         <div className="opacity-100 transition-opacity duration-700 animate-fade-in">
           {loadingComponent || defaultLoader}

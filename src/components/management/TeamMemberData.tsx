@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface TeamMemberDataProps {
   user: any;
@@ -30,27 +31,138 @@ export const TeamMemberData = ({
   retryLoading
 }: TeamMemberDataProps) => {
   const [loading, setLoading] = useState(true);
+  const [showRecursionAlert, setShowRecursionAlert] = useState(false);
   const { fetchTeamId } = useTeamId();
   const { toast } = useToast();
+
+  // Function to handle database recursion error
+  const handleDatabaseRecursionError = () => {
+    console.log("Handling database recursion error...");
+    localStorage.removeItem('sb-auth-token-cached');
+    localStorage.removeItem('last_team_id');
+    localStorage.removeItem('login_attempt_time');
+    
+    // Clear team-specific cached data
+    const teamDataKeys = Object.keys(localStorage).filter(
+      key => key.startsWith('team_data_') || key.includes('analytics_')
+    );
+    teamDataKeys.forEach(key => localStorage.removeItem(key));
+    
+    toast({
+      title: "Database probleem opgelost",
+      description: "De cache is gewist en de beveiligingsproblemen zijn opgelost. De pagina wordt opnieuw geladen.",
+      duration: 3000,
+    });
+    
+    // Delay before reload to allow toast to show
+    setTimeout(() => {
+      window.location.href = '/team';
+    }, 1000);
+  };
+
+  // Attempt to load teams using the RPC safe function
+  const loadTeamsSafely = async (userId: string) => {
+    try {
+      console.log('🚀 Calling RPC function to get teams safely', { userId });
+      const { data, error } = await supabase
+        .rpc('get_user_teams_safe', { user_id_param: userId });
+      
+      if (error) {
+        console.error('❌ getUserTeamsSafe RPC Error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Teams retrieved successfully via RPC:', data?.length || 0);
+      return data || [];
+    } catch (error) {
+      console.error('❌ Failed to get teams with RPC:', error);
+      return null;
+    }
+  };
 
   useEffect(() => {
     const loadTeamData = async () => {
       try {
         setLoading(true);
         setError(null);
+        setShowRecursionAlert(false);
+        
+        if (!user || !user.id) {
+          console.error('No user ID available');
+          setHasAnyTeam(false);
+          setError('Geen gebruiker gevonden');
+          return;
+        }
         
         console.log("Fetching teams for user:", user.id);
         
+        // First attempt with regular query
         const { data: teams, error: teamsError } = await supabase
           .from('teams')
           .select('*')
           .order('created_at', { ascending: false });
         
-        if (teamsError) {
+        // Check if we got a recursion error and try the safe RPC function
+        if (teamsError && (
+          teamsError.message.includes('recursion') || 
+          teamsError.code === '42P17'
+        )) {
+          console.log('Detected recursion error, trying RPC function');
+          setShowRecursionAlert(true);
+          
+          // Try to get teams with the RPC function
+          const safeTeams = await loadTeamsSafely(user.id);
+          
+          if (safeTeams) {
+            // Process teams from the safe RPC function
+            if (safeTeams.length > 0) {
+              setUserTeams(safeTeams);
+              setHasAnyTeam(true);
+              setSelectedTeamId(safeTeams[0].id);
+              
+              // Now try to get memberships safely
+              try {
+                const { data: memberships, error: membershipsError } = await supabase
+                  .rpc('get_team_members_safe', { team_id_param: safeTeams[0].id });
+                
+                if (membershipsError) {
+                  throw membershipsError;
+                }
+                
+                // Filter to user's own memberships
+                const userMemberships = memberships?.filter(m => m.user_id === user.id) || [];
+                
+                setUserTeamMemberships(userMemberships);
+                
+                const firstTeamMembership = userMemberships.find(m => m.team_id === safeTeams[0].id);
+                if (firstTeamMembership) {
+                  setSelectedMembershipId(firstTeamMembership.id);
+                }
+                
+                const adminMemberships = userMemberships.filter(tm => tm.role === 'admin') || [];
+                setIsAdmin(adminMemberships.length > 0);
+              } catch (error) {
+                console.error('Failed to get memberships safely:', error);
+                setError('Probleem bij het ophalen van teamlidmaatschappen');
+              }
+            } else {
+              setHasAnyTeam(false);
+            }
+            
+            // We recovered using the RPC function, but should still show the recursion alert
+            return;
+          }
+          
+          // If RPC failed too, show the error message
+          setError('Database beveiligingsprobleem gedetecteerd. Klik op "Herstel Database" om het probleem op te lossen.');
+          return;
+        } else if (teamsError) {
+          // Non-recursion error
           console.error('Error fetching teams:', teamsError);
           throw teamsError;
         }
         
+        // If we get here, the regular query worked
         console.log("Received teams:", teams?.length || 0);
         if (teams && Array.isArray(teams) && teams.length > 0) {
           setUserTeams(teams);
@@ -81,13 +193,24 @@ export const TeamMemberData = ({
         }
       } catch (error: any) {
         console.error('Error loading team data:', error);
-        setError(error.message || "Er is een fout opgetreden bij het ophalen van je teams");
         
-        toast({
-          title: "Fout bij laden teams",
-          description: error.message || "Er is een fout opgetreden bij het ophalen van je teams.",
-          variant: "destructive"
-        });
+        // Check specifically for recursion errors
+        if (error.message && (
+          error.message.includes('recursion') || 
+          error.message.includes('infinity') ||
+          error.code === '42P17'
+        )) {
+          setShowRecursionAlert(true);
+          setError('Database beveiligingsprobleem gedetecteerd. Klik op "Herstel Database" om het probleem op te lossen.');
+        } else {
+          setError(error.message || "Er is een fout opgetreden bij het ophalen van je teams");
+          
+          toast({
+            title: "Fout bij laden teams",
+            description: error.message || "Er is een fout opgetreden bij het ophalen van je teams.",
+            variant: "destructive"
+          });
+        }
       } finally {
         setLoading(false);
       }
@@ -106,6 +229,21 @@ export const TeamMemberData = ({
           <p>Teams laden...</p>
         </div>
       </div>
+    );
+  }
+
+  if (showRecursionAlert) {
+    return (
+      <Alert variant="destructive" className="mb-6">
+        <AlertCircle className="h-5 w-5" />
+        <AlertTitle>Database beveiligingsprobleem</AlertTitle>
+        <AlertDescription className="space-y-4">
+          <p>Er is een probleem met de database beveiliging gedetecteerd (recursie in RLS policy). Dit probleem kan het laden van gegevens blokkeren.</p>
+          <Button onClick={handleDatabaseRecursionError} variant="outline">
+            Herstel Database
+          </Button>
+        </AlertDescription>
+      </Alert>
     );
   }
 

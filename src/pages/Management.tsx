@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, History } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,9 @@ import PermissionsTab from '@/components/management/PermissionsTab';
 import PayoutsTab from '@/components/management/PayoutsTab';
 import { TeamMemberData } from '@/components/management/TeamMemberData';
 import { useTeamManagement } from '@/hooks/useTeamManagement';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const Management = () => {
   const location = useLocation();
@@ -29,6 +32,21 @@ const Management = () => {
   const [hasAnyTeam, setHasAnyTeam] = useState(false);
   const [activeTab, setActiveTab] = useState(initialTabFromState || "teams");
   const [loadAttempts, setLoadAttempts] = useState(0);
+
+  // Get the current user
+  useEffect(() => {
+    const getUserData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setUser(user);
+      } catch (error) {
+        console.error('Error getting user:', error);
+        setError('Kon de gebruiker niet ophalen');
+      }
+    };
+    
+    getUserData();
+  }, []);
 
   const {
     newTeamName,
@@ -53,21 +71,58 @@ const Management = () => {
     setError(null);
   };
 
+  // Function to handle database recursion error
+  const handleDatabaseRecursionError = () => {
+    console.log("Handling database recursion error...");
+    localStorage.removeItem('sb-auth-token-cached');
+    localStorage.removeItem('last_team_id');
+    localStorage.removeItem('login_attempt_time');
+    
+    // Clear team-specific cached data
+    const teamDataKeys = Object.keys(localStorage).filter(
+      key => key.startsWith('team_data_') || key.includes('analytics_')
+    );
+    teamDataKeys.forEach(key => localStorage.removeItem(key));
+    
+    window.location.reload();
+  };
+
+  if (error && error.includes('beveiligingsprobleem')) {
+    return (
+      <div className="container mx-auto px-4 py-6 space-y-6 pb-20">
+        <h1 className="text-2xl font-bold">Beheer</h1>
+        
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-5 w-5" />
+          <AlertTitle>Database beveiligingsprobleem</AlertTitle>
+          <AlertDescription className="space-y-4">
+            <p>Er is een probleem met de database beveiliging gedetecteerd (recursie in RLS policy). Dit probleem kan het laden van gegevens blokkeren.</p>
+            <Button onClick={handleDatabaseRecursionError} variant="outline">
+              Herstel Database
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-6 space-y-6 pb-20">
       <h1 className="text-2xl font-bold">Beheer</h1>
       
-      <TeamMemberData
-        user={user}
-        setUserTeams={setUserTeams}
-        setUserTeamMemberships={setUserTeamMemberships}
-        setIsAdmin={setIsAdmin}
-        setError={setError}
-        setHasAnyTeam={setHasAnyTeam}
-        setSelectedTeamId={setSelectedTeamId}
-        setSelectedMembershipId={setSelectedMembershipId}
-        retryLoading={retryLoading}
-      />
+      {user && (
+        <TeamMemberData
+          user={user}
+          setUserTeams={setUserTeams}
+          setUserTeamMemberships={setUserTeamMemberships}
+          setIsAdmin={setIsAdmin}
+          setError={setError}
+          setHasAnyTeam={setHasAnyTeam}
+          setSelectedTeamId={setSelectedTeamId}
+          setSelectedMembershipId={setSelectedMembershipId}
+          retryLoading={retryLoading}
+        />
+      )}
       
       <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue={hasAnyTeam ? "teams" : "teams"}>
         <TabsList className="grid w-full grid-cols-3">

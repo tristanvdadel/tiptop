@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppProvider } from "@/contexts/AppContext";
 import { AppDataProvider } from "@/contexts/AppDataContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -37,13 +37,13 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <TeamIdProvider>
-          <AppDataProvider>
-            <AppProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <BrowserRouter>
+        <BrowserRouter>
+          <TeamIdProvider>
+            <AppDataProvider>
+              <AppProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
                   <Routes>
                     {/* Public routes */}
                     <Route path="/splash" element={<Splash />} />
@@ -60,11 +60,11 @@ const App = () => {
                     <Route path="/settings" element={<AuthGuard><Layout><Settings /></Layout></AuthGuard>} />
                     <Route path="*" element={<AuthGuard><Layout><NotFound /></Layout></AuthGuard>} />
                   </Routes>
-                </BrowserRouter>
-              </TooltipProvider>
-            </AppProvider>
-          </AppDataProvider>
-        </TeamIdProvider>
+                </TooltipProvider>
+              </AppProvider>
+            </AppDataProvider>
+          </TeamIdProvider>
+        </BrowserRouter>
       </ThemeProvider>
     </QueryClientProvider>
   );

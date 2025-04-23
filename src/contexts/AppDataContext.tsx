@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Period, TeamMember } from '@/types';
 import { useTeamId } from '@/hooks/useTeamId';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, getTeamPeriodsSafe } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { debounce } from '@/lib/utils';
 
@@ -60,14 +60,9 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setHasError(false);
       setErrorMessage(null);
       
-      // Get all periods for the team using RPC function to avoid recursion
-      const { data: periodsData, error: periodsError } = await supabase
-        .rpc('get_team_periods_safe', { team_id_param: teamId });
-        
-      if (periodsError) {
-        throw periodsError;
-      }
-
+      // Get all periods for the team directly from the database
+      const periodsData = await getTeamPeriodsSafe(teamId);
+      
       // Get all team members using the safe RPC function
       const { data: teamMembersData, error: teamMembersError } = await supabase
         .rpc('get_team_members_safe', { team_id_param: teamId });
@@ -76,16 +71,16 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         throw teamMembersError;
       }
       
-      // Format the data to match our types
-      const formattedPeriods: Period[] = (periodsData || []).map(period => ({
+      // Format the periods data to match our types
+      const formattedPeriods: Period[] = Array.isArray(periodsData) ? periodsData.map(period => ({
         id: period.id,
-        name: period.name,
+        name: period.name || undefined,
         startDate: period.start_date,
-        endDate: period.end_date,
+        endDate: period.end_date || undefined,
         isCurrent: period.is_active,
         isPaid: period.is_paid,
-        autoCloseDate: period.auto_close_date,
-        notes: period.notes,
+        autoCloseDate: period.auto_close_date || undefined,
+        notes: period.notes || undefined,
         tips: period.tips ? period.tips.map((tip: any) => ({
           id: tip.id,
           amount: tip.amount,
@@ -95,18 +90,19 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
           date: tip.date,
           note: tip.note
         })) : []
-      }));
+      })) : [];
       
-      const formattedTeamMembers: TeamMember[] = (teamMembersData || []).map(member => ({
+      // Format team members data to match our types
+      const formattedTeamMembers: TeamMember[] = Array.isArray(teamMembersData) ? teamMembersData.map((member: any) => ({
         id: member.id,
         name: member.user_id || member.id,
-        hourlyRate: member.hourly_rate || 0,
+        hourlyRate: 0, // Default value as this property doesn't exist in the DB
         hours: member.hours || 0,
         balance: member.balance || 0,
         role: member.role,
         hasAccount: !!member.user_id,
         userId: member.user_id
-      }));
+      })) : [];
       
       // Find the current active period
       const activePeriod = formattedPeriods.find(p => p.isCurrent) || null;

@@ -73,12 +73,34 @@ export const getUserTeams = async (userId: string) => {
   }
 };
 
-// Get team periods safely (without recursion)
+// Get team periods safely using direct query instead of RPC function
 export const getTeamPeriodsSafe = async (teamId: string) => {
   try {
     console.log('Fetching periods for team:', teamId);
     
-    const { data, error } = await supabase.rpc('get_team_periods_safe', { team_id_param: teamId });
+    const { data, error } = await supabase
+      .from('periods')
+      .select(`
+        id, 
+        name,
+        start_date, 
+        end_date, 
+        is_active, 
+        is_paid,
+        auto_close_date,
+        notes,
+        tips (
+          id,
+          amount,
+          added_by,
+          period_id,
+          created_at,
+          date,
+          note
+        )
+      `)
+      .eq('team_id', teamId);
+    
     if (error) throw error;
     
     return data || [];

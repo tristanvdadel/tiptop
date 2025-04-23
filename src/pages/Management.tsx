@@ -11,9 +11,7 @@ import PermissionsTab from '@/components/management/PermissionsTab';
 import PayoutsTab from '@/components/management/PayoutsTab';
 import { TeamMemberData } from '@/components/management/TeamMemberData';
 import { useTeamManagement } from '@/hooks/useTeamManagement';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Database } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import DatabaseSecurityResolver from '@/components/ui/DatabaseSecurityResolver';
 
 const Management = () => {
   const location = useLocation();
@@ -71,39 +69,11 @@ const Management = () => {
     setError(null);
   };
 
-  // Function to handle database recursion error
-  const handleDatabaseRecursionError = () => {
-    console.log("Handling database recursion error...");
-    localStorage.removeItem('sb-auth-token-cached');
-    localStorage.removeItem('last_team_id');
-    localStorage.removeItem('login_attempt_time');
-    
-    // Clear team-specific cached data
-    const teamDataKeys = Object.keys(localStorage).filter(
-      key => key.startsWith('team_data_') || key.includes('analytics_')
-    );
-    teamDataKeys.forEach(key => localStorage.removeItem(key));
-    
-    // Reload the page to restart with clean cache
-    window.location.reload();
-  };
-
   if (error && error.includes('beveiligingsprobleem')) {
     return (
       <div className="container mx-auto px-4 py-6 space-y-6 pb-20">
         <h1 className="text-2xl font-bold">Beheer</h1>
-        
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-5 w-5" />
-          <AlertTitle>Database beveiligingsprobleem</AlertTitle>
-          <AlertDescription className="space-y-4">
-            <p>Er is een probleem met de database beveiliging gedetecteerd (recursie in RLS policy). Dit probleem kan het laden van gegevens blokkeren.</p>
-            <Button onClick={handleDatabaseRecursionError} variant="outline" className="flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              Herstel Database
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <DatabaseSecurityResolver fullReset={true} />
       </div>
     );
   }

@@ -11,12 +11,14 @@ interface DatabaseSecurityResolverProps {
   onResolved?: () => void;
   variant?: 'default' | 'destructive' | 'inline';
   message?: string;
+  fullReset?: boolean;
 }
 
 const DatabaseSecurityResolver: React.FC<DatabaseSecurityResolverProps> = ({
   onResolved,
   variant = 'default',
-  message
+  message,
+  fullReset = false
 }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -34,6 +36,12 @@ const DatabaseSecurityResolver: React.FC<DatabaseSecurityResolverProps> = ({
       
       // Log out current user to clear session state
       await supabase.auth.signOut();
+      
+      if (fullReset) {
+        // More aggressive cache clearing
+        localStorage.clear();
+        sessionStorage.clear();
+      }
       
       // Wait briefly to show the toast before redirecting
       setTimeout(() => {

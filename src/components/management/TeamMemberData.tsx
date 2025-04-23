@@ -1,11 +1,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTeamId } from '@/hooks/useTeamId';
-import { supabase, isRecursionError } from "@/integrations/supabase/client";
+import { supabase, isRecursionError, clearSecurityCache } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getUserTeamsSafe, getTeamMembersSafe } from '@/services/teamService';
+import DatabaseSecurityResolver from '@/components/ui/DatabaseSecurityResolver';
 
 interface TeamMemberDataProps {
   user: any;
@@ -37,15 +39,7 @@ export const TeamMemberData = ({
 
   const handleDatabaseRecursionError = useCallback(() => {
     console.log("Handling database recursion error...");
-    localStorage.removeItem('sb-auth-token-cached');
-    localStorage.removeItem('last_team_id');
-    localStorage.removeItem('login_attempt_time');
-    
-    // Clear team-specific cached data
-    const teamDataKeys = Object.keys(localStorage).filter(
-      key => key.startsWith('team_data_') || key.includes('analytics_')
-    );
-    teamDataKeys.forEach(key => localStorage.removeItem(key));
+    clearSecurityCache();
     
     toast({
       title: "Database probleem opgelost",
@@ -74,39 +68,18 @@ export const TeamMemberData = ({
         
         console.log("Fetching teams for user:", user.id);
         
-        // Use direct database query instead of RPC
-        const { data: teams, error: teamsError } = await supabase
-          .from('teams')
-          .select('*')
-          .eq('created_by', user.id);
-        
-        if (teamsError) {
-          console.error('Error fetching teams:', teamsError);
-          
-          if (isRecursionError(teamsError)) {
-            setShowRecursionAlert(true);
-            setError('Database beveiligingsprobleem gedetecteerd. Klik op "Herstel Database" om het probleem op te lossen.');
-          } else {
-            setError(teamsError.message || 'Fout bij ophalen van teams');
-          }
-          return;
-        }
+        // Use safe RPC function instead of direct database query
+        const teams = await getUserTeamsSafe(user.id);
         
         if (teams && teams.length > 0) {
+          console.log("Teams fetched successfully:", teams.length);
           setUserTeams(teams);
           setHasAnyTeam(true);
           setSelectedTeamId(teams[0].id);
           
-          // Get memberships using direct query
+          // Get memberships using safe RPC
           try {
-            const { data: memberships, error: membershipError } = await supabase
-              .from('team_members')
-              .select('*')
-              .eq('team_id', teams[0].id);
-            
-            if (membershipError) {
-              throw membershipError;
-            }
+            const memberships = await getTeamMembersSafe(teams[0].id);
             
             const userMemberships = memberships?.filter(m => m.user_id === user.id) || [];
             setUserTeamMemberships(userMemberships);
@@ -167,19 +140,7 @@ export const TeamMemberData = ({
   }
 
   if (showRecursionAlert) {
-    return (
-      <Alert variant="destructive" className="mb-6">
-        <AlertCircle className="h-5 w-5" />
-        <AlertTitle>Database beveiligingsprobleem</AlertTitle>
-        <AlertDescription className="space-y-4">
-          <p>Er is een probleem met de database beveiliging gedetecteerd (recursie in RLS policy). Dit probleem kan het laden van gegevens blokkeren.</p>
-          <Button onClick={handleDatabaseRecursionError} variant="outline" className="flex items-center gap-2">
-            <Database className="h-4 w-4" />
-            Herstel Database
-          </Button>
-        </AlertDescription>
-      </Alert>
-    );
+    return <DatabaseSecurityResolver fullReset={true} />;
   }
 
   return null;

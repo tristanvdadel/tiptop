@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PayoutSummary } from '@/components/PayoutSummary';
 import { TeamProvider } from '@/contexts/TeamContext';
@@ -8,43 +8,21 @@ import { useTeamId } from '@/hooks/useTeamId';
 import { useToast } from '@/hooks/use-toast';
 import { StatusIndicator } from '@/components/ui/status-indicator';
 import { LoadingState } from '@/components/ui/loading-state';
-import { RealtimeConnection } from '@/components/team/RealtimeConnection';
+import { useAppData } from '@/contexts/AppDataContext';
 
 const Team: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { teamId, loading: teamIdLoading, fetchTeamId } = useTeamId();
+  const { teamId, loading: teamIdLoading } = useTeamId();
   const { toast } = useToast();
   const [showPayoutSummary, setShowPayoutSummary] = useState(false);
-  const [needsTeamIdRefresh, setNeedsTeamIdRefresh] = useState(false);
-
-  const handleTeamIdRefresh = useCallback(async () => {
-    if (needsTeamIdRefresh) {
-      try {
-        await fetchTeamId();
-        setNeedsTeamIdRefresh(false);
-      } catch (error) {
-        console.error("Failed to refresh team ID:", error);
-      }
-    }
-  }, [needsTeamIdRefresh, fetchTeamId]);
-
-  React.useEffect(() => {
+  const { connectionState } = useAppData();
+  
+  useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const showSummary = urlParams.get('payoutSummary') === 'true';
-    const isRecovery = urlParams.get('recover') === 'true';
-    
-    console.log("Team.tsx: URL param 'payoutSummary':", showSummary);
     setShowPayoutSummary(showSummary);
-    
-    if (isRecovery) {
-      setNeedsTeamIdRefresh(true);
-    }
   }, [location.search]);
-
-  React.useEffect(() => {
-    handleTeamIdRefresh();
-  }, [handleTeamIdRefresh]);
 
   const handleRefreshTeamId = async () => {
     toast({
@@ -53,22 +31,7 @@ const Team: React.FC = () => {
     });
     
     try {
-      const newTeamId = await fetchTeamId();
-      if (newTeamId) {
-        toast({
-          title: "Team gevonden",
-          description: "Je teamgegevens worden geladen.",
-        });
-        
-        navigate('/team', { replace: true });
-      } else {
-        toast({
-          title: "Geen team gevonden",
-          description: "Je hebt nog geen team of bent geen lid van een team.",
-          variant: "destructive"
-        });
-        navigate('/management');
-      }
+      navigate('/management');
     } catch (error) {
       toast({
         title: "Fout bij laden",
@@ -77,8 +40,6 @@ const Team: React.FC = () => {
       });
     }
   };
-
-  console.log("Team.tsx: Rendering Team component with TeamProvider");
   
   if (teamIdLoading) {
     return (
@@ -99,7 +60,7 @@ const Team: React.FC = () => {
           type="error"
           title="Geen team gevonden"
           message="We konden je team niet vinden. Probeer het opnieuw."
-          actionLabel="Team opnieuw ophalen"
+          actionLabel="Naar teambeheer"
           onAction={handleRefreshTeamId}
         />
       </div>
@@ -108,8 +69,16 @@ const Team: React.FC = () => {
   
   return (
     <TeamProvider>
-      <RealtimeConnection />
       <div className="transition-opacity duration-300">
+        {connectionState === 'disconnected' && (
+          <div className="mb-4">
+            <StatusIndicator 
+              type="offline"
+              message="Je bent offline. De pagina wordt automatisch bijgewerkt wanneer er wijzigingen plaatsvinden zodra je weer online bent."
+            />
+          </div>
+        )}
+        
         <LoadingState 
           isLoading={false}
           instant={true}

@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 
 const Index = () => {
   const { updateTip } = useApp();
-  const { currentPeriod, isLoading, isInitialized, hasError } = useAppData();
+  const { currentPeriod, isLoading, isInitialized, hasError, connectionState } = useAppData();
   const [contentVisible, setContentVisible] = useState(false);
   const navigate = useNavigate();
 
@@ -64,6 +64,15 @@ const Index = () => {
 
   return (
     <div className={`space-y-6 transition-opacity duration-500 ${contentVisible ? 'opacity-100' : 'opacity-0'}`}>
+      {connectionState === 'disconnected' && (
+        <div className="mb-4">
+          <StatusIndicator 
+            type="offline"
+            message="Je bent offline. Wijzigingen worden bijgewerkt zodra je weer online bent."
+          />
+        </div>
+      )}
+      
       <div className="grid md:grid-cols-2 gap-6">
         <div>
           <LoadingState 

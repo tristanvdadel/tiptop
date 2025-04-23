@@ -1,9 +1,10 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useGlobalDataFetching } from '@/hooks/useGlobalDataFetching';
-import { Period, TeamMember, Tip } from '@/types';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { Period, TeamMember } from '@/types';
 import { useTeamId } from '@/hooks/useTeamId';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { debounce } from '@/lib/utils';
 
 interface AppDataContextType {
   periods: Period[];
@@ -14,6 +15,7 @@ interface AppDataContextType {
   hasError: boolean;
   errorMessage: string | null;
   refreshData: () => Promise<void>;
+  connectionState: 'connected' | 'disconnected' | 'connecting';
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
@@ -28,46 +30,49 @@ export const useAppData = () => {
 
 export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { teamId } = useTeamId();
+  const { toast } = useToast();
   const [periods, setPeriods] = useState<Period[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [currentPeriod, setCurrentPeriod] = useState<Period | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [connectionState, setConnectionState] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
+  const [lastRefreshTime, setLastRefreshTime] = useState<number>(Date.now());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Core data fetching function that will be centralized
-  const fetchAllData = async () => {
+  // Main data fetching function
+  const fetchData = useCallback(async () => {
     if (!teamId) {
       console.log('No team ID available for fetching data');
       return;
     }
     
+    // Prevent multiple simultaneous refreshes
+    if (isRefreshing) {
+      console.log('Already refreshing data, skipping duplicate request');
+      return;
+    }
+    
     try {
-      // Get all periods for the team - this query doesn't seem to be causing recursion issues
+      setIsRefreshing(true);
+      setHasError(false);
+      setErrorMessage(null);
+      
+      // Get all periods for the team using RPC function to avoid recursion
       const { data: periodsData, error: periodsError } = await supabase
-        .from('periods')
-        .select(`
-          id,
-          name,
-          start_date,
-          end_date,
-          is_active,
-          is_paid,
-          auto_close_date,
-          notes,
-          tips (*)
-        `)
-        .eq('team_id', teamId)
-        .order('start_date', { ascending: false });
+        .rpc('get_team_periods_safe', { team_id_param: teamId });
         
       if (periodsError) {
-        console.error('Error fetching periods:', periodsError);
         throw periodsError;
       }
 
-      // Get all team members using the safe RPC function to avoid recursion
+      // Get all team members using the safe RPC function
       const { data: teamMembersData, error: teamMembersError } = await supabase
         .rpc('get_team_members_safe', { team_id_param: teamId });
         
       if (teamMembersError) {
-        console.error('Error fetching team members:', teamMembersError);
         throw teamMembersError;
       }
       
@@ -81,21 +86,21 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isPaid: period.is_paid,
         autoCloseDate: period.auto_close_date,
         notes: period.notes,
-        tips: period.tips.map((tip: any) => ({
+        tips: period.tips ? period.tips.map((tip: any) => ({
           id: tip.id,
           amount: tip.amount,
           teamMemberId: tip.added_by,
-          periodId: tip.period_id, // Add missing required property
-          timestamp: tip.created_at, // Add missing required property
+          periodId: tip.period_id,
+          timestamp: tip.created_at,
           date: tip.date,
           note: tip.note
-        }))
+        })) : []
       }));
       
       const formattedTeamMembers: TeamMember[] = (teamMembersData || []).map(member => ({
         id: member.id,
-        name: member.user_id || member.id, // Fallback if name doesn't exist
-        hourlyRate: 0, // Add required property with default value
+        name: member.user_id || member.id,
+        hourlyRate: member.hourly_rate || 0,
         hours: member.hours || 0,
         balance: member.balance || 0,
         role: member.role,
@@ -110,82 +115,114 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setPeriods(formattedPeriods);
       setTeamMembers(formattedTeamMembers);
       setCurrentPeriod(activePeriod);
+      setLastRefreshTime(Date.now());
+      setIsInitialized(true);
       
       console.log('Data refreshed successfully:', {
         periods: formattedPeriods.length,
         members: formattedTeamMembers.length,
         currentPeriod: activePeriod ? activePeriod.id : 'none'
       });
-    } catch (error) {
-      console.error('Error in fetchAllData:', error);
-      throw error;
+    } catch (error: any) {
+      console.error('Error in fetchData:', error);
+      setHasError(true);
+      setErrorMessage(error.message || 'Error fetching data');
+      
+      toast({
+        title: "Fout bij laden",
+        description: error.message || "Er is een fout opgetreden bij het laden van gegevens",
+        variant: "destructive",
+        duration: 5000
+      });
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
-  };
+  }, [teamId, toast, isRefreshing]);
   
-  // Use our centralized global data fetching hook
-  const {
-    isLoading,
-    hasError,
-    errorMessage,
-    isInitialized,
-    refreshData
-  } = useGlobalDataFetching(fetchAllData);
-  
-  // Set up real-time subscriptions for data updates
+  // Debounced version to prevent too frequent refreshes
+  const debouncedRefresh = useCallback(debounce(() => {
+    fetchData();
+  }, 1000), [fetchData]);
+
+  // Setup real-time subscriptions
   useEffect(() => {
     if (!teamId) return;
     
-    // Set up channels for real-time updates
-    const periodsChannel = supabase.channel('periods-changes')
+    // Start loading if no data is present
+    if (!isInitialized) {
+      setIsLoading(true);
+    }
+    
+    // Set up a single channel for all real-time updates
+    const channel = supabase.channel('global-data-changes')
+      // Handle presence events for connection status
+      .on('presence', { event: 'sync' }, () => {
+        console.log('Realtime connection synced');
+        setConnectionState('connected');
+      })
+      .on('presence', { event: 'join' }, () => {
+        console.log('Client joined channel');
+      })
+      .on('presence', { event: 'leave' }, () => {
+        console.log('Client left channel');
+      })
+      // Handle disconnect event
+      .on('system', { event: 'disconnect' }, () => {
+        console.log('Disconnected from realtime updates');
+        setConnectionState('disconnected');
+      })
+      // Watch for periods changes
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'periods',
         filter: `team_id=eq.${teamId}`
       }, () => {
-        console.log('Periods updated, refreshing data');
-        refreshData();
+        console.log('Periods updated');
+        debouncedRefresh();
       })
-      .subscribe();
-      
-    const tipsChannel = supabase.channel('tips-changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'tips'
-      }, (payload) => {
-        // Check if this tip belongs to one of our periods
-        if (payload.new && 'period_id' in payload.new) {
-          const periodId = payload.new.period_id;
-          if (periodId && periods.some(p => p.id === periodId)) {
-            console.log('Tips updated, refreshing data');
-            refreshData();
-          }
-        }
-      })
-      .subscribe();
-      
-    const teamMembersChannel = supabase.channel('team-members-changes')
+      // Watch for team members changes
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'team_members',
         filter: `team_id=eq.${teamId}`
       }, () => {
-        console.log('Team members updated, refreshing data');
-        refreshData();
+        console.log('Team members updated');
+        debouncedRefresh();
       })
-      .subscribe();
+      // Watch for tips changes
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'tips'
+      }, (payload) => {
+        if (payload.new && 'period_id' in payload.new) {
+          console.log('Tips updated');
+          debouncedRefresh();
+        }
+      })
+      .subscribe(status => {
+        console.log('Channel status:', status);
+        if (status === 'SUBSCRIBED') {
+          setConnectionState('connected');
+          // Initial data fetch
+          fetchData();
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setConnectionState('disconnected');
+        } else {
+          setConnectionState('connecting');
+        }
+      });
     
-    // Cleanup subscriptions
+    // Clean up subscription
     return () => {
-      supabase.removeChannel(periodsChannel);
-      supabase.removeChannel(tipsChannel);
-      supabase.removeChannel(teamMembersChannel);
+      supabase.removeChannel(channel);
     };
-  }, [teamId, refreshData, periods]);
+  }, [teamId, fetchData, debouncedRefresh, isInitialized]);
   
-  const value = {
+  const value: AppDataContextType = {
     periods,
     teamMembers,
     currentPeriod,
@@ -193,7 +230,8 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     isInitialized,
     hasError,
     errorMessage,
-    refreshData
+    refreshData: fetchData,
+    connectionState
   };
   
   return (

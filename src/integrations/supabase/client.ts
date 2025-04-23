@@ -73,6 +73,21 @@ export const getUserTeams = async (userId: string) => {
   }
 };
 
+// Get team periods safely (without recursion)
+export const getTeamPeriodsSafe = async (teamId: string) => {
+  try {
+    console.log('Fetching periods for team:', teamId);
+    
+    const { data, error } = await supabase.rpc('get_team_periods_safe', { team_id_param: teamId });
+    if (error) throw error;
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error in getTeamPeriodsSafe:', error);
+    return [];
+  }
+}
+
 // Interface extensions to help with TypeScript
 export interface Team {
   id: string;

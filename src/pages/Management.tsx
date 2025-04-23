@@ -12,7 +12,7 @@ import PayoutsTab from '@/components/management/PayoutsTab';
 import { TeamMemberData } from '@/components/management/TeamMemberData';
 import { useTeamManagement } from '@/hooks/useTeamManagement';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const Management = () => {
@@ -84,6 +84,7 @@ const Management = () => {
     );
     teamDataKeys.forEach(key => localStorage.removeItem(key));
     
+    // Reload the page to restart with clean cache
     window.location.reload();
   };
 
@@ -97,7 +98,8 @@ const Management = () => {
           <AlertTitle>Database beveiligingsprobleem</AlertTitle>
           <AlertDescription className="space-y-4">
             <p>Er is een probleem met de database beveiliging gedetecteerd (recursie in RLS policy). Dit probleem kan het laden van gegevens blokkeren.</p>
-            <Button onClick={handleDatabaseRecursionError} variant="outline">
+            <Button onClick={handleDatabaseRecursionError} variant="outline" className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
               Herstel Database
             </Button>
           </AlertDescription>

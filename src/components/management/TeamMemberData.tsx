@@ -60,26 +60,7 @@ export const TeamMemberData = ({
     }, 1500);
   }, [toast]);
 
-  // Attempt to load teams using the RPC safe function
-  const loadTeamsSafely = async (userId: string) => {
-    try {
-      console.log('🚀 Calling RPC function to get teams safely', { userId });
-      const { data, error } = await supabase
-        .rpc('get_user_teams_safe', { user_id_param: userId });
-      
-      if (error) {
-        console.error('❌ getUserTeamsSafe RPC Error:', error);
-        throw error;
-      }
-      
-      console.log('✅ Teams retrieved successfully via RPC:', data?.length || 0);
-      return data || [];
-    } catch (error) {
-      console.error('❌ Failed to get teams with RPC:', error);
-      return null;
-    }
-  };
-
+  // Using service layer for safer data access
   useEffect(() => {
     const loadTeamData = async () => {
       try {
@@ -96,98 +77,62 @@ export const TeamMemberData = ({
         
         console.log("Fetching teams for user:", user.id);
         
-        // First attempt with regular query
-        const { data: teams, error: teamsError } = await supabase
-          .from('teams')
-          .select('*')
-          .order('created_at', { ascending: false });
+        // Use the safe RPC function directly
+        const { data: teams, error: teamsRpcError } = await supabase
+          .rpc('get_user_teams_safe', { user_id_param: user.id });
         
-        // Check if we got a recursion error and try the safe RPC function
-        if (teamsError && (
-          teamsError.message.includes('recursion') || 
-          teamsError.message.includes('infinity') ||
-          teamsError.code === '42P17'
-        )) {
-          console.log('Detected recursion error, trying RPC function');
-          setShowRecursionAlert(true);
+        if (teamsRpcError) {
+          console.error('Error fetching teams with safe RPC:', teamsRpcError);
           
-          // Try to get teams with the RPC function
-          const safeTeams = await loadTeamsSafely(user.id);
-          
-          if (safeTeams) {
-            // Process teams from the safe RPC function
-            if (safeTeams.length > 0) {
-              setUserTeams(safeTeams);
-              setHasAnyTeam(true);
-              setSelectedTeamId(safeTeams[0].id);
-              
-              // Now try to get memberships safely
-              try {
-                const { data: memberships, error: membershipsError } = await supabase
-                  .rpc('get_team_members_safe', { team_id_param: safeTeams[0].id });
-                
-                if (membershipsError) {
-                  throw membershipsError;
-                }
-                
-                // Filter to user's own memberships
-                const userMemberships = memberships?.filter(m => m.user_id === user.id) || [];
-                
-                setUserTeamMemberships(userMemberships);
-                
-                const firstTeamMembership = userMemberships.find(m => m.team_id === safeTeams[0].id);
-                if (firstTeamMembership) {
-                  setSelectedMembershipId(firstTeamMembership.id);
-                }
-                
-                const adminMemberships = userMemberships.filter(tm => tm.role === 'admin') || [];
-                setIsAdmin(adminMemberships.length > 0);
-              } catch (error) {
-                console.error('Failed to get memberships safely:', error);
-                setError('Probleem bij het ophalen van teamlidmaatschappen');
-              }
-            } else {
-              setHasAnyTeam(false);
-            }
-            
-            // We recovered using the RPC function, but should still show the recursion alert
-            return;
+          // Check for recursion errors
+          if (teamsRpcError.message?.includes('recursion') || 
+              teamsRpcError.message?.includes('infinity') ||
+              teamsRpcError.code === '42P17') {
+            setShowRecursionAlert(true);
+            setError('Database beveiligingsprobleem gedetecteerd. Klik op "Herstel Database" om het probleem op te lossen.');
+          } else {
+            setError(teamsRpcError.message || 'Fout bij ophalen van teams');
           }
-          
-          // If RPC failed too, show the error message
-          setError('Database beveiligingsprobleem gedetecteerd. Klik op "Herstel Database" om het probleem op te lossen.');
           return;
-        } else if (teamsError) {
-          // Non-recursion error
-          console.error('Error fetching teams:', teamsError);
-          throw teamsError;
         }
         
-        // If we get here, the regular query worked
-        console.log("Received teams:", teams?.length || 0);
-        if (teams && Array.isArray(teams) && teams.length > 0) {
+        // Process teams data
+        if (teams && teams.length > 0) {
           setUserTeams(teams);
           setHasAnyTeam(true);
           setSelectedTeamId(teams[0].id);
+          
+          // Get memberships using RPC
+          try {
+            const { data: memberships, error: membershipError } = await supabase
+              .rpc('get_team_members_safe', { team_id_param: teams[0].id });
             
-          const { data: memberships, error: membershipsError } = await supabase
-            .from('team_members')
-            .select('id, team_id, role')
-            .eq('user_id', user.id);
+            if (membershipError) {
+              throw membershipError;
+            }
             
-          if (membershipsError) {
-            console.error('Error fetching memberships:', membershipsError);
-            throw membershipsError;
-          } else {
-            setUserTeamMemberships(memberships || []);
-              
-            const firstTeamMembership = memberships?.find(m => m.team_id === teams[0].id);
+            // Filter to user's own memberships
+            const userMemberships = memberships?.filter((m: any) => m.user_id === user.id) || [];
+            setUserTeamMemberships(userMemberships);
+            
+            const firstTeamMembership = userMemberships.find((m: any) => m.team_id === teams[0].id);
             if (firstTeamMembership) {
               setSelectedMembershipId(firstTeamMembership.id);
             }
-              
-            const adminMemberships = memberships?.filter(tm => tm.role === 'admin') || [];
+            
+            const adminMemberships = userMemberships.filter((tm: any) => tm.role === 'admin') || [];
             setIsAdmin(adminMemberships.length > 0);
+          } catch (error: any) {
+            console.error('Failed to get memberships:', error);
+            
+            if (error.message?.includes('recursion') || 
+                error.message?.includes('infinity') ||
+                error.code === '42P17') {
+              setShowRecursionAlert(true);
+              setError('Database beveiligingsprobleem gedetecteerd. Klik op "Herstel Database" om het probleem op te lossen.');
+            } else {
+              setError(error.message || 'Fout bij ophalen van teamlidmaatschappen');
+            }
           }
         } else {
           setHasAnyTeam(false);
@@ -195,12 +140,9 @@ export const TeamMemberData = ({
       } catch (error: any) {
         console.error('Error loading team data:', error);
         
-        // Check specifically for recursion errors
-        if (error.message && (
-          error.message.includes('recursion') || 
-          error.message.includes('infinity') ||
-          error.code === '42P17'
-        )) {
+        if (error.message?.includes('recursion') || 
+            error.message?.includes('infinity') ||
+            error.code === '42P17') {
           setShowRecursionAlert(true);
           setError('Database beveiligingsprobleem gedetecteerd. Klik op "Herstel Database" om het probleem op te lossen.');
         } else {

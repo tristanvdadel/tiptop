@@ -71,26 +71,8 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         throw teamMembersError;
       }
       
-      // Format the periods data to match our types
-      const formattedPeriods: Period[] = Array.isArray(periodsData) ? periodsData.map(period => ({
-        id: period.id,
-        name: period.name || undefined,
-        startDate: period.start_date,
-        endDate: period.end_date || undefined,
-        isCurrent: period.is_active,
-        isPaid: period.is_paid,
-        autoCloseDate: period.auto_close_date || undefined,
-        notes: period.notes || undefined,
-        tips: period.tips ? period.tips.map((tip: any) => ({
-          id: tip.id,
-          amount: tip.amount,
-          teamMemberId: tip.added_by,
-          periodId: tip.period_id,
-          timestamp: tip.created_at,
-          date: tip.date,
-          note: tip.note
-        })) : []
-      })) : [];
+      // The periodsData is already formatted in the getTeamPeriodsSafe function
+      const formattedPeriods: Period[] = Array.isArray(periodsData) ? periodsData : [];
       
       // Format team members data to match our types
       const formattedTeamMembers: TeamMember[] = Array.isArray(teamMembersData) ? teamMembersData.map((member: any) => ({

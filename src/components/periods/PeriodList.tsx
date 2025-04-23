@@ -19,10 +19,14 @@ import { useApp } from '@/contexts/AppContext';
 
 // The component doesn't need props explicitly passed since it uses useApp context
 const PeriodList: React.FC = () => {
-  const { periods, markPeriodAsPaid } = useApp();
+  const { periods, updatePeriod } = useApp();
   
   const formatPeriodDate = (date: string) => {
     return format(new Date(date), 'd MMMM yyyy', { locale: nl });
+  };
+
+  const handleMarkAsPaid = (periodId: string) => {
+    updatePeriod(periodId, { isPaid: true });
   };
 
   return (
@@ -83,7 +87,7 @@ const PeriodList: React.FC = () => {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => markPeriodAsPaid(period.id)}
+                        onClick={() => handleMarkAsPaid(period.id)}
                       >
                         Markeer als uitbetaald
                       </Button>

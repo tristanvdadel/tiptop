@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Period, TeamMember } from '@/types';
 import { useTeamId } from '@/hooks/useTeamId';
-import { supabase, getTeamPeriodsSafe } from '@/integrations/supabase/client';
+import { supabase, getTeamPeriodsSafe, isRecursionError, clearSecurityCache } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { debounce } from '@/lib/utils';
 
@@ -16,6 +16,7 @@ interface AppDataContextType {
   errorMessage: string | null;
   refreshData: () => Promise<void>;
   connectionState: 'connected' | 'disconnected' | 'connecting';
+  handleSecurityRecursionIssue: () => void;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
@@ -41,6 +42,26 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [connectionState, setConnectionState] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   const [lastRefreshTime, setLastRefreshTime] = useState<number>(Date.now());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasRecursionError, setHasRecursionError] = useState(false);
+
+  // Special handler for database recursion security issues
+  const handleSecurityRecursionIssue = useCallback(() => {
+    console.log("Handling database recursion security issue...");
+    
+    // Clear all security-related cache
+    clearSecurityCache();
+    
+    toast({
+      title: "Database probleem opgelost",
+      description: "De cache is gewist en de beveiligingsproblemen zijn opgelost. De pagina wordt opnieuw geladen.",
+      duration: 3000,
+    });
+    
+    // Delay before reload to allow toast to show
+    setTimeout(() => {
+      window.location.href = '/team';
+    }, 1000);
+  }, [toast]);
 
   // Main data fetching function
   const fetchData = useCallback(async () => {
@@ -59,6 +80,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setIsRefreshing(true);
       setHasError(false);
       setErrorMessage(null);
+      setHasRecursionError(false);
       
       // Get all periods for the team directly from the database
       const periodsData = await getTeamPeriodsSafe(teamId);
@@ -68,10 +90,15 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .rpc('get_team_members_safe', { team_id_param: teamId });
         
       if (teamMembersError) {
+        if (isRecursionError(teamMembersError)) {
+          console.error('Recursion error detected in RLS policy:', teamMembersError);
+          setHasRecursionError(true);
+          throw new Error('Database beveiligingsprobleem gedetecteerd (recursie in RLS policy). Klik op "Beveiligingsprobleem Oplossen".');
+        }
         throw teamMembersError;
       }
       
-      // The periodsData is already formatted in the getTeamPeriodsSafe function
+      // The formatted periods come directly from getTeamPeriodsSafe
       const formattedPeriods: Period[] = Array.isArray(periodsData) ? periodsData : [];
       
       // Format team members data to match our types
@@ -104,7 +131,14 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (error: any) {
       console.error('Error in fetchData:', error);
       setHasError(true);
-      setErrorMessage(error.message || 'Error fetching data');
+      
+      // Special handling for recursion errors
+      if (isRecursionError(error)) {
+        setHasRecursionError(true);
+        setErrorMessage('Database beveiligingsprobleem gedetecteerd. Klik op "Beveiligingsprobleem Oplossen".');
+      } else {
+        setErrorMessage(error.message || 'Error fetching data');
+      }
       
       toast({
         title: "Fout bij laden",
@@ -209,7 +243,8 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     hasError,
     errorMessage,
     refreshData: fetchData,
-    connectionState
+    connectionState,
+    handleSecurityRecursionIssue
   };
   
   return (

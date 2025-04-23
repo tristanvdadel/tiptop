@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -47,7 +48,7 @@ export const getUserEmail = async (userId: string) => {
 // Import safe team functions from service layer
 import { getUserTeamsSafe, getTeamMembersSafe } from '@/services/teamService';
 
-// Verbeterde team member queries met veilige functies
+// Enhanced team member queries with safe functions
 export const getTeamMembers = async (teamId: string) => {
   try {
     console.log('Fetching team members for team:', teamId);
@@ -114,14 +115,33 @@ export const getTeamPeriodsSafe = async (teamId: string) => {
   }
 };
 
-// Add new function to detect recursion errors
+// Enhanced function to detect and handle recursion errors
 export const isRecursionError = (error: any): boolean => {
   if (!error) return false;
   
   const errorMessage = typeof error === 'string' ? error : error.message || '';
+  const errorCode = typeof error === 'object' && error.code ? error.code : '';
+  
   return errorMessage.includes('recursion') || 
          errorMessage.includes('infinity') ||
-         errorMessage.code === '42P17';
+         errorCode === '42P17' ||
+         errorMessage.includes('maximum call stack size exceeded');
+};
+
+// Function to clear all cached security tokens and team data
+export const clearSecurityCache = () => {
+  console.log("Clearing security and session cache to resolve recursion issues");
+  localStorage.removeItem('sb-auth-token-cached');
+  localStorage.removeItem('last_team_id');
+  localStorage.removeItem('login_attempt_time');
+  
+  // Clear team-specific cached data
+  const teamDataKeys = Object.keys(localStorage).filter(
+    key => key.startsWith('team_data_') || key.includes('analytics_')
+  );
+  teamDataKeys.forEach(key => localStorage.removeItem(key));
+  
+  return true;
 };
 
 // Interface extensions to help with TypeScript

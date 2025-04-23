@@ -478,6 +478,23 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_team_periods_safe: {
+        Args: { team_id_param: string }
+        Returns: {
+          id: string
+          team_id: string
+          name: string
+          start_date: string
+          end_date: string
+          is_active: boolean
+          is_paid: boolean
+          auto_close_date: string
+          average_tip_per_hour: number
+          created_at: string
+          notes: string
+          tips: Json
+        }[]
+      }
       get_user_teams: {
         Args: { user_id_param: string }
         Returns: {

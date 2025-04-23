@@ -72,41 +72,42 @@ export const getUserTeams = async (userId: string) => {
   }
 };
 
-// Update getTeamPeriodsSafe to use direct query instead of RPC
+// Update getTeamPeriodsSafe to handle the new tips JSON format
 export const getTeamPeriodsSafe = async (teamId: string) => {
   try {
     console.log('🔍 Fetching periods safely for team:', teamId);
     
     const { data, error } = await supabase
-      .from('periods')
-      .select(`
-        id, 
-        name,
-        start_date, 
-        end_date, 
-        is_active, 
-        is_paid,
-        auto_close_date,
-        notes,
-        tips (
-          id,
-          amount,
-          added_by,
-          period_id,
-          created_at,
-          date,
-          note
-        )
-      `)
-      .eq('team_id', teamId);
+      .rpc('get_team_periods_safe', { team_id_param: teamId });
     
     if (error) {
       console.error('❌ Error in getTeamPeriodsSafe:', error);
       throw error;
     }
     
-    console.log('✅ Successfully fetched periods:', data?.length || 0);
-    return data || [];
+    // Transform the data to match our Period type
+    const formattedData = data?.map((period: any) => ({
+      id: period.id,
+      name: period.name,
+      startDate: period.start_date,
+      endDate: period.end_date,
+      isCurrent: period.is_active,
+      isPaid: period.is_paid,
+      autoCloseDate: period.auto_close_date,
+      notes: period.notes,
+      tips: period.tips.map((tip: any) => ({
+        id: tip.id,
+        amount: tip.amount,
+        teamMemberId: tip.added_by,
+        periodId: tip.period_id,
+        timestamp: tip.created_at,
+        date: tip.date,
+        note: tip.note
+      }))
+    })) || [];
+    
+    console.log('✅ Successfully fetched periods:', formattedData.length);
+    return formattedData;
   } catch (error) {
     console.error('❌ Unexpected error in getTeamPeriodsSafe:', error);
     return [];

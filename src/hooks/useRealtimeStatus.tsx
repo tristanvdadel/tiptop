@@ -2,55 +2,96 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { debounce } from '@/lib/utils';
 
 export const useRealtimeStatus = () => {
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   const previousStatusRef = useRef<string>('connecting');
   const statusChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const channelsRef = useRef<RealtimeChannel[]>([]);
   
-  // Geef statusveranderingen een sterker debounce effect om flikkering te voorkomen (verhoogd naar 1000ms)
-  const setDebouncedStatus = useCallback((newStatus: 'connected' | 'disconnected' | 'connecting') => {
-    if (newStatus === previousStatusRef.current) return;
-    
-    // Als er al een timeout actief is, annuleer deze dan
-    if (statusChangeTimeoutRef.current) {
-      clearTimeout(statusChangeTimeoutRef.current);
-    }
-    
-    // Wacht 1000ms voordat we de status daadwerkelijk updaten
-    statusChangeTimeoutRef.current = setTimeout(() => {
+  // Debounce status changes to prevent flickering
+  const setDebouncedStatus = useCallback(
+    debounce((newStatus: 'connected' | 'disconnected' | 'connecting') => {
+      if (newStatus === previousStatusRef.current) return;
+      
       setRealtimeStatus(newStatus);
       previousStatusRef.current = newStatus;
-      statusChangeTimeoutRef.current = null;
-    }, 1000);
-  }, []);
+    }, 1000),
+    []
+  );
   
+  // Check all active channels for connection status
   const checkConnectionStatus = useCallback(() => {
     const channels = supabase.getChannels();
-    if (channels.length === 0) return undefined;
+    channelsRef.current = channels;
     
-    const channel = channels[0] as RealtimeChannel;
+    if (channels.length === 0) {
+      setDebouncedStatus('disconnected');
+      return false;
+    }
     
-    if (channel && channel.state as string === 'SUBSCRIBED') {
+    // Check if any channel is fully connected
+    const hasConnectedChannel = channels.some(
+      channel => (channel.state as string) === 'SUBSCRIBED'
+    );
+    
+    // Check if any channel is trying to connect
+    const hasConnectingChannel = channels.some(
+      channel => (channel.state as string) === 'SUBSCRIBING'
+    );
+    
+    if (hasConnectedChannel) {
       setDebouncedStatus('connected');
-      return 1;
-    } else if (channel && channel.state as string === 'SUBSCRIBING') {
+      return true;
+    } else if (hasConnectingChannel) {
       setDebouncedStatus('connecting');
-      return 0;
+      return null;
     } else {
       setDebouncedStatus('disconnected');
-      return 2;
+      return false;
     }
   }, [setDebouncedStatus]);
-
-  // Cleanup timeout bij unmount
+  
+  // Periodically check connection status
   useEffect(() => {
+    const interval = setInterval(() => {
+      checkConnectionStatus();
+    }, 5000);
+    
     return () => {
+      clearInterval(interval);
       if (statusChangeTimeoutRef.current) {
         clearTimeout(statusChangeTimeoutRef.current);
       }
     };
-  }, []);
+  }, [checkConnectionStatus]);
+  
+  // Try to reconnect all channels
+  const reconnect = useCallback(() => {
+    // First check connection status
+    checkConnectionStatus();
+    
+    // Try to reconnect each channel
+    channelsRef.current.forEach(channel => {
+      const channelName = channel.topic;
+      supabase.removeChannel(channel);
+      
+      // Create a new channel with the same name
+      const newChannel = supabase.channel(channelName);
+      newChannel.subscribe((status: string) => {
+        console.log(`Channel ${channelName} status: ${status}`);
+        checkConnectionStatus();
+      });
+    });
+    
+    return true;
+  }, [checkConnectionStatus]);
 
-  return { realtimeStatus, setRealtimeStatus: setDebouncedStatus, checkConnectionStatus };
+  return { 
+    realtimeStatus, 
+    setRealtimeStatus: setDebouncedStatus, 
+    checkConnectionStatus,
+    reconnect
+  };
 };

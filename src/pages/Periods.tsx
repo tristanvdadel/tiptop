@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarPlus, PlusCircle, RefreshCw } from "lucide-react";
@@ -5,10 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { nl } from 'date-fns/locale';
 import { useApp } from "@/contexts/AppContext";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { LoadingState } from "@/components/ui/loading-state";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import PeriodList from "@/components/periods/PeriodList";
+import { useAppData } from "@/contexts/AppDataContext";
+import { StatusIndicator } from "@/components/ui/status-indicator";
+import DatabaseSecurityResolver from "@/components/ui/DatabaseSecurityResolver";
 
 const Periods = () => {
   const { 
@@ -16,32 +20,76 @@ const Periods = () => {
     currentPeriod, 
     startNewPeriod,
     fetchData,
-    isLoading,
+    isLoading: appLoading,
   } = useApp();
+  
+  const { 
+    errorMessage, 
+    hasError,
+    connectionState,
+    handleSecurityRecursionIssue
+  } = useAppData();
   
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [dataReady, setDataReady] = useState(false);
   
+  // Check for recursion errors
+  const hasRecursionError = errorMessage?.toLowerCase().includes('recursie') || 
+                            errorMessage?.toLowerCase().includes('beveiligingsprobleem') ||
+                            errorMessage?.toLowerCase().includes('recursion');
+  
   useEffect(() => {
     // Set data ready after initial loading is complete
-    if (!isLoading) {
+    if (!appLoading) {
       setDataReady(true);
     }
-  }, [isLoading]);
+  }, [appLoading]);
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await fetchData();
-    setIsRefreshing(false);
-  };
+  const handleRefresh = useCallback(async () => {
+    try {
+      setIsRefreshing(true);
+      await fetchData();
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [fetchData]);
 
   const activePeriods = periods.filter(p => p.isCurrent);
   const inactivePeriods = periods.filter(p => !p.isCurrent).sort((a, b) => {
     return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
   });
 
+  // Handle overall errors first
+  if (hasError && !hasRecursionError) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold">Periodes</h1>
+            <p className="text-muted-foreground">Beheer je fooienperiodes</p>
+          </div>
+        </div>
+        
+        <Alert variant="destructive">
+          <AlertTitle>Fout bij laden</AlertTitle>
+          <AlertDescription>
+            {errorMessage || "Er is een fout opgetreden bij het laden van de periodes."}
+          </AlertDescription>
+          <div className="mt-4">
+            <Button onClick={handleRefresh} variant="outline">
+              <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              Opnieuw proberen
+            </Button>
+          </div>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 transition-opacity duration-500 animate-fade-in">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Periodes</h1>
@@ -53,8 +101,28 @@ const Periods = () => {
         </Button>
       </div>
 
+      {/* Security Issue Handler */}
+      {hasRecursionError && (
+        <div className="mb-4">
+          <DatabaseSecurityResolver onResolved={handleSecurityRecursionIssue} />
+        </div>
+      )}
+      
+      {/* Connection Status */}
+      {connectionState === 'disconnected' && (
+        <div className="mb-4">
+          <StatusIndicator 
+            type="offline"
+            title="Geen verbinding"
+            message="Je bent offline. De pagina wordt automatisch bijgewerkt wanneer je weer online bent."
+            actionLabel="Opnieuw verbinden"
+            onAction={handleRefresh}
+          />
+        </div>
+      )}
+
       <LoadingState isLoading={!dataReady} delay={300} minDuration={500}>
-        <Card className="mb-6">
+        <Card className="mb-6 border-amber-200/50 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader>
             <CardTitle>Actieve periode</CardTitle>
             <CardDescription>
@@ -63,7 +131,7 @@ const Periods = () => {
           </CardHeader>
           <CardContent>
             {currentPeriod ? (
-              <div className="rounded-md border p-4">
+              <div className="rounded-md border p-4 bg-white">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="font-medium">
@@ -79,16 +147,16 @@ const Periods = () => {
                 </div>
               </div>
             ) : (
-              <div className="rounded-md border p-4 bg-muted/50">
+              <div className="rounded-md border p-4 bg-muted/20 hover:bg-muted/30 transition-colors">
                 <div className="flex flex-col items-center justify-center py-6 text-center space-y-4">
-                  <CalendarPlus className="h-12 w-12 text-muted-foreground" />
+                  <CalendarPlus className="h-12 w-12 text-amber-400" />
                   <div>
                     <p className="font-medium">Geen actieve periode</p>
                     <p className="text-sm text-muted-foreground pt-1">
                       Start een nieuwe periode om fooien te registreren
                     </p>
                   </div>
-                  <Button onClick={startNewPeriod}>
+                  <Button onClick={startNewPeriod} variant="default" className="bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-600 hover:to-amber-500 text-white">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Nieuwe periode starten
                   </Button>
@@ -106,7 +174,7 @@ const Periods = () => {
           </CardFooter>
         </Card>
 
-        {periods.length === 0 && !isLoading ? (
+        {periods.length === 0 && !appLoading ? (
           <Alert>
             <AlertTitle>Geen periodes gevonden</AlertTitle>
             <AlertDescription>

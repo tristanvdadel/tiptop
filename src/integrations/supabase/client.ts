@@ -5,12 +5,25 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://aufcygymqwmyvviofywt.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1ZmN5Z3ltcXdteXZ2aW9meXd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM3MTU5MzksImV4cCI6MjA1OTI5MTkzOX0.MbymYGamv15OLMlJ4CL1C_z35QvO55bRCBiAyjTHIn0";
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
+// Export the Supabase client with optimized configuration
+export const supabase = createClient<Database>(
+  SUPABASE_URL, 
+  SUPABASE_PUBLISHABLE_KEY,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      storage: localStorage
+    },
+    global: {
+      headers: {
+        'x-client-info': 'tiptop-app'
+      }
+    }
+  }
+);
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-
-// Supabase auth status helpers
+// Improved auth status helpers
 export const getUser = async () => {
   const { data: { user } } = await supabase.auth.getUser();
   return user;
@@ -33,7 +46,6 @@ export const getUserEmail = async (userId: string) => {
       
     if (profile) {
       // Since email isn't stored in the profiles table, we'll return a placeholder
-      // In a real application, you might implement this differently
       return 'Onbekend';
     }
     
@@ -73,7 +85,7 @@ export const getUserTeams = async (userId: string) => {
   }
 };
 
-// Update getTeamPeriodsSafe to handle the new tips JSON format
+// Update getTeamPeriodsSafe to handle the new tips JSON format and improve error handling
 export const getTeamPeriodsSafe = async (teamId: string) => {
   try {
     console.log('🔍 Fetching periods safely for team:', teamId);
@@ -82,40 +94,51 @@ export const getTeamPeriodsSafe = async (teamId: string) => {
       .rpc('get_team_periods_safe', { team_id_param: teamId });
     
     if (error) {
+      // Improved error detection
+      if (isRecursionError(error)) {
+        console.error('⚠️ Detected database recursion error in RLS policy:', error);
+        throw new Error('database_recursion_error');
+      }
+      
       console.error('❌ Error in getTeamPeriodsSafe:', error);
       throw error;
     }
     
-    // Transform the data to match our Period type
+    // Transform the data to match our Period type with safer null handling
     const formattedData = data?.map((period: any) => ({
       id: period.id,
-      name: period.name,
+      name: period.name || `Periode ${new Date(period.start_date).toLocaleDateString('nl')}`,
       startDate: period.start_date,
       endDate: period.end_date,
-      isCurrent: period.is_active,
-      isPaid: period.is_paid,
+      isCurrent: period.is_active || false,
+      isPaid: period.is_paid || false,
       autoCloseDate: period.auto_close_date,
-      notes: period.notes,
-      tips: period.tips.map((tip: any) => ({
+      notes: period.notes || '',
+      tips: Array.isArray(period.tips) ? period.tips.map((tip: any) => ({
         id: tip.id,
         amount: tip.amount,
         teamMemberId: tip.added_by,
         periodId: tip.period_id,
         timestamp: tip.created_at,
-        date: tip.date,
-        note: tip.note
-      }))
+        date: tip.date || tip.created_at,
+        note: tip.note || ''
+      })) : []
     })) || [];
     
     console.log('✅ Successfully fetched periods:', formattedData.length);
     return formattedData;
-  } catch (error) {
+  } catch (error: any) {
+    // Special handling for recursion errors to bubble up correctly
+    if (error.message === 'database_recursion_error') {
+      throw error;
+    }
+    
     console.error('❌ Unexpected error in getTeamPeriodsSafe:', error);
     return [];
   }
 };
 
-// Enhanced function to detect and handle recursion errors
+// Enhanced function to detect and handle recursion errors with accuracy
 export const isRecursionError = (error: any): boolean => {
   if (!error) return false;
   
@@ -123,7 +146,10 @@ export const isRecursionError = (error: any): boolean => {
   const errorCode = typeof error === 'object' && error.code ? error.code : '';
   
   return errorMessage.includes('recursion') || 
+         errorMessage.includes('recursie') ||
          errorMessage.includes('infinity') ||
+         errorMessage.includes('oneindig') ||
+         errorMessage.includes('beveiligingsprobleem') ||
          errorCode === '42P17' ||
          errorMessage.includes('maximum call stack size exceeded');
 };

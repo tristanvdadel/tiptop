@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
@@ -10,53 +10,46 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
-  const authCheckTimeout = useRef<number | null>(null);
   const { toast } = useToast();
-  // Gereduceerd naar 100ms voor snellere respons
-  const maxAuthCheckTime = 100;
-
+  
+  // Define public routes that don't require authentication
+  const isPublicRoute = location.pathname === '/splash' || 
+                        location.pathname === '/login' || 
+                        location.pathname.startsWith('/fast-tip');
+                      
   useEffect(() => {
-    // Voor snelle initiële render, controleer of we een gecachte token hebben
-    const cachedToken = localStorage.getItem('sb-auth-token-cached');
-    const isCachedSessionLikely = !!cachedToken;
-    const loginAttemptTime = localStorage.getItem('login_attempt_time');
-    const recentLoginAttempt = loginAttemptTime && (Date.now() - parseInt(loginAttemptTime)) < 10000;
-    
     let mounted = true;
     
-    // Stel een kortere timeout in voor betere gebruikerservaring
-    authCheckTimeout.current = window.setTimeout(() => {
-      if (mounted && isLoading) {
-        console.log('Session check timeout - forcing completion');
-        // Als we een gecachte token hebben, nemen we aan dat de gebruiker is ingelogd
-        if (isCachedSessionLikely) {
-          setSession({ dummy: 'temporary' }); // Tijdelijk sessie-object
-        } else {
-          setSession(null);
-        }
+    // Setup auth state listener for all auth events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+      console.log('Auth state changed:', event);
+      
+      if (mounted) {
+        setSession(newSession);
         setIsLoading(false);
+        
+        // Handle logout events
+        if (event === 'SIGNED_OUT') {
+          // Clear all cached data
+          localStorage.removeItem('sb-auth-token-cached');
+          localStorage.removeItem('login_attempt_time');
+          localStorage.removeItem('last_team_id');
+          
+          const teamIds = Object.keys(localStorage).filter(key => key.startsWith('team_data_'));
+          teamIds.forEach(key => localStorage.removeItem(key));
+        }
       }
-    }, maxAuthCheckTime);
-    
-    // Snelle sessiecontrole met prioriteit voor gecachte gegevens
+    });
+
+    // Initial session check
     const checkSession = async () => {
       try {
-        // Bij een recente inlogpoging gebruiken we eerst de cache
-        if (recentLoginAttempt && isCachedSessionLikely && mounted) {
-          console.log('Recent login detected, using cached session first');
-          setSession({ dummy: 'temporary' }); // Tijdelijke sessie uit cache
-          setIsLoading(false);
-        }
-        
-        // Toch nog de volledige controle op de achtergrond uitvoeren
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('Error getting session:', error);
           if (mounted) {
             setIsLoading(false);
-            // Als er een error is bij het ophalen van de sessie, verwijder dan de gecachte token
-            localStorage.removeItem('sb-auth-token-cached');
           }
           return;
         }
@@ -64,16 +57,6 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
         if (mounted) {
           setSession(data.session);
           setIsLoading(false);
-          
-          // Sla token op in cache voor snellere laden volgende keer
-          if (data.session?.access_token) {
-            localStorage.setItem('sb-auth-token-cached', data.session.access_token);
-          }
-          
-          // Verwijder de login-pogingtijd na succesvolle authenticatie
-          if (data.session) {
-            localStorage.removeItem('login_attempt_time');
-          }
         }
       } catch (error) {
         console.error('Unexpected error in session check:', error);
@@ -81,66 +64,37 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       }
     };
     
-    // Setup auth state listener voor ALLE auth-events
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
-      console.log('Auth state changed:', event, newSession ? 'User logged in' : 'No session');
-      
-      if (mounted) {
-        setSession(newSession);
-        setIsLoading(false);
-        
-        // Als de gebruiker uitlogt, verwijder dan de gecachte token
-        if (event === 'SIGNED_OUT') {
-          localStorage.removeItem('sb-auth-token-cached');
-          localStorage.removeItem('login_attempt_time');
-          // Ook team-specifieke gegevens wissen
-          localStorage.removeItem('last_team_id');
-          localStorage.removeItem('analytics_last_refresh');
-          
-          const teamIds = Object.keys(localStorage).filter(key => key.startsWith('team_data_refresh_'));
-          teamIds.forEach(key => localStorage.removeItem(key));
-        }
-        
-        // Als de gebruiker inlogt, sla de token op in de cache
-        if (event === 'SIGNED_IN' && newSession?.access_token) {
-          localStorage.setItem('sb-auth-token-cached', newSession.access_token);
-          localStorage.removeItem('login_attempt_time');
-        }
-      }
-    });
-
-    // Start sessiecontrole onmiddellijk
+    // Start session check immediately
     checkSession();
 
+    // Safety timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (mounted && isLoading) {
+        console.log("Session check timeout - forcing completion");
+        setIsLoading(false);
+      }
+    }, 2000);
+    
     return () => {
       mounted = false;
       subscription?.unsubscribe();
-      if (authCheckTimeout.current) {
-        clearTimeout(authCheckTimeout.current);
-      }
+      clearTimeout(timeoutId);
     };
   }, []);
 
-  // Definieer openbare routes die geen authenticatie vereisen
-  const isPublicRoute = location.pathname === '/splash' || 
-                        location.pathname === '/login' || 
-                        location.pathname.startsWith('/fast-tip');
-                        
-  // Controleer of redirect nodig is
-  const needsRedirect = !isLoading && !session && !isPublicRoute;
-
-  // Handle redirect indien nodig - aparte effect voor redirects
+  // Handle redirect if needed
   useEffect(() => {
-    if (needsRedirect) {
+    // Only redirect if we're done loading and have no session
+    if (!isLoading && !session && !isPublicRoute) {
       console.log('No session, redirecting to login from:', location.pathname);
       
-      // Check of er een recursie-error was
+      // Check for recursion error in URL params
       const urlParams = new URLSearchParams(location.search);
       const hasRecursionError = urlParams.get('error') === 'recursion';
       
-      // Bij een recursie-error tonen we een bericht
+      // Show toast for recursion errors
       if (hasRecursionError) {
-        // Alles wissen uit localStorage om problemen te voorkomen
+        // Clear localStorage to prevent issues
         Object.keys(localStorage).forEach(key => {
           if (key.startsWith('team_data_') || 
               key.includes('analytics_') || 
@@ -158,31 +112,33 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
           } 
         });
         
-        // Toon een toast om duidelijk te maken wat er gebeurt
         toast({
           title: "Database beveiligingsprobleem gedetecteerd",
-          description: "Probeer opnieuw in te loggen om het database beveiligingsprobleem op te lossen. Wij hebben gegevens gereset om dit te helpen.",
+          description: "Probeer opnieuw in te loggen om het database beveiligingsprobleem op te lossen.",
           variant: "destructive",
           duration: 5000
         });
       } else {
-        // Gebruik replace in plaats van push voor betere geschiedenisbeheer
+        // Regular redirect
         navigate('/login', { replace: true });
       }
     }
-  }, [needsRedirect, navigate, location.pathname, location.search, toast]);
+  }, [isLoading, session, isPublicRoute, navigate, location.pathname, location.search, toast]);
 
-  // Toon minimale laadstatus
+  // Show loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-amber-50/30 to-amber-100/30">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-amber-500 mx-auto" />
+          <p className="mt-2 text-sm text-muted-foreground">Laden...</p>
+        </div>
       </div>
     );
   }
 
-  // Render geen children tijdens redirect
-  if (needsRedirect) {
+  // Don't render children during redirect
+  if (!isLoading && !session && !isPublicRoute) {
     return null;
   }
 

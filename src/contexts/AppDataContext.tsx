@@ -86,6 +86,8 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         id: tip.id,
         amount: tip.amount,
         teamMemberId: tip.added_by,
+        periodId: tip.period_id, // Add missing required property
+        timestamp: tip.created_at, // Add missing required property
         date: tip.date,
         note: tip.note
       }))
@@ -93,12 +95,13 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     
     const formattedTeamMembers: TeamMember[] = (teamMembersData || []).map(member => ({
       id: member.id,
-      name: member.name || member.id,
+      name: member.user_id || member.id, // Fallback if name doesn't exist
+      hourlyRate: 0, // Add required property with default value
       hours: member.hours || 0,
       balance: member.balance || 0,
       role: member.role,
-      userId: member.user_id,
-      permissions: member.permissions
+      hasAccount: !!member.user_id,
+      userId: member.user_id
     }));
     
     // Find the current active period
@@ -149,10 +152,12 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         table: 'tips'
       }, (payload) => {
         // Check if this tip belongs to one of our periods
-        const periodId = payload.new?.period_id;
-        if (periodId && periods.some(p => p.id === periodId)) {
-          console.log('Tips updated, refreshing data');
-          refreshData();
+        if (payload.new && 'period_id' in payload.new) {
+          const periodId = payload.new.period_id;
+          if (periodId && periods.some(p => p.id === periodId)) {
+            console.log('Tips updated, refreshing data');
+            refreshData();
+          }
         }
       })
       .subscribe();

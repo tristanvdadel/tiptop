@@ -1,5 +1,6 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAppData } from '@/contexts/AppDataContext';
 import { useApp } from '@/contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingState } from '@/components/ui/loading-state';
@@ -10,42 +11,19 @@ import PeriodActions from '@/components/periods/PeriodActions';
 import { usePeriodSort } from '@/hooks/usePeriodSort';
 
 const Periods = () => {
-  const { periods, refreshTeamData, updatePeriod } = useApp();
-  const [loading, setLoading] = useState(true);
-  const [initialized, setInitialized] = useState(false);
+  const { periods, isLoading, isInitialized } = useAppData();
+  const { updatePeriod } = useApp();
   const [contentVisible, setContentVisible] = useState(false);
   const { toast } = useToast();
   const { sortDirection, sortedPeriods, handleToggleSort } = usePeriodSort(periods);
 
-  // Initialize content visibility
-  React.useEffect(() => {
+  // Initialize content visibility for smooth transitions
+  useEffect(() => {
     const timer = setTimeout(() => {
       setContentVisible(true);
     }, 100);
     return () => clearTimeout(timer);
   }, []);
-
-  // Load data
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      await refreshTeamData();
-      setInitialized(true);
-    } catch (error) {
-      console.error('Error loading periods:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [refreshTeamData]);
-
-  // Initial load and auto-refresh
-  React.useEffect(() => {
-    loadData();
-    const refreshInterval = setInterval(() => {
-      refreshTeamData().catch(console.error);
-    }, 120000);
-    return () => clearInterval(refreshInterval);
-  }, [refreshTeamData, loadData]);
 
   const handleMarkAsPaid = async (periodId: string) => {
     try {
@@ -75,10 +53,10 @@ const Periods = () => {
       </div>
 
       <LoadingState 
-        isLoading={loading && !initialized} 
+        isLoading={isLoading && !isInitialized} 
         delay={500}
         minDuration={800}
-        backgroundLoad={initialized}
+        backgroundLoad={isInitialized}
       >
         <Card>
           <CardHeader className="pb-3">

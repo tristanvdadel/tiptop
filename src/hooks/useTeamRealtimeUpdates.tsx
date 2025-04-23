@@ -13,6 +13,7 @@ export const useTeamRealtimeUpdates = (
   refreshData: () => Promise<void>
 ) => {
   const [refreshCount, setRefreshCount] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   const {
     connectionState,
@@ -27,7 +28,11 @@ export const useTeamRealtimeUpdates = (
   });
 
   const handleDataChange = useCallback(async () => {
+    // Prevent multiple simultaneous refreshes
+    if (isRefreshing) return;
+    
     try {
+      setIsRefreshing(true);
       setLastActivity(new Date());
       await refreshData();
       setLastError(null);
@@ -35,8 +40,10 @@ export const useTeamRealtimeUpdates = (
     } catch (error: any) {
       console.error('Error refreshing data:', error);
       setLastError(error.message || 'Unknown error refreshing data');
+    } finally {
+      setIsRefreshing(false);
     }
-  }, [refreshData, setLastActivity, setLastError]);
+  }, [refreshData, setLastActivity, setLastError, isRefreshing]);
 
   const { setupChannels, cleanupChannels } = useTeamChannels(
     teamId,
@@ -62,7 +69,7 @@ export const useTeamRealtimeUpdates = (
     };
   }, [teamId, setupChannels, cleanupChannels]);
 
-  // Gezondheidscheck om connectie te bevestigen
+  // Health check to confirm connection
   useEffect(() => {
     const heartbeatInterval = setInterval(() => {
       if (connectionState === 'connected') {
@@ -78,6 +85,7 @@ export const useTeamRealtimeUpdates = (
     reconnect,
     lastError,
     lastActivity,
-    refreshCount
+    refreshCount,
+    isRefreshing
   };
 };

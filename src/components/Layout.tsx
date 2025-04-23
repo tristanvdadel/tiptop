@@ -1,5 +1,5 @@
 
-import { ReactNode, useState, useEffect } from 'react';
+import { ReactNode, useState, useEffect, useCallback } from 'react';
 import Navbar from './Navbar';
 import { useLocation } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
@@ -21,8 +21,33 @@ const Layout = ({ children }: LayoutProps) => {
   // Check if we're in the payout summary view
   const isPayoutSummary = location.search.includes('payoutSummary=true');
 
+  // Function to handle database recursion error
+  const handleDatabaseRecursionError = useCallback(() => {
+    console.log("Handling database recursion error...");
+    localStorage.removeItem('sb-auth-token-cached');
+    localStorage.removeItem('last_team_id');
+    localStorage.removeItem('login_attempt_time');
+    
+    // Clear team-specific cached data
+    const teamDataKeys = Object.keys(localStorage).filter(
+      key => key.startsWith('team_data_') || key.includes('analytics_')
+    );
+    teamDataKeys.forEach(key => localStorage.removeItem(key));
+    
+    toast({
+      title: "Database probleem opgelost",
+      description: "De cache is gewist en de beveiligingsproblemen zijn opgelost. De pagina wordt opnieuw geladen.",
+      duration: 3000,
+    });
+    
+    // Delay before reload to allow toast to show
+    setTimeout(() => {
+      window.location.href = '/team';
+    }, 1000);
+  }, [toast]);
+
+  // Check console logs for recursion errors
   useEffect(() => {
-    // Check console logs for recursion errors
     const originalConsoleError = console.error;
     console.error = (...args) => {
       originalConsoleError(...args);
@@ -49,31 +74,6 @@ const Layout = ({ children }: LayoutProps) => {
       description: "Rond eerst het huidige uitbetalingsproces af voordat je verder gaat.",
       variant: "destructive"
     });
-  };
-
-  // Handle database recursion error
-  const handleDatabaseRecursionError = () => {
-    console.log("Handling database recursion error...");
-    localStorage.removeItem('sb-auth-token-cached');
-    localStorage.removeItem('last_team_id');
-    localStorage.removeItem('login_attempt_time');
-    
-    // Clear team-specific cached data
-    const teamDataKeys = Object.keys(localStorage).filter(
-      key => key.startsWith('team_data_') || key.includes('analytics_')
-    );
-    teamDataKeys.forEach(key => localStorage.removeItem(key));
-    
-    toast({
-      title: "Database probleem opgelost",
-      description: "De cache is gewist en de beveiligingsproblemen zijn opgelost. De pagina wordt opnieuw geladen.",
-      duration: 3000,
-    });
-    
-    // Delay before reload to allow toast to show
-    setTimeout(() => {
-      window.location.href = '/team';
-    }, 1000);
   };
 
   return (

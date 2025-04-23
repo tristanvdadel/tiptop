@@ -12,6 +12,7 @@ export const useTeamChannels = (
   const channelsRef = useRef<RealtimeChannel[]>([]);
   const lastRefreshTimeRef = useRef<number>(Date.now());
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isRefreshingRef = useRef<boolean>(false);
 
   const cleanupChannels = useCallback(() => {
     channelsRef.current.forEach(channel => {
@@ -25,26 +26,34 @@ export const useTeamChannels = (
   }, []);
 
   const handleDataChange = useCallback(() => {
+    // Prevent multiple rapid refreshes
+    if (isRefreshingRef.current) {
+      return;
+    }
+    
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
     
-    // Gebruik een korte debounce om te voorkomen dat we te veel updates tegelijk doen
+    // Use debounce to prevent too many updates at once
     debounceTimeoutRef.current = setTimeout(async () => {
       const now = Date.now();
       const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
       
-      // Voorkom te snelle updates (minimaal 2 seconden tussen updates)
+      // Prevent too rapid updates (minimum 2 seconds between updates)
       if (timeSinceLastRefresh < 2000) {
         return;
       }
       
       lastRefreshTimeRef.current = now;
+      isRefreshingRef.current = true;
       
       try {
         await onDataChange();
       } catch (error) {
         console.error('Error refreshing data after realtime update:', error);
+      } finally {
+        isRefreshingRef.current = false;
       }
     }, 500);
   }, [onDataChange]);
@@ -58,6 +67,7 @@ export const useTeamChannels = (
     cleanupChannels();
     
     try {
+      // Use a single channel for all updates to reduce connection overhead
       const mainChannel = supabase.channel('team-realtime-all')
         .on('presence', { event: 'sync' }, () => {
           console.log('Connection synced');

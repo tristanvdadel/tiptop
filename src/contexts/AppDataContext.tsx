@@ -39,84 +39,87 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return;
     }
     
-    // Get all periods for the team
-    const { data: periodsData, error: periodsError } = await supabase
-      .from('periods')
-      .select(`
-        id,
-        name,
-        start_date,
-        end_date,
-        is_active,
-        is_paid,
-        auto_close_date,
-        notes,
-        tips (*)
-      `)
-      .eq('team_id', teamId)
-      .order('start_date', { ascending: false });
-      
-    if (periodsError) {
-      console.error('Error fetching periods:', periodsError);
-      throw periodsError;
-    }
+    try {
+      // Get all periods for the team - this query doesn't seem to be causing recursion issues
+      const { data: periodsData, error: periodsError } = await supabase
+        .from('periods')
+        .select(`
+          id,
+          name,
+          start_date,
+          end_date,
+          is_active,
+          is_paid,
+          auto_close_date,
+          notes,
+          tips (*)
+        `)
+        .eq('team_id', teamId)
+        .order('start_date', { ascending: false });
+        
+      if (periodsError) {
+        console.error('Error fetching periods:', periodsError);
+        throw periodsError;
+      }
 
-    // Get all team members
-    const { data: teamMembersData, error: teamMembersError } = await supabase
-      .from('team_members')
-      .select('*')
-      .eq('team_id', teamId);
+      // Get all team members using the safe RPC function to avoid recursion
+      const { data: teamMembersData, error: teamMembersError } = await supabase
+        .rpc('get_team_members_safe', { team_id_param: teamId });
+        
+      if (teamMembersError) {
+        console.error('Error fetching team members:', teamMembersError);
+        throw teamMembersError;
+      }
       
-    if (teamMembersError) {
-      console.error('Error fetching team members:', teamMembersError);
-      throw teamMembersError;
+      // Format the data to match our types
+      const formattedPeriods: Period[] = (periodsData || []).map(period => ({
+        id: period.id,
+        name: period.name,
+        startDate: period.start_date,
+        endDate: period.end_date,
+        isCurrent: period.is_active,
+        isPaid: period.is_paid,
+        autoCloseDate: period.auto_close_date,
+        notes: period.notes,
+        tips: period.tips.map((tip: any) => ({
+          id: tip.id,
+          amount: tip.amount,
+          teamMemberId: tip.added_by,
+          periodId: tip.period_id, // Add missing required property
+          timestamp: tip.created_at, // Add missing required property
+          date: tip.date,
+          note: tip.note
+        }))
+      }));
+      
+      const formattedTeamMembers: TeamMember[] = (teamMembersData || []).map(member => ({
+        id: member.id,
+        name: member.user_id || member.id, // Fallback if name doesn't exist
+        hourlyRate: 0, // Add required property with default value
+        hours: member.hours || 0,
+        balance: member.balance || 0,
+        role: member.role,
+        hasAccount: !!member.user_id,
+        userId: member.user_id
+      }));
+      
+      // Find the current active period
+      const activePeriod = formattedPeriods.find(p => p.isCurrent) || null;
+      
+      // Update state
+      setPeriods(formattedPeriods);
+      setTeamMembers(formattedTeamMembers);
+      setCurrentPeriod(activePeriod);
+      
+      console.log('Data refreshed successfully:', {
+        periods: formattedPeriods.length,
+        members: formattedTeamMembers.length,
+        currentPeriod: activePeriod ? activePeriod.id : 'none'
+      });
+    } catch (error) {
+      console.error('Error in fetchAllData:', error);
+      throw error;
     }
-    
-    // Format the data to match our types
-    const formattedPeriods: Period[] = (periodsData || []).map(period => ({
-      id: period.id,
-      name: period.name,
-      startDate: period.start_date,
-      endDate: period.end_date,
-      isCurrent: period.is_active,
-      isPaid: period.is_paid,
-      autoCloseDate: period.auto_close_date,
-      notes: period.notes,
-      tips: period.tips.map((tip: any) => ({
-        id: tip.id,
-        amount: tip.amount,
-        teamMemberId: tip.added_by,
-        periodId: tip.period_id, // Add missing required property
-        timestamp: tip.created_at, // Add missing required property
-        date: tip.date,
-        note: tip.note
-      }))
-    }));
-    
-    const formattedTeamMembers: TeamMember[] = (teamMembersData || []).map(member => ({
-      id: member.id,
-      name: member.user_id || member.id, // Fallback if name doesn't exist
-      hourlyRate: 0, // Add required property with default value
-      hours: member.hours || 0,
-      balance: member.balance || 0,
-      role: member.role,
-      hasAccount: !!member.user_id,
-      userId: member.user_id
-    }));
-    
-    // Find the current active period
-    const activePeriod = formattedPeriods.find(p => p.isCurrent) || null;
-    
-    // Update state
-    setPeriods(formattedPeriods);
-    setTeamMembers(formattedTeamMembers);
-    setCurrentPeriod(activePeriod);
-    
-    console.log('Data refreshed successfully:', {
-      periods: formattedPeriods.length,
-      members: formattedTeamMembers.length,
-      currentPeriod: activePeriod ? activePeriod.id : 'none'
-    });
   };
   
   // Use our centralized global data fetching hook

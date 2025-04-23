@@ -15,13 +15,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StatusIndicator } from '@/components/ui/status-indicator';
 import { CalendarDays, Check, Clock } from 'lucide-react';
+import { useApp } from '@/contexts/AppContext';
 
-interface PeriodListProps {
-  periods: Period[];
-  onMarkAsPaid: (periodId: string) => void;
-}
-
-const PeriodList: React.FC<PeriodListProps> = ({ periods, onMarkAsPaid }) => {
+// The component doesn't need props explicitly passed since it uses useApp context
+const PeriodList: React.FC = () => {
+  const { periods, markPeriodAsPaid } = useApp();
+  
   const formatPeriodDate = (date: string) => {
     return format(new Date(date), 'd MMMM yyyy', { locale: nl });
   };
@@ -84,7 +83,7 @@ const PeriodList: React.FC<PeriodListProps> = ({ periods, onMarkAsPaid }) => {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => onMarkAsPaid(period.id)}
+                        onClick={() => markPeriodAsPaid(period.id)}
                       >
                         Markeer als uitbetaald
                       </Button>

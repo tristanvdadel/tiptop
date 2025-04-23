@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarPlus, PlusCircle, RefreshCw } from "lucide-react";
@@ -9,7 +8,7 @@ import { useApp } from "@/contexts/AppContext";
 import { useState, useEffect } from "react";
 import { LoadingState } from "@/components/ui/loading-state";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { PeriodList } from "@/components/periods/PeriodList";
+import PeriodList from "@/components/periods/PeriodList";
 
 const Periods = () => {
   const { 

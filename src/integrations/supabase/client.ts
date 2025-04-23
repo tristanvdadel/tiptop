@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -73,10 +72,10 @@ export const getUserTeams = async (userId: string) => {
   }
 };
 
-// Get team periods safely using direct query instead of RPC function
+// Update getTeamPeriodsSafe to use direct query instead of RPC
 export const getTeamPeriodsSafe = async (teamId: string) => {
   try {
-    console.log('Fetching periods for team:', teamId);
+    console.log('🔍 Fetching periods safely for team:', teamId);
     
     const { data, error } = await supabase
       .from('periods')
@@ -101,14 +100,28 @@ export const getTeamPeriodsSafe = async (teamId: string) => {
       `)
       .eq('team_id', teamId);
     
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error in getTeamPeriodsSafe:', error);
+      throw error;
+    }
     
+    console.log('✅ Successfully fetched periods:', data?.length || 0);
     return data || [];
   } catch (error) {
-    console.error('Error in getTeamPeriodsSafe:', error);
+    console.error('❌ Unexpected error in getTeamPeriodsSafe:', error);
     return [];
   }
-}
+};
+
+// Add new function to detect recursion errors
+export const isRecursionError = (error: any): boolean => {
+  if (!error) return false;
+  
+  const errorMessage = typeof error === 'string' ? error : error.message || '';
+  return errorMessage.includes('recursion') || 
+         errorMessage.includes('infinity') ||
+         errorMessage.code === '42P17';
+};
 
 // Interface extensions to help with TypeScript
 export interface Team {

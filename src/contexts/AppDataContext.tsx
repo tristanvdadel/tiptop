@@ -211,7 +211,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // Better approach to handle reconnections with clear status updates
     channel.subscribe(status => {
       console.log('Channel status:', status);
-      if (status === 'SUBSCRIBED') {
+      if (status === 'SUBSCRIBED') {  // Fix: Use string literal, not enum
         setConnectionState('connected');
         // Initial data fetch
         fetchData();
@@ -219,7 +219,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setConnectionState('disconnected');
         // Try to reconnect automatically after a short delay
         setTimeout(() => {
-          if (channel.state !== 'SUBSCRIBED') {
+          if (channel.state !== 'SUBSCRIBED') {  // Fix: Use string literal, not enum
             channel.subscribe();
           }
         }, 3000);

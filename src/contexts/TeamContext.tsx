@@ -48,9 +48,15 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
     errorMessage, 
     refreshData, 
     showRecursionAlert,
-    handleDatabaseRecursionError,
+    handleDatabaseRecursionIssue,  // This is the correct property name
     isInitialized
   } = useCachedTeamData(refreshTeamData);
+  
+  // Create a handler function with the expected name in the interface
+  const handleDatabaseRecursionError = useCallback(() => {
+    // Call the actual implementation function
+    handleDatabaseRecursionIssue();
+  }, [handleDatabaseRecursionIssue]);
   
   const {
     selectedPeriods,
@@ -107,7 +113,7 @@ export const TeamProvider: React.FC<{ children: React.ReactNode }> = ({ children
     hasError,
     errorMessage,
     showRecursionAlert,
-    handleDatabaseRecursionError,
+    handleDatabaseRecursionError,  // Use our adapter function
     togglePeriodSelection,
     handlePayout,
     handleRefresh,

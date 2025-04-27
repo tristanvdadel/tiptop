@@ -1,5 +1,5 @@
 
-import { ReactNode, useCallback } from 'react';
+import { ReactNode, useCallback, useState, useEffect } from 'react';
 import Navbar from './Navbar';
 import { useLocation } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +22,24 @@ const Layout = ({ children }: LayoutProps) => {
     isLoading: dataLoading,
     connectionState 
   } = useAppData();
+  
+  const [showConnectionStatus, setShowConnectionStatus] = useState(false);
+  
+  // Only show connection status after persistent disconnection
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    if (connectionState === 'disconnected') {
+      // Wait before showing disconnected state to prevent flickering
+      timeoutId = setTimeout(() => {
+        setShowConnectionStatus(true);
+      }, 3000);
+    } else {
+      setShowConnectionStatus(false);
+    }
+    
+    return () => clearTimeout(timeoutId);
+  }, [connectionState]);
   
   const isFastTip = location.pathname === '/fast-tip';
   
@@ -69,8 +87,8 @@ const Layout = ({ children }: LayoutProps) => {
           </div>
         )}
         
-        {/* Realtime connection status indicator */}
-        {connectionState === 'disconnected' && (
+        {/* Realtime connection status indicator - only show after persistent disconnection */}
+        {connectionState === 'disconnected' && showConnectionStatus && (
           <div className="mb-4 animate-fade-in">
             <StatusIndicator 
               type="offline"

@@ -7,16 +7,15 @@ export const RealtimeConnection: React.FC = () => {
   const { connectionState, refreshData } = useAppData();
   const [showIndicator, setShowIndicator] = useState(false);
   
-  // Only show the connection indicator after a delay of being disconnected
-  // This prevents brief disconnection flickers from showing the UI element
+  // Reduced delay from 3000ms to 1500ms for faster feedback but still prevents flicker
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
     if (connectionState === 'disconnected') {
-      // Wait 3 seconds before showing the disconnected indicator
+      // Wait 1.5 seconds before showing the disconnected indicator
       timeoutId = setTimeout(() => {
         setShowIndicator(true);
-      }, 3000);
+      }, 1500);
     } else {
       setShowIndicator(false);
     }
@@ -26,7 +25,7 @@ export const RealtimeConnection: React.FC = () => {
     };
   }, [connectionState]);
   
-  // Don't show anything when connected or if disconnected for less than 3 seconds
+  // Don't show anything when connected or if disconnected for less than threshold time
   if (connectionState === 'connected' || !showIndicator) {
     return null;
   }

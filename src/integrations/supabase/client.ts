@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -18,6 +17,11 @@ export const supabase = createClient<Database>(
     global: {
       headers: {
         'x-client-info': 'tiptop-app'
+      }
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10
       }
     }
   }
@@ -85,13 +89,43 @@ export const getUserTeams = async (userId: string) => {
   }
 };
 
-// Update getTeamPeriodsSafe to handle the new tips JSON format and improve error handling
+// Update getTeamPeriodsSafe to handle the new tips JSON format with improved error handling
 export const getTeamPeriodsSafe = async (teamId: string) => {
   try {
     console.log('🔍 Fetching periods safely for team:', teamId);
     
-    const { data, error } = await supabase
-      .rpc('get_team_periods_safe', { team_id_param: teamId });
+    // Add retry logic for safer period fetching
+    let attempts = 0;
+    const maxAttempts = 2;
+    let data;
+    let error;
+    
+    while (attempts < maxAttempts) {
+      try {
+        const result = await supabase
+          .rpc('get_team_periods_safe', { team_id_param: teamId });
+          
+        data = result.data;
+        error = result.error;
+        
+        if (!error) break;
+        
+        // If recursion error, break immediately to handle specially
+        if (isRecursionError(error)) break;
+        
+        // Otherwise retry
+        attempts++;
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (err) {
+        error = err;
+        attempts++;
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+    }
     
     if (error) {
       // Improved error detection
@@ -138,12 +172,13 @@ export const getTeamPeriodsSafe = async (teamId: string) => {
   }
 };
 
-// Enhanced function to detect and handle recursion errors with accuracy
+// Enhanced and more comprehensive function to detect recursion errors
 export const isRecursionError = (error: any): boolean => {
   if (!error) return false;
   
   const errorMessage = typeof error === 'string' ? error : error.message || '';
   const errorCode = typeof error === 'object' && error.code ? error.code : '';
+  const errorDetails = typeof error === 'object' && error.details ? error.details : '';
   
   return errorMessage.includes('recursion') || 
          errorMessage.includes('recursie') ||
@@ -151,21 +186,36 @@ export const isRecursionError = (error: any): boolean => {
          errorMessage.includes('oneindig') ||
          errorMessage.includes('beveiligingsprobleem') ||
          errorCode === '42P17' ||
+         errorDetails.includes('recursion') ||
          errorMessage.includes('maximum call stack size exceeded');
 };
 
-// Function to clear all cached security tokens and team data
+// Improved function to clear all cached security tokens and team data
 export const clearSecurityCache = () => {
   console.log("Clearing security and session cache to resolve recursion issues");
+  
+  // Clear auth tokens
   localStorage.removeItem('sb-auth-token-cached');
+  localStorage.removeItem('sb:token');
+  localStorage.removeItem('supabase.auth.token');
+  
+  // Clear team data
   localStorage.removeItem('last_team_id');
   localStorage.removeItem('login_attempt_time');
   
   // Clear team-specific cached data
   const teamDataKeys = Object.keys(localStorage).filter(
-    key => key.startsWith('team_data_') || key.includes('analytics_')
+    key => key.startsWith('team_data_') || 
+           key.includes('analytics_') || 
+           key.includes('supabase.auth')
   );
   teamDataKeys.forEach(key => localStorage.removeItem(key));
+  
+  // Also remove any session storage items
+  const sessionKeys = Object.keys(sessionStorage).filter(
+    key => key.includes('supabase') || key.includes('team')
+  );
+  sessionKeys.forEach(key => sessionStorage.removeItem(key));
   
   return true;
 };

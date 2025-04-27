@@ -25,7 +25,7 @@ const Layout = ({ children }: LayoutProps) => {
   
   const [showConnectionStatus, setShowConnectionStatus] = useState(false);
   
-  // Only show connection status after persistent disconnection
+  // Reduced delay from 3000ms to 1500ms for connection status
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
@@ -33,7 +33,7 @@ const Layout = ({ children }: LayoutProps) => {
       // Wait before showing disconnected state to prevent flickering
       timeoutId = setTimeout(() => {
         setShowConnectionStatus(true);
-      }, 3000);
+      }, 1500);
     } else {
       setShowConnectionStatus(false);
     }
@@ -46,7 +46,7 @@ const Layout = ({ children }: LayoutProps) => {
   // Check if we're in the payout summary view
   const isPayoutSummary = location.search.includes('payoutSummary=true');
   
-  // Detect recursion errors in error messages with improved detection
+  // Improved detection for recursion errors with exact keywords
   const hasRecursionError = errorMessage?.toLowerCase().includes('recursie') || 
                             errorMessage?.toLowerCase().includes('beveiligingsprobleem') ||
                             errorMessage?.toLowerCase().includes('recursion') ||
@@ -87,13 +87,15 @@ const Layout = ({ children }: LayoutProps) => {
           </div>
         )}
         
-        {/* Realtime connection status indicator - only show after persistent disconnection */}
+        {/* Realtime connection status indicator - show after shorter disconnection */}
         {connectionState === 'disconnected' && showConnectionStatus && (
           <div className="mb-4 animate-fade-in">
             <StatusIndicator 
               type="offline"
               title="Geen verbinding"
               message="Je bent offline. De pagina wordt automatisch bijgewerkt wanneer je weer online bent."
+              actionLabel="Verbinding herstellen"
+              onAction={() => fetchTeamId()}
               minimal={true}
             />
           </div>

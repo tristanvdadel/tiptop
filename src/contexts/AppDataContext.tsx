@@ -3,8 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { Period, TeamMember } from '@/types';
 import { useTeamId } from '@/hooks/useTeamId';
 import { supabase, getTeamPeriodsSafe, isRecursionError, clearSecurityCache } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { debounce } from '@/lib/utils';
+import { useToast } from "@/hooks/use-toast";
 
 interface AppDataContextType {
   periods: Period[];
@@ -40,9 +39,9 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
-  const [lastRefreshTime, setLastRefreshTime] = useState<number>(Date.now());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasRecursionError, setHasRecursionError] = useState(false);
+  const [currentChannel, setCurrentChannel] = useState<any>(null);
 
   // Special handler for database recursion security issues
   const handleSecurityRecursionIssue = useCallback(() => {
@@ -63,7 +62,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, 1000);
   }, [toast]);
 
-  // Main data fetching function
+  // Main data fetching function with improved retry and error handling
   const fetchData = useCallback(async () => {
     if (!teamId) {
       console.log('No team ID available for fetching data');
@@ -120,7 +119,6 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setPeriods(formattedPeriods);
       setTeamMembers(formattedTeamMembers);
       setCurrentPeriod(activePeriod);
-      setLastRefreshTime(Date.now());
       setIsInitialized(true);
       
       console.log('Data refreshed successfully:', {
@@ -151,13 +149,8 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setIsRefreshing(false);
     }
   }, [teamId, toast, isRefreshing]);
-  
-  // Debounced version to prevent too frequent refreshes
-  const debouncedRefresh = useCallback(debounce(() => {
-    fetchData();
-  }, 1000), [fetchData]);
 
-  // Setup real-time subscriptions
+  // Setup real-time subscription with improved connection handling
   useEffect(() => {
     if (!teamId) return;
     
@@ -166,18 +159,17 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setIsLoading(true);
     }
     
-    // Set up a single channel for all real-time updates
-    const channel = supabase.channel('global-data-changes')
+    // Clean up any existing channel before creating a new one
+    if (currentChannel) {
+      supabase.removeChannel(currentChannel);
+    }
+    
+    // Create a single channel for all events to minimize connections
+    const channel = supabase.channel(`team-data-${teamId}`)
       // Handle presence events for connection status
       .on('presence', { event: 'sync' }, () => {
         console.log('Realtime connection synced');
         setConnectionState('connected');
-      })
-      .on('presence', { event: 'join' }, () => {
-        console.log('Client joined channel');
-      })
-      .on('presence', { event: 'leave' }, () => {
-        console.log('Client left channel');
       })
       // Handle disconnect event
       .on('system', { event: 'disconnect' }, () => {
@@ -192,7 +184,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         filter: `team_id=eq.${teamId}`
       }, () => {
         console.log('Periods updated');
-        debouncedRefresh();
+        fetchData();
       })
       // Watch for team members changes
       .on('postgres_changes', {
@@ -202,7 +194,7 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         filter: `team_id=eq.${teamId}`
       }, () => {
         console.log('Team members updated');
-        debouncedRefresh();
+        fetchData();
       })
       // Watch for tips changes
       .on('postgres_changes', {
@@ -212,27 +204,38 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }, (payload) => {
         if (payload.new && 'period_id' in payload.new) {
           console.log('Tips updated');
-          debouncedRefresh();
-        }
-      })
-      .subscribe(status => {
-        console.log('Channel status:', status);
-        if (status === 'SUBSCRIBED') {
-          setConnectionState('connected');
-          // Initial data fetch
           fetchData();
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          setConnectionState('disconnected');
-        } else {
-          setConnectionState('connecting');
         }
       });
+    
+    // Better approach to handle reconnections with clear status updates
+    channel.subscribe(status => {
+      console.log('Channel status:', status);
+      if (status === 'SUBSCRIBED') {
+        setConnectionState('connected');
+        // Initial data fetch
+        fetchData();
+      } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+        setConnectionState('disconnected');
+        // Try to reconnect automatically after a short delay
+        setTimeout(() => {
+          if (channel.state !== 'SUBSCRIBED') {
+            channel.subscribe();
+          }
+        }, 3000);
+      } else {
+        setConnectionState('connecting');
+      }
+    });
+    
+    setCurrentChannel(channel);
     
     // Clean up subscription
     return () => {
       supabase.removeChannel(channel);
+      setCurrentChannel(null);
     };
-  }, [teamId, fetchData, debouncedRefresh, isInitialized]);
+  }, [teamId, fetchData, isInitialized]);
   
   const value: AppDataContextType = {
     periods,

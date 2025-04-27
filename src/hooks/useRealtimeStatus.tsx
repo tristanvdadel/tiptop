@@ -1,56 +1,35 @@
+
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { debounce } from '@/lib/utils';
 
 export const useRealtimeStatus = () => {
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   const previousStatusRef = useRef<string>('connecting');
-  const statusChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const channelsRef = useRef<RealtimeChannel[]>([]);
-  const stableConnectionTimeRef = useRef<NodeJS.Timeout | null>(null);
   const disconnectionCountRef = useRef<number>(0);
   
-  // Use a more aggressive debounce for disconnected states to prevent flickering
-  // Only change to disconnected after multiple consistent checks
-  const setDebouncedStatus = useCallback(
-    debounce((newStatus: 'connected' | 'disconnected' | 'connecting') => {
-      if (newStatus === previousStatusRef.current) return;
+  // More efficient direct status setter with shorter debounce time
+  const setDebouncedStatus = useCallback((newStatus: 'connected' | 'disconnected' | 'connecting') => {
+    if (newStatus === previousStatusRef.current) return;
+    
+    // If we're switching to "disconnected", require multiple consecutive disconnected states
+    if (newStatus === 'disconnected') {
+      disconnectionCountRef.current += 1;
       
-      // If we're switching to "disconnected", require multiple consecutive disconnected states
-      if (newStatus === 'disconnected') {
-        disconnectionCountRef.current += 1;
-        
-        // Only show disconnected after multiple consecutive disconnected states (prevents flickering)
-        if (disconnectionCountRef.current < 3) {
-          return;
-        }
-      } else {
-        // Reset disconnection counter when we get any other status
-        disconnectionCountRef.current = 0;
-      }
-      
-      // Clear any stable connection timer when status changes
-      if (stableConnectionTimeRef.current) {
-        clearTimeout(stableConnectionTimeRef.current);
-      }
-      
-      // For connected status, only show as connected after a stable period
-      if (newStatus === 'connected') {
-        stableConnectionTimeRef.current = setTimeout(() => {
-          setRealtimeStatus('connected');
-          previousStatusRef.current = 'connected';
-        }, 2000); // Wait 2 seconds of stable connection before showing as connected
-        
-        // Meanwhile keep previous state
+      // Only show disconnected after 2 consecutive disconnected states (prevents flickering)
+      if (disconnectionCountRef.current < 2) {
         return;
       }
-      
-      setRealtimeStatus(newStatus);
-      previousStatusRef.current = newStatus;
-    }, 1500), // More aggressive debounce to prevent UI flickering
-    []
-  );
+    } else {
+      // Reset disconnection counter when we get any other status
+      disconnectionCountRef.current = 0;
+    }
+    
+    // Update status immediately but with consistent rules
+    setRealtimeStatus(newStatus);
+    previousStatusRef.current = newStatus;
+  }, []);
   
   // Check all active channels for connection status
   const checkConnectionStatus = useCallback(() => {
@@ -84,31 +63,24 @@ export const useRealtimeStatus = () => {
     }
   }, [setDebouncedStatus]);
   
-  // Periodically check connection status
+  // Periodically check connection status - reduced interval for faster response
   useEffect(() => {
     // First check immediately
     checkConnectionStatus();
     
-    // Then set up periodic checks with a longer interval to reduce flickering
+    // Then set up periodic checks
     const interval = setInterval(() => {
       checkConnectionStatus();
-    }, 5000); // Check every 5 seconds instead of more frequently
+    }, 3000); // Check every 3 seconds instead of 5
     
     return () => {
       clearInterval(interval);
-      if (statusChangeTimeoutRef.current) {
-        clearTimeout(statusChangeTimeoutRef.current);
-      }
-      if (stableConnectionTimeRef.current) {
-        clearTimeout(stableConnectionTimeRef.current);
-      }
     };
   }, [checkConnectionStatus]);
   
   // Try to reconnect all channels
   const reconnect = useCallback(() => {
-    // First check connection status
-    checkConnectionStatus();
+    console.log("Attempting to reconnect all channels...");
     
     // Reset disconnection counter when manually reconnecting
     disconnectionCountRef.current = 0;

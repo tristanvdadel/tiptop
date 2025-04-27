@@ -20,7 +20,8 @@ export const useCachedTeamData = (refreshTeamData: () => Promise<void>) => {
   // Use refs to track loading state across renders
   const isRefreshingRef = useRef(false);
   const lastRefreshTimeRef = useRef<number>(0);
-  const minimumRefreshInterval = 2000; // ms
+  // Verlaag de minimum tijd tussen refreshes naar 500ms om sneller data te laden
+  const minimumRefreshInterval = 500; // Verlaagd van 2000ms naar 500ms
   
   // Handle database recursion errors
   const handleDatabaseRecursionError = useCallback(() => {
@@ -38,10 +39,10 @@ export const useCachedTeamData = (refreshTeamData: () => Promise<void>) => {
     });
   }, [toast]);
   
-  // Debounced refresh to prevent too many calls
+  // Debounced refresh to prevent too many calls - verlaag debounce tijd
   const debouncedRefreshData = useCallback(debounce(() => {
     refreshData();
-  }, 1000), []);
+  }, 300), []); // Verlaagd van 1000ms naar 300ms
   
   // Main refresh function
   const refreshData = useCallback(async (force: boolean = false) => {
@@ -53,10 +54,10 @@ export const useCachedTeamData = (refreshTeamData: () => Promise<void>) => {
       return Promise.resolve();
     }
     
-    // Check if minimum interval has passed
+    // Check if minimum interval has passed - skip this check bij eerste initialisatie
     const now = Date.now();
     const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
-    if (timeSinceLastRefresh < minimumRefreshInterval && !force) {
+    if (timeSinceLastRefresh < minimumRefreshInterval && !force && isInitialized) {
       console.log(`Too soon to refresh (${timeSinceLastRefresh}ms), minimum interval is ${minimumRefreshInterval}ms`);
       return Promise.resolve();
     }
@@ -101,20 +102,21 @@ export const useCachedTeamData = (refreshTeamData: () => Promise<void>) => {
     }
   }, [refreshTeamData, isInitialized, toast, handleDatabaseRecursionError]);
   
-  // Initial data loading when teamId changes
+  // Initial data loading when teamId changes - direct zonder wachten
   useEffect(() => {
-    if (teamId && !isRefreshingRef.current) {
+    if (teamId) {
       console.log("Team ID changed, refreshing data...", teamId);
+      // Force refresh direct uitvoeren bij teamId change, wacht niet op state updates
       refreshData(true);
     }
   }, [teamId, refreshData]);
   
-  // Monitor loading times to detect hanging loads
+  // Monitor loading times to detect hanging loads - verlaag timeout naar 10 seconden
   useEffect(() => {
     if (isLoading && loadingStartTime) {
       const loadingTimeoutId = setTimeout(() => {
         const loadDuration = Date.now() - loadingStartTime;
-        if (loadDuration > 15000) { // 15 seconds timeout
+        if (loadDuration > 10000) { // Verlaagd van 15s naar 10s timeout
           console.warn("Data loading taking too long, may be hung");
           setIsLoading(false);
           setIsRefreshing(false);
@@ -128,7 +130,7 @@ export const useCachedTeamData = (refreshTeamData: () => Promise<void>) => {
             variant: "destructive"
           });
         }
-      }, 15000);
+      }, 10000); // Verlaagd van 15000ms naar 10000ms
       
       return () => clearTimeout(loadingTimeoutId);
     }

@@ -12,9 +12,16 @@ const Settings = () => {
   const [dataReady, setDataReady] = useState(false);
 
   useEffect(() => {
-    // Set data ready after initial loading is complete
+    // Set data ready immediately if data is already loaded
     if (!isLoading) {
       setDataReady(true);
+    } else {
+      // Set a timeout to prevent indefinite loading state
+      const timeoutId = setTimeout(() => {
+        setDataReady(true);
+      }, 3000); // Max 3 seconden wachten op data
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [isLoading]);
 
@@ -24,7 +31,7 @@ const Settings = () => {
         <h1 className="text-2xl font-bold">Instellingen</h1>
       </div>
       
-      <LoadingState isLoading={!dataReady} minDuration={500} instant={!isLoading}>
+      <LoadingState isLoading={!dataReady} minDuration={300} instant={!isLoading}>
         <AccountSettings />
         <PeriodSettings />
         <AppSettings />

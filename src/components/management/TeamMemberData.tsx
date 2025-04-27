@@ -3,9 +3,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTeamId } from '@/hooks/useTeamId';
 import { supabase, isRecursionError, clearSecurityCache } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Database } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { getUserTeamsSafe, getTeamMembersSafe } from '@/services/teamService';
 import DatabaseSecurityResolver from '@/components/ui/DatabaseSecurityResolver';
 
@@ -33,28 +30,34 @@ export const TeamMemberData = ({
   retryLoading
 }: TeamMemberDataProps) => {
   const [loading, setLoading] = useState(true);
+  const [loadStarted, setLoadStarted] = useState(false);
   const [showRecursionAlert, setShowRecursionAlert] = useState(false);
   const { fetchTeamId } = useTeamId();
   const { toast } = useToast();
+  const [retryAttempts, setRetryAttempts] = useState(0);
 
   const handleDatabaseRecursionError = useCallback(() => {
     console.log("Handling database recursion error...");
     clearSecurityCache();
     
-    toast({
-      title: "Database probleem opgelost",
-      description: "De cache is gewist en de beveiligingsproblemen zijn opgelost. De pagina wordt opnieuw geladen.",
-      duration: 3000,
-    });
+    setShowRecursionAlert(true);
     
-    setTimeout(() => {
-      window.location.reload();
-    }, 1500);
+    toast({
+      title: "Database probleem gedetecteerd",
+      description: "De cache wordt gewist om het beveiligingsprobleem op te lossen. Klik op 'Herstel Database' om het proces te voltooien.",
+      duration: 5000,
+    });
   }, [toast]);
 
   useEffect(() => {
     const loadTeamData = async () => {
+      // Prevent multiple simultaneous loading attempts
+      if (loadStarted) {
+        return;
+      }
+      
       try {
+        setLoadStarted(true);
         setLoading(true);
         setError(null);
         setShowRecursionAlert(false);
@@ -63,13 +66,39 @@ export const TeamMemberData = ({
           console.error('No user ID available');
           setHasAnyTeam(false);
           setError('Geen gebruiker gevonden');
+          setLoadStarted(false);
           return;
         }
         
         console.log("Fetching teams for user:", user.id);
         
-        // Use safe RPC function instead of direct database query
-        const teams = await getUserTeamsSafe(user.id);
+        // Use safe RPC function with retry mechanism
+        let teams;
+        let retryCount = 0;
+        const maxRetries = 2;
+        
+        while (retryCount < maxRetries) {
+          try {
+            teams = await getUserTeamsSafe(user.id);
+            break;
+          } catch (teamsError: any) {
+            console.error(`Error fetching teams (attempt ${retryCount + 1}):`, teamsError);
+            
+            if (isRecursionError(teamsError)) {
+              handleDatabaseRecursionError();
+              setLoadStarted(false);
+              return;
+            }
+            
+            retryCount++;
+            if (retryCount < maxRetries) {
+              console.log(`Retrying team fetch in 1 second... (attempt ${retryCount + 1})`);
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            } else {
+              throw teamsError;
+            }
+          }
+        }
         
         if (teams && teams.length > 0) {
           console.log("Teams fetched successfully:", teams.length);
@@ -77,7 +106,7 @@ export const TeamMemberData = ({
           setHasAnyTeam(true);
           setSelectedTeamId(teams[0].id);
           
-          // Get memberships using safe RPC
+          // Get memberships using safe RPC with retry mechanism
           try {
             const memberships = await getTeamMembersSafe(teams[0].id);
             
@@ -91,14 +120,15 @@ export const TeamMemberData = ({
             
             const adminMemberships = userMemberships.filter(tm => tm.role === 'admin') || [];
             setIsAdmin(adminMemberships.length > 0);
-          } catch (error: any) {
-            console.error('Failed to get memberships:', error);
+          } catch (membershipError: any) {
+            console.error('Failed to get memberships:', membershipError);
             
-            if (isRecursionError(error)) {
-              setShowRecursionAlert(true);
-              setError('Database beveiligingsprobleem gedetecteerd. Klik op "Herstel Database" om het probleem op te lossen.');
+            if (isRecursionError(membershipError)) {
+              handleDatabaseRecursionError();
+              setLoadStarted(false);
+              return;
             } else {
-              setError(error.message || 'Fout bij ophalen van teamlidmaatschappen');
+              setError(membershipError.message || 'Fout bij ophalen van teamlidmaatschappen');
             }
           }
         } else {
@@ -108,8 +138,7 @@ export const TeamMemberData = ({
         console.error('Error loading team data:', error);
         
         if (isRecursionError(error)) {
-          setShowRecursionAlert(true);
-          setError('Database beveiligingsprobleem gedetecteerd. Klik op "Herstel Database" om het probleem op te lossen.');
+          handleDatabaseRecursionError();
         } else {
           setError(error.message || "Er is een fout opgetreden bij het ophalen van je teams");
           toast({
@@ -120,13 +149,27 @@ export const TeamMemberData = ({
         }
       } finally {
         setLoading(false);
+        setLoadStarted(false);
       }
     };
 
-    if (user) {
+    if (user && !loadStarted) {
       loadTeamData();
     }
-  }, [user, setUserTeams, setUserTeamMemberships, setIsAdmin, setError, setHasAnyTeam, setSelectedTeamId, setSelectedMembershipId, toast]);
+    
+    // Add automatic retry mechanic with exponential backoff if we hit errors
+    if (retryAttempts > 0) {
+      const retryTimeout = setTimeout(() => {
+        if (user && !loadStarted) {
+          console.log(`Auto-retrying team data load (attempt ${retryAttempts})`);
+          loadTeamData();
+          setRetryAttempts(prev => Math.max(0, prev - 1));
+        }
+      }, Math.min(10000, 1000 * Math.pow(2, retryAttempts - 1)));
+      
+      return () => clearTimeout(retryTimeout);
+    }
+  }, [user, setUserTeams, setUserTeamMemberships, setIsAdmin, setError, setHasAnyTeam, setSelectedTeamId, setSelectedMembershipId, toast, loadStarted, retryAttempts, handleDatabaseRecursionError]);
 
   if (loading) {
     return (
@@ -140,7 +183,7 @@ export const TeamMemberData = ({
   }
 
   if (showRecursionAlert) {
-    return <DatabaseSecurityResolver fullReset={true} />;
+    return <DatabaseSecurityResolver fullReset={true} redirectPath="/team" />;
   }
 
   return null;

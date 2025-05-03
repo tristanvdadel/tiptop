@@ -1,3 +1,4 @@
+
 import React, {
   createContext,
   useContext,
@@ -6,38 +7,109 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
-import {
-  Period,
-  TeamMember,
-  TipEntry,
-  TeamSettings,
-  Payout,
-} from '@/integrations/supabase/client';
-import {
-  fetchPeriods,
-  savePeriod,
-  deletePeriod as deletePeriodService,
-} from '@/services/periodService';
-import {
-  fetchTeamMembers,
-  saveTeamMember,
-  deleteTeamMember as deleteTeamMemberService,
-  updateTeamMember as updateTeamMemberService,
-} from '@/services/teamMemberService';
-import {
-  fetchPayouts,
-  savePayout,
-  deletePayout as deletePayoutService,
-} from '@/services/payoutService';
-import {
-  fetchTeamSettings,
-  saveTeamSettings,
-} from '@/services/teamService';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { calculateDistribution } from '@/services/teamDataService';
+import { 
+  fetchTeamPeriods,
+  savePeriod as savePeriodToSupabase,
+} from '@/services/periodService';
+import {
+  saveTeamMember as saveTeamMemberToSupabase,
+} from '@/services/teamMemberService';
+import {
+  savePayoutToSupabase,
+} from '@/services/payoutService';
+import {
+  saveTeamSettings as saveTeamSettingsToSupabase,
+} from '@/services/teamService';
+import { 
+  calculateTipDistributionTotals,
+} from '@/services/teamDataService';
+
+// Define the missing types locally since they are not exported from the client
+export interface TipEntry {
+  id: string;
+  periodId: string;
+  amount: number;
+  date: string;
+  note?: string | null;
+  addedBy?: string | null;
+}
+
+export interface Period {
+  id: string;
+  teamId: string;
+  startDate: string;
+  endDate?: string | null;
+  isActive: boolean;
+  isPaid: boolean;
+  notes?: string | null;
+  name?: string | null;
+  autoCloseDate?: string | null;
+  averageTipPerHour?: number | null;
+  tips?: TipEntry[];
+}
+
+export interface TeamMemberPermissions {
+  add_tips: boolean;
+  edit_tips: boolean;
+  add_hours: boolean;
+  view_team: boolean;
+  view_reports: boolean;
+  close_periods: boolean;
+  manage_payouts: boolean;
+}
+
+export interface TeamMember {
+  id: string;
+  teamId: string;
+  user_id?: string;
+  name: string;
+  hours: number;
+  balance?: number;
+  role?: string;
+  permissions?: TeamMemberPermissions;
+  hasAccount?: boolean;
+  hourRegistrations?: any[];
+}
+
+export interface TeamSettings {
+  id?: string;
+  teamId: string;
+  autoClosePeriods?: boolean;
+  periodDuration?: string;
+  alignWithCalendar?: boolean;
+  closingTime?: any;
+}
+
+export interface PayoutDistribution {
+  memberId: string;
+  amount: number;
+  actualAmount?: number;
+  balance?: number;
+}
+
+export interface Payout {
+  id: string;
+  teamId: string;
+  date: string;
+  payerName?: string | null;
+  payoutTime: string;
+  totalAmount: number;
+  periodIds: string[];
+  distribution: PayoutDistribution[];
+}
+
+export interface PayoutData {
+  id: string;
+  date: string;
+  payerName?: string | null;
+  payoutTime: string;
+  distribution?: PayoutDistribution[];
+  periodIds?: string[];
+}
 
 interface AppContextType {
   teamId: string | null;
@@ -62,7 +134,7 @@ interface AppContextType {
   saveTeamMemberRole: (memberId: string, role: string) => Promise<void>;
   saveTeamMemberPermissions: (memberId: string, permissions: any) => Promise<void>;
   saveTeamSettingsContext: (settings: TeamSettings) => Promise<void>;
-  calculateTipDistribution: (periodIds: string[]) => TeamMember[];
+  calculateTipDistribution: (periodIds?: string[]) => TeamMember[];
   markPeriodsAsPaid: (periodIds: string[], distribution: any[]) => Promise<void>;
   deletePeriod: (periodId: string) => Promise<void>;
   deletePayout: (payoutId: string) => Promise<void>;
@@ -183,31 +255,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const fetchedTeamId = teams.id;
       setTeamId(fetchedTeamId);
       
-      // Fetch all data in parallel
-      const [
-        { data: periodsData, error: periodsError },
-        { data: membersData, error: membersError },
-        { data: settingsData, error: settingsError },
-        { data: payoutsData, error: payoutsError },
-      ] = await Promise.all([
-        fetchPeriods(fetchedTeamId),
-        fetchTeamMembers(fetchedTeamId),
-        fetchTeamSettings(fetchedTeamId),
-        fetchPayouts(fetchedTeamId),
-      ]);
+      // Get team periods
+      const periodsData = await fetchTeamPeriods(fetchedTeamId);
       
-      if (periodsError) {
-        console.error('Error fetching periods:', periodsError);
-        setError(periodsError);
-      }
+      // Get team members
+      const { data: membersData, error: membersError } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('team_id', fetchedTeamId);
+      
       if (membersError) {
         console.error('Error fetching team members:', membersError);
         setError(membersError);
       }
-      if (settingsError) {
+      
+      // Get team settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('team_settings')
+        .select('*')
+        .eq('team_id', fetchedTeamId)
+        .single();
+      
+      if (settingsError && settingsError.code !== 'PGRST116') {
         console.error('Error fetching team settings:', settingsError);
         setError(settingsError);
       }
+      
+      // Get payouts
+      const { data: payoutsData, error: payoutsError } = await supabase
+        .from('payouts')
+        .select('*')
+        .eq('team_id', fetchedTeamId);
+      
       if (payoutsError) {
         console.error('Error fetching payouts:', payoutsError);
         setError(payoutsError);
@@ -215,14 +294,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       // Update state with fetched data
       setPeriods(periodsData || []);
-      setTeamMembers(membersData || []);
-      setTeamSettings(settingsData || null);
-      setPayouts(payoutsData || []);
+      
+      // Transform team members data to match our interface
+      const transformedMembers = (membersData || []).map(member => ({
+        id: member.id,
+        teamId: member.team_id,
+        user_id: member.user_id,
+        role: member.role,
+        hours: member.hours || 0,
+        balance: member.balance || 0,
+        permissions: member.permissions as TeamMemberPermissions,
+        name: member.id.substring(0, 8), // Placeholder name
+      }));
+      
+      setTeamMembers(transformedMembers);
+      
+      // Transform team settings
+      if (settingsData) {
+        const transformedSettings: TeamSettings = {
+          id: settingsData.id,
+          teamId: settingsData.team_id,
+          autoClosePeriods: settingsData.auto_close_periods,
+          periodDuration: settingsData.period_duration,
+          alignWithCalendar: settingsData.align_with_calendar,
+          closingTime: settingsData.closing_time
+        };
+        setTeamSettings(transformedSettings);
+      } else {
+        setTeamSettings(null);
+      }
+      
+      // Transform payouts data
+      const transformedPayouts = (payoutsData || []).map(payout => ({
+        id: payout.id,
+        teamId: payout.team_id,
+        date: payout.date,
+        payerName: payout.payer_name,
+        payoutTime: payout.payout_time,
+        totalAmount: 0, // Placeholder
+        periodIds: [], // Placeholder
+        distribution: [] // Placeholder
+      }));
+      
+      setPayouts(transformedPayouts);
       
       // Determine current and active periods
       const now = new Date();
       const active = periodsData?.find(
-        (period) => new Date(period.startDate) <= now && new Date(period.endDate) >= now
+        (period) => new Date(period.startDate) <= now && new Date(period.endDate || now) >= now
       ) || null;
       const current = active || periodsData?.[0] || null;
       
@@ -276,7 +395,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const startDate = startOfMonth(now).toISOString();
       const endDate = endOfMonth(now).toISOString();
 
-      const newPeriod: Omit<Period, 'id' | 'createdAt' | 'tips'> = {
+      const newPeriod: Omit<Period, 'id'> = {
         teamId: teamId,
         startDate: startDate,
         endDate: endDate,
@@ -286,7 +405,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       // Save the new period to the database
-      const savedPeriod = await savePeriod(newPeriod);
+      const savedPeriod = await savePeriodToSupabase(teamId, newPeriod as Period);
 
       if (savedPeriod) {
         // Update the local state with the new period
@@ -325,7 +444,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       // Find the period in the local state
       const periodToUpdate = periods.find(period => period.id === periodId);
-      if (!periodToUpdate) {
+      if (!periodToUpdate || !teamId) {
         console.error('Period not found in local state');
         return;
       }
@@ -334,7 +453,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updatedPeriod = { ...periodToUpdate, name };
       
       // Save the updated period to the database
-      const savedPeriod = await savePeriod(updatedPeriod);
+      const savedPeriod = await savePeriodToSupabase(teamId, updatedPeriod);
       
       if (savedPeriod) {
         // Update the local state with the saved period
@@ -367,8 +486,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addTip = async (amount: number, note?: string, date?: string) => {
-    if (!currentPeriod) {
-      console.error('Cannot add tip without a current period');
+    if (!currentPeriod || !teamId) {
+      console.error('Cannot add tip without a current period and team ID');
       return;
     }
 
@@ -386,11 +505,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Update the period with the new tip
       const updatedPeriod = {
         ...currentPeriod,
-        tips: [...(currentPeriod.tips || []), tipEntry],
+        tips: [...(currentPeriod.tips || []), tipEntry as TipEntry],
       };
 
       // Save the updated period to the database
-      const savedPeriod = await savePeriod(updatedPeriod);
+      const savedPeriod = await savePeriodToSupabase(teamId, updatedPeriod);
 
       if (savedPeriod) {
         // Update the local state with the saved period
@@ -412,8 +531,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       // Trigger a broadcast event to notify other clients
-      if (teamId) {
-        await supabase.realtime.channel(`team-${teamId}`).send({
+      if (teamId && realtimeClient) {
+        await realtimeClient.channel(`team-${teamId}`).send({
           type: 'broadcast',
           event: 'tips-updated',
           payload: { teamId },
@@ -433,6 +552,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   
   const updateTip = async (periodId: string, tipId: string, amount: number, note?: string, date?: string) => {
+    if (!teamId) {
+      console.error('Cannot update tip without team ID');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     
@@ -452,7 +576,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       // Update the tip with the new values
-      const updatedTip = { ...tipToUpdate, amount, note: note || null, date: date || new Date().toISOString() };
+      const updatedTip = { ...tipToUpdate, amount, note: note || null, date: date || tipToUpdate.date };
       
       // Update the period with the updated tip
       const updatedPeriod = {
@@ -461,14 +585,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       
       // Save the updated period to the database
-      const savedPeriod = await savePeriod(updatedPeriod);
+      const savedPeriod = await savePeriodToSupabase(teamId, updatedPeriod);
       
       if (savedPeriod) {
         // Update the local state with the saved period
         setPeriods(prevPeriods =>
           prevPeriods.map(period => (period.id === periodId ? savedPeriod : period))
         );
-        setCurrentPeriod(savedPeriod);
+        
+        if (currentPeriod?.id === periodId) {
+          setCurrentPeriod(savedPeriod);
+        }
         
         toast({
           title: "Fooi gewijzigd",
@@ -483,8 +610,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       // Trigger a broadcast event to notify other clients
-      if (teamId) {
-        await supabase.realtime.channel(`team-${teamId}`).send({
+      if (teamId && realtimeClient) {
+        await realtimeClient.channel(`team-${teamId}`).send({
           type: 'broadcast',
           event: 'tips-updated',
           payload: { teamId },
@@ -504,6 +631,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteTip = async (periodId: string, tipId: string) => {
+    if (!teamId) {
+      console.error('Cannot delete tip without team ID');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
 
@@ -525,14 +657,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       // Save the updated period to the database
-      const savedPeriod = await savePeriod(updatedPeriod);
+      const savedPeriod = await savePeriodToSupabase(teamId, updatedPeriod);
 
       if (savedPeriod) {
         // Update the local state with the saved period
         setPeriods(prevPeriods =>
           prevPeriods.map(period => (period.id === periodId ? savedPeriod : period))
         );
-        setCurrentPeriod(savedPeriod);
+        
+        if (currentPeriod?.id === periodId) {
+          setCurrentPeriod(savedPeriod);
+        }
 
         toast({
           title: "Fooi verwijderd",
@@ -547,8 +682,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       // Trigger a broadcast event to notify other clients
-      if (teamId) {
-        await supabase.realtime.channel(`team-${teamId}`).send({
+      if (teamId && realtimeClient) {
+        await realtimeClient.channel(`team-${teamId}`).send({
           type: 'broadcast',
           event: 'tips-updated',
           payload: { teamId },
@@ -577,18 +712,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setError(null);
 
     try {
-      const newTeamMember: Omit<TeamMember, 'id' | 'role' | 'createdAt' | 'permissions'> = {
+      const newTeamMember: Partial<TeamMember> = {
         teamId: teamId,
         name: name,
         hours: hours,
       };
 
       // Save the new team member to the database
-      const savedTeamMember = await saveTeamMember(newTeamMember);
+      const savedTeamMember = await saveTeamMemberToSupabase(teamId, newTeamMember as TeamMember);
 
       if (savedTeamMember) {
+        // Transform the saved member to match our interface
+        const transformedMember: TeamMember = {
+          id: savedTeamMember.id,
+          teamId: savedTeamMember.team_id,
+          user_id: savedTeamMember.user_id,
+          name: name,
+          hours: hours,
+          balance: savedTeamMember.balance || 0,
+          role: savedTeamMember.role,
+          permissions: savedTeamMember.permissions as TeamMemberPermissions
+        };
+        
         // Update the local state with the new team member
-        setTeamMembers(prevTeamMembers => [...prevTeamMembers, savedTeamMember]);
+        setTeamMembers(prevTeamMembers => [...prevTeamMembers, transformedMember]);
 
         toast({
           title: "Teamlid toegevoegd",
@@ -615,6 +762,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateTeamMemberHours = async (memberId: string, hours: number) => {
+    if (!teamId) {
+      console.error('Cannot update team member without team ID');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
 
@@ -630,12 +782,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updatedTeamMember = { ...teamMemberToUpdate, hours };
 
       // Save the updated team member to the database
-      const savedTeamMember = await updateTeamMemberService(memberId, updatedTeamMember);
+      const savedTeamMember = await saveTeamMemberToSupabase(teamId, updatedTeamMember);
 
       if (savedTeamMember) {
+        // Transform the saved member to match our interface
+        const transformedMember: TeamMember = {
+          ...updatedTeamMember,
+          hours,
+        };
+        
         // Update the local state with the saved team member
         setTeamMembers(prevTeamMembers =>
-          prevTeamMembers.map(member => (member.id === memberId ? savedTeamMember : member))
+          prevTeamMembers.map(member => (member.id === memberId ? transformedMember : member))
         );
 
         toast({
@@ -663,6 +821,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   
   const updateTeamMemberName = async (memberId: string, name: string) => {
+    if (!teamId) {
+      console.error('Cannot update team member without team ID');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     
@@ -678,12 +841,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updatedTeamMember = { ...teamMemberToUpdate, name };
       
       // Save the updated team member to the database
-      const savedTeamMember = await updateTeamMemberService(memberId, updatedTeamMember);
+      const savedTeamMember = await saveTeamMemberToSupabase(teamId, updatedTeamMember);
       
       if (savedTeamMember) {
+        // Transform the saved member to match our interface
+        const transformedMember: TeamMember = {
+          ...updatedTeamMember,
+          name,
+        };
+        
         // Update the local state with the saved team member
         setTeamMembers(prevTeamMembers =>
-          prevTeamMembers.map(member => (member.id === memberId ? savedTeamMember : member))
+          prevTeamMembers.map(member => (member.id === memberId ? transformedMember : member))
         );
         
         toast({
@@ -711,12 +880,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   
   const deleteTeamMember = async (memberId: string) => {
+    if (!teamId) {
+      console.error('Cannot delete team member without team ID');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     
     try {
-      // Delete the team member from the database
-      await deleteTeamMemberService(memberId);
+      // Delete from database
+      const { error: deleteError } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('id', memberId);
+      
+      if (deleteError) {
+        throw deleteError;
+      }
       
       // Update the local state by filtering out the deleted team member
       setTeamMembers(prevTeamMembers => prevTeamMembers.filter(member => member.id !== memberId));
@@ -739,6 +920,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   
   const saveTeamMemberRole = async (memberId: string, role: string) => {
+    if (!teamId) {
+      console.error('Cannot update team member role without team ID');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     
@@ -754,12 +940,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updatedTeamMember = { ...teamMemberToUpdate, role };
       
       // Save the updated team member to the database
-      const savedTeamMember = await updateTeamMemberService(memberId, updatedTeamMember);
+      const savedTeamMember = await saveTeamMemberToSupabase(teamId, updatedTeamMember);
       
       if (savedTeamMember) {
+        // Transform the saved member to match our interface
+        const transformedMember: TeamMember = {
+          ...updatedTeamMember,
+          role,
+        };
+        
         // Update the local state with the saved team member
         setTeamMembers(prevTeamMembers =>
-          prevTeamMembers.map(member => (member.id === memberId ? savedTeamMember : member))
+          prevTeamMembers.map(member => (member.id === memberId ? transformedMember : member))
         );
         
         toast({
@@ -786,7 +978,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
   
-  const saveTeamMemberPermissions = async (memberId: string, permissions: any) => {
+  const saveTeamMemberPermissions = async (memberId: string, permissions: TeamMemberPermissions) => {
+    if (!teamId) {
+      console.error('Cannot update team member permissions without team ID');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     
@@ -802,12 +999,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updatedTeamMember = { ...teamMemberToUpdate, permissions };
       
       // Save the updated team member to the database
-      const savedTeamMember = await updateTeamMemberService(memberId, updatedTeamMember);
+      const savedTeamMember = await saveTeamMemberToSupabase(teamId, updatedTeamMember);
       
       if (savedTeamMember) {
+        // Transform the saved member to match our interface
+        const transformedMember: TeamMember = {
+          ...updatedTeamMember,
+          permissions,
+        };
+        
         // Update the local state with the saved team member
         setTeamMembers(prevTeamMembers =>
-          prevTeamMembers.map(member => (member.id === memberId ? savedTeamMember : member))
+          prevTeamMembers.map(member => (member.id === memberId ? transformedMember : member))
         );
         
         toast({
@@ -845,7 +1048,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     try {
       // Save the team settings to the database
-      const savedSettings = await saveTeamSettings({ ...settings, teamId });
+      const savedSettings = await saveTeamSettingsToSupabase(teamId, settings);
 
       if (savedSettings) {
         // Update the local state with the saved team settings
@@ -875,17 +1078,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const calculateTipDistribution = (periodIds: string[]): TeamMember[] => {
+  const calculateTipDistribution = (periodIds?: string[]): TeamMember[] => {
     if (!teamId) {
       console.error('Cannot calculate tip distribution without a team ID');
       return [];
     }
-  
-    const distribution = calculateDistribution(periodIds, periods, teamMembers);
-    return distribution;
+    
+    const selectedPeriods = periodIds || [];
+    if (selectedPeriods.length === 0) {
+      return [...teamMembers];
+    }
+    
+    // Calculate totals using the imported function
+    const { totalTips, totalHours } = calculateTipDistributionTotals(selectedPeriods, periods, teamMembers);
+    
+    if (totalHours === 0) {
+      return [...teamMembers];
+    }
+    
+    // Calculate distribution
+    const tipPerHour = totalTips / totalHours;
+    
+    return teamMembers.map(member => {
+      const tipAmount = member.hours * tipPerHour;
+      return { ...member, tipAmount };
+    });
   };
 
   const markPeriodsAsPaid = async (periodIds: string[], distribution: any[]) => {
+    if (!teamId) {
+      console.error('Cannot mark periods as paid without team ID');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
 
@@ -903,45 +1128,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const updatedPeriod = { ...periodToUpdate, isPaid: true };
 
           // Save the updated period to the database
-          await savePeriod(updatedPeriod);
+          await savePeriodToSupabase(teamId, updatedPeriod);
         })
       );
 
-      // Save payout information to the database
-      const payoutData: Omit<Payout, 'id' | 'createdAt'> = {
-        teamId: teamId!,
+      // Create payout data
+      const payoutData = {
+        id: crypto.randomUUID(),
+        teamId: teamId,
         periodIds: periodIds,
+        date: new Date().toISOString(),
+        payoutTime: new Date().toISOString(),
         distribution: distribution,
-        totalTips: distribution.reduce((acc: number, member: any) => acc + member.amount, 0),
-        totalHours: teamMembers.reduce((acc: number, member: TeamMember) => acc + member.hours, 0),
-        payoutDate: new Date().toISOString(),
+        totalTips: distribution.reduce((acc, member) => acc + (member.amount || 0), 0),
+        totalHours: teamMembers.reduce((acc, member) => acc + (member.hours || 0), 0),
       };
 
       // Save the payout to the database
-      const savedPayout = await savePayout(payoutData);
+      await savePayoutToSupabase(teamId, payoutData as any);
+      
+      // Add the payout to the local state
+      const newPayout: Payout = {
+        id: payoutData.id,
+        teamId: payoutData.teamId,
+        date: payoutData.date,
+        payoutTime: payoutData.payoutTime,
+        periodIds: payoutData.periodIds,
+        totalAmount: payoutData.totalTips,
+        distribution: payoutData.distribution,
+      };
+      
+      setPayouts(prevPayouts => [...prevPayouts, newPayout]);
 
-      if (savedPayout) {
-        // Update the local state with the updated periods
-        setPeriods(prevPeriods =>
-          prevPeriods.map(period =>
-            periodIds.includes(period.id) ? { ...period, isPaid: true } : period
-          )
-        );
+      // Update the local state with the updated periods
+      setPeriods(prevPeriods =>
+        prevPeriods.map(period =>
+          periodIds.includes(period.id) ? { ...period, isPaid: true } : period
+        )
+      );
 
-        // Update the local state with the new payout
-        setPayouts(prevPayouts => [...prevPayouts, savedPayout]);
-
-        toast({
-          title: "Periode(s) uitbetaald",
-          description: "De periode(s) zijn succesvol uitbetaald.",
-        });
-      } else {
-        toast({
-          title: "Fout",
-          description: "Er is een fout opgetreden bij het uitbetalen van de periode(s)",
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Periode(s) uitbetaald",
+        description: "De periode(s) zijn succesvol uitbetaald.",
+      });
     } catch (err) {
       console.error('Error marking periods as paid:', err);
       setError(err instanceof Error ? err : new Error('Failed to mark periods as paid'));
@@ -956,15 +1185,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   
   const deletePeriod = async (periodId: string) => {
+    if (!teamId) {
+      console.error('Cannot delete period without team ID');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     
     try {
-      // Delete the period from the database
-      await deletePeriodService(periodId);
+      // Delete from database
+      const { error: deleteError } = await supabase
+        .from('periods')
+        .delete()
+        .eq('id', periodId);
+        
+      if (deleteError) {
+        throw deleteError;
+      }
       
       // Update the local state by filtering out the deleted period
       setPeriods(prevPeriods => prevPeriods.filter(period => period.id !== periodId));
+      
+      // If the deleted period was the current period, set a new current period
+      if (currentPeriod?.id === periodId) {
+        const newCurrentPeriod = periods.find(p => p.id !== periodId);
+        setCurrentPeriod(newCurrentPeriod || null);
+      }
+      
+      // If the deleted period was the active period, set a new active period
+      if (activePeriod?.id === periodId) {
+        setActivePeriod(null); // No active period anymore
+      }
       
       toast({
         title: "Periode verwijderd",
@@ -984,12 +1236,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   
   const deletePayout = async (payoutId: string) => {
+    if (!teamId) {
+      console.error('Cannot delete payout without team ID');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     
     try {
-      // Delete the payout from the database
-      await deletePayoutService(payoutId);
+      // Delete from database
+      const { error: deleteError } = await supabase
+        .from('payouts')
+        .delete()
+        .eq('id', payoutId);
+        
+      if (deleteError) {
+        throw deleteError;
+      }
       
       // Update the local state by filtering out the deleted payout
       setPayouts(prevPayouts => prevPayouts.filter(payout => payout.id !== payoutId));

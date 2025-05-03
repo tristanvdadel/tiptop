@@ -961,4 +961,103 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     try {
       // Delete the period from the database
-      await
+      await deletePeriodService(periodId);
+      
+      // Update the local state by filtering out the deleted period
+      setPeriods(prevPeriods => prevPeriods.filter(period => period.id !== periodId));
+      
+      toast({
+        title: "Periode verwijderd",
+        description: "De periode is succesvol verwijderd.",
+      });
+    } catch (err) {
+      console.error('Error deleting period:', err);
+      setError(err instanceof Error ? err : new Error('Failed to delete period'));
+      toast({
+        title: "Fout",
+        description: "Er is een fout opgetreden bij het verwijderen van de periode",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const deletePayout = async (payoutId: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Delete the payout from the database
+      await deletePayoutService(payoutId);
+      
+      // Update the local state by filtering out the deleted payout
+      setPayouts(prevPayouts => prevPayouts.filter(payout => payout.id !== payoutId));
+      
+      toast({
+        title: "Uitbetaling verwijderd",
+        description: "De uitbetaling is succesvol verwijderd.",
+      });
+    } catch (err) {
+      console.error('Error deleting payout:', err);
+      setError(err instanceof Error ? err : new Error('Failed to delete payout'));
+      toast({
+        title: "Fout",
+        description: "Er is een fout opgetreden bij het verwijderen van de uitbetaling",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Prepare the context value with all functions and state
+  const contextValue = {
+    teamId,
+    periods,
+    teamMembers,
+    teamSettings,
+    payouts,
+    currentPeriod,
+    activePeriod,
+    loading,
+    error,
+    refreshTeamData,
+    startNewPeriod,
+    savePeriodName,
+    addTip,
+    updateTip,
+    deleteTip,
+    addTeamMember,
+    updateTeamMemberHours,
+    updateTeamMemberName,
+    deleteTeamMember,
+    saveTeamMemberRole,
+    saveTeamMemberPermissions,
+    saveTeamSettingsContext,
+    calculateTipDistribution,
+    markPeriodsAsPaid,
+    deletePeriod,
+    deletePayout,
+    subscribeToChannel,
+    selectedMonth,
+    setSelectedMonth,
+    nextMonth,
+    prevMonth,
+    formatMonth,
+  };
+
+  return (
+    <AppContext.Provider value={contextValue}>
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (context === undefined) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
+};

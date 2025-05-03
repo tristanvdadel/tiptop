@@ -39,7 +39,7 @@ const TipDistribution: React.FC<TipDistributionProps> = ({
         <CardHeader className="pb-2 border-b">
           <CardTitle className="flex justify-between text-sm font-medium text-muted-foreground">
             <span>Overzicht</span>
-            <span>Totaal: €{totalTips.toFixed(2)} | Uren: {totalHours.toFixed(1)}</span>
+            <span>Totaal: €{totalTips.toFixed(2)} | Uren: {totalHours}</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-4">
@@ -59,7 +59,7 @@ const TipDistribution: React.FC<TipDistributionProps> = ({
                   <li key={member.id} className="flex justify-between items-center py-1">
                     <div className="font-medium">{member.name}</div>
                     <div className="flex space-x-6">
-                      <div className="w-16 text-right text-gray-600">{member.hours.toFixed(1)}</div>
+                      <div className="w-16 text-right text-gray-600">{member.hours}</div>
                       <div className={`w-16 text-right ${getBalanceClass(member.balance)}`}>
                         {member.balance !== undefined && member.balance !== 0 ? formatBalance(member.balance) : '€0.00'}
                       </div>

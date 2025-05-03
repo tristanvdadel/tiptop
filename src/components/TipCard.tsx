@@ -5,8 +5,7 @@ import { nl } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2 } from 'lucide-react';
-import { useApp } from '@/contexts/AppContext';
-import { TipEntry } from '@/types';
+import { TipEntry, useApp } from '@/contexts/AppContext';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +34,7 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
   
   const actualPeriodId = periodId || (currentPeriod ? currentPeriod.id : '');
   
+  // Add a null check before using formatDistanceToNow
   const formattedDate = tip.date ? formatDistanceToNow(new Date(tip.date), {
     addSuffix: true,
     locale: nl,
@@ -53,7 +53,9 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
           .single();
         
         if (teamMemberships) {
+          // Admin always has permission, otherwise check edit_tips permission
           const isAdmin = teamMemberships.role === 'admin';
+          // Safely cast the JSON permissions to our type
           const permissions = teamMemberships.permissions as unknown as TeamMemberPermissions;
           const canEditTips = permissions?.edit_tips === true;
           

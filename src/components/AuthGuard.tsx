@@ -3,78 +3,65 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 
 const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
-  const { toast } = useToast();
-  
-  // Define public routes that don't require authentication
-  const isPublicRoute = location.pathname === '/splash' || 
-                        location.pathname === '/login' || 
-                        location.pathname.startsWith('/fast-tip');
-                      
+
   useEffect(() => {
     let mounted = true;
-    
-    // Setup auth state listener for all auth events
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
-      console.log('Auth state changed:', event);
+    let initialCheckComplete = false;
+
+    // Set up auth state listener FIRST to catch all auth events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      console.log('Auth state changed:', _event, newSession ? 'User logged in' : 'No session');
       
       if (mounted) {
         setSession(newSession);
-        setIsLoading(false);
         
-        // Handle logout events
-        if (event === 'SIGNED_OUT') {
-          // Clear all cached data
-          localStorage.removeItem('sb-auth-token-cached');
-          localStorage.removeItem('login_attempt_time');
-          localStorage.removeItem('last_team_id');
-          
-          const teamIds = Object.keys(localStorage).filter(key => key.startsWith('team_data_'));
-          teamIds.forEach(key => localStorage.removeItem(key));
+        // Only end loading here if we actually got a definitive answer
+        if (_event === 'SIGNED_IN' || _event === 'SIGNED_OUT' || _event === 'TOKEN_REFRESHED') {
+          setIsLoading(false);
+          initialCheckComplete = true;
         }
       }
     });
 
-    // Initial session check
-    const checkSession = async () => {
+    // THEN check for existing session, but only set state if we don't already have a session
+    const getInitialSession = async () => {
       try {
+        console.log('Performing fast session check');
         const { data, error } = await supabase.auth.getSession();
+        console.log('Initial session check:', data.session ? 'Session found' : 'No session found');
         
         if (error) {
           console.error('Error getting session:', error);
-          if (mounted) {
-            setIsLoading(false);
-          }
-          return;
         }
         
-        if (mounted) {
+        // Only update if mounted and initial check from auth change event hasn't completed
+        if (mounted && !initialCheckComplete) {
           setSession(data.session);
           setIsLoading(false);
         }
       } catch (error) {
-        console.error('Unexpected error in session check:', error);
+        console.error('Error getting session:', error);
         if (mounted) setIsLoading(false);
       }
     };
-    
-    // Start session check immediately
-    checkSession();
 
-    // Safety timeout to prevent infinite loading
+    // Start initial session check
+    getInitialSession();
+    
+    // Set a shorter timeout as a fallback - reduce from 800ms to 500ms
     const timeoutId = setTimeout(() => {
       if (mounted && isLoading) {
-        console.log("Session check timeout - forcing completion");
+        console.log('Session check timeout - forcing completion');
         setIsLoading(false);
       }
-    }, 2000);
-    
+    }, 500); // Reduced from 800ms to 500ms for faster fallback
+
     return () => {
       mounted = false;
       subscription?.unsubscribe();
@@ -82,63 +69,32 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
+  // Avoid updating state during render - use local variables instead
+  const isPublicRoute = location.pathname === '/splash' || 
+                        location.pathname === '/login' || 
+                        location.pathname.startsWith('/fast-tip');
+                        
+  const needsRedirect = !isLoading && !session && !isPublicRoute;
+
   // Handle redirect if needed
   useEffect(() => {
-    // Only redirect if we're done loading and have no session
-    if (!isLoading && !session && !isPublicRoute) {
+    if (needsRedirect) {
       console.log('No session, redirecting to login from:', location.pathname);
-      
-      // Check for recursion error in URL params
-      const urlParams = new URLSearchParams(location.search);
-      const hasRecursionError = urlParams.get('error') === 'recursion';
-      
-      // Show toast for recursion errors
-      if (hasRecursionError) {
-        // Clear localStorage to prevent issues
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('team_data_') || 
-              key.includes('analytics_') || 
-              key.includes('sb-') ||
-              key === 'last_team_id' ||
-              key === 'login_attempt_time') {
-            localStorage.removeItem(key);
-          }
-        });
-        
-        navigate('/login', { 
-          replace: true, 
-          state: { 
-            message: "Je bent uitgelogd vanwege een database beveiligingsprobleem. Inloggen zou dit probleem moeten oplossen door een nieuwe sessie aan te maken."
-          } 
-        });
-        
-        toast({
-          title: "Database beveiligingsprobleem gedetecteerd",
-          description: "Probeer opnieuw in te loggen om het database beveiligingsprobleem op te lossen.",
-          variant: "destructive",
-          duration: 5000
-        });
-      } else {
-        // Regular redirect
-        navigate('/login', { replace: true });
-      }
+      navigate('/login', { replace: true });
     }
-  }, [isLoading, session, isPublicRoute, navigate, location.pathname, location.search, toast]);
+  }, [needsRedirect, navigate, location.pathname]);
 
-  // Show loading state
+  // Only show loading state for a maximum of 500 milliseconds
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-amber-50/30 to-amber-100/30">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-amber-500 mx-auto" />
-          <p className="mt-2 text-sm text-muted-foreground">Laden...</p>
-        </div>
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
       </div>
     );
   }
 
-  // Don't render children during redirect
-  if (!isLoading && !session && !isPublicRoute) {
+  // Don't return children until we've redirected if needed
+  if (needsRedirect) {
     return null;
   }
 

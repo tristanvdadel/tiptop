@@ -292,11 +292,6 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
                                           <span className="text-xs text-gray-500 flex items-center">
                                             <Calendar className="h-3 w-3 mr-1" />
                                             {formatDate(registration.date)}
-                                            {registration.processed && (
-                                              <Badge variant="outline" className="ml-2 text-xs bg-blue-50 text-blue-800 border-blue-200">
-                                                Uitbetaald
-                                              </Badge>
-                                            )}
                                           </span>
                                         </div>
                                         <Button 
@@ -304,8 +299,6 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
                                           size="icon" 
                                           onClick={() => deleteHourRegistration(member.id, registration.id)} 
                                           className="h-7 w-7 text-gray-500 hover:text-red-500"
-                                          disabled={registration.processed}
-                                          title={registration.processed ? "Uitbetaalde uren kunnen niet verwijderd worden" : "Verwijder uurregistratie"}
                                         >
                                           <Trash2 className="h-3 w-3" />
                                         </Button>

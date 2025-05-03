@@ -1,33 +1,16 @@
+
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 const SUPABASE_URL = "https://aufcygymqwmyvviofywt.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1ZmN5Z3ltcXdteXZ2aW9meXd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM3MTU5MzksImV4cCI6MjA1OTI5MTkzOX0.MbymYGamv15OLMlJ4CL1C_z35QvO55bRCBiAyjTHIn0";
 
-// Export the Supabase client with optimized configuration
-export const supabase = createClient<Database>(
-  SUPABASE_URL, 
-  SUPABASE_PUBLISHABLE_KEY,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      storage: localStorage
-    },
-    global: {
-      headers: {
-        'x-client-info': 'tiptop-app'
-      }
-    },
-    realtime: {
-      params: {
-        eventsPerSecond: 10
-      }
-    }
-  }
-);
+// Import the supabase client like this:
+// import { supabase } from "@/integrations/supabase/client";
 
-// Improved auth status helpers
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// Supabase auth status helpers
 export const getUser = async () => {
   const { data: { user } } = await supabase.auth.getUser();
   return user;
@@ -50,6 +33,7 @@ export const getUserEmail = async (userId: string) => {
       
     if (profile) {
       // Since email isn't stored in the profiles table, we'll return a placeholder
+      // In a real application, you might implement this differently
       return 'Onbekend';
     }
     
@@ -64,7 +48,7 @@ export const getUserEmail = async (userId: string) => {
 // Import safe team functions from service layer
 import { getUserTeamsSafe, getTeamMembersSafe } from '@/services/teamService';
 
-// Enhanced team member queries with safe functions
+// Verbeterde team member queries met veilige functies
 export const getTeamMembers = async (teamId: string) => {
   try {
     console.log('Fetching team members for team:', teamId);
@@ -87,137 +71,6 @@ export const getUserTeams = async (userId: string) => {
     console.error('Unexpected error in getUserTeams:', error);
     return { data: [], error };
   }
-};
-
-// Update getTeamPeriodsSafe to handle the new tips JSON format with improved error handling
-export const getTeamPeriodsSafe = async (teamId: string) => {
-  try {
-    console.log('🔍 Fetching periods safely for team:', teamId);
-    
-    // Add retry logic for safer period fetching
-    let attempts = 0;
-    const maxAttempts = 2;
-    let data;
-    let error;
-    
-    while (attempts < maxAttempts) {
-      try {
-        const result = await supabase
-          .rpc('get_team_periods_safe', { team_id_param: teamId });
-          
-        data = result.data;
-        error = result.error;
-        
-        if (!error) break;
-        
-        // If recursion error, break immediately to handle specially
-        if (isRecursionError(error)) break;
-        
-        // Otherwise retry
-        attempts++;
-        if (attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      } catch (err) {
-        error = err;
-        attempts++;
-        if (attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-    }
-    
-    if (error) {
-      // Improved error detection
-      if (isRecursionError(error)) {
-        console.error('⚠️ Detected database recursion error in RLS policy:', error);
-        throw new Error('database_recursion_error');
-      }
-      
-      console.error('❌ Error in getTeamPeriodsSafe:', error);
-      throw error;
-    }
-    
-    // Transform the data to match our Period type with safer null handling
-    const formattedData = data?.map((period: any) => ({
-      id: period.id,
-      name: period.name || `Periode ${new Date(period.start_date).toLocaleDateString('nl')}`,
-      startDate: period.start_date,
-      endDate: period.end_date,
-      isCurrent: period.is_active || false,
-      isPaid: period.is_paid || false,
-      autoCloseDate: period.auto_close_date,
-      notes: period.notes || '',
-      tips: Array.isArray(period.tips) ? period.tips.map((tip: any) => ({
-        id: tip.id,
-        amount: tip.amount,
-        teamMemberId: tip.added_by,
-        periodId: tip.period_id,
-        timestamp: tip.created_at,
-        date: tip.date || tip.created_at,
-        note: tip.note || ''
-      })) : []
-    })) || [];
-    
-    console.log('✅ Successfully fetched periods:', formattedData.length);
-    return formattedData;
-  } catch (error: any) {
-    // Special handling for recursion errors to bubble up correctly
-    if (error.message === 'database_recursion_error') {
-      throw error;
-    }
-    
-    console.error('❌ Unexpected error in getTeamPeriodsSafe:', error);
-    return [];
-  }
-};
-
-// Enhanced and more comprehensive function to detect recursion errors
-export const isRecursionError = (error: any): boolean => {
-  if (!error) return false;
-  
-  const errorMessage = typeof error === 'string' ? error : error.message || '';
-  const errorCode = typeof error === 'object' && error.code ? error.code : '';
-  const errorDetails = typeof error === 'object' && error.details ? error.details : '';
-  
-  return errorMessage.includes('recursion') || 
-         errorMessage.includes('recursie') ||
-         errorMessage.includes('infinity') ||
-         errorMessage.includes('oneindig') ||
-         errorMessage.includes('beveiligingsprobleem') ||
-         errorCode === '42P17' ||
-         errorDetails.includes('recursion') ||
-         errorMessage.includes('maximum call stack size exceeded');
-};
-
-// Improved function to clear all cached security tokens and team data
-export const clearSecurityCache = () => {
-  console.log("Clearing security and session cache to resolve recursion issues");
-  
-  // Clear auth tokens
-  localStorage.removeItem('sb-auth-token-cached');
-  localStorage.removeItem('sb:token');
-  localStorage.removeItem('supabase.auth.token');
-  
-  // Clear team data
-  localStorage.removeItem('last_team_id');
-  localStorage.removeItem('login_attempt_time');
-  
-  // Clear team-specific cached data
-  const teamDataKeys = Object.keys(localStorage).filter(
-    key => key.startsWith('team_data_') || 
-           key.includes('analytics_') || 
-           key.includes('supabase.auth')
-  );
-  teamDataKeys.forEach(key => localStorage.removeItem(key));
-  
-  // Also remove any session storage items
-  const sessionKeys = Object.keys(sessionStorage).filter(
-    key => key.includes('supabase') || key.includes('team')
-  );
-  sessionKeys.forEach(key => sessionStorage.removeItem(key));
-  
-  return true;
 };
 
 // Interface extensions to help with TypeScript

@@ -1,25 +1,13 @@
 
 import React from 'react';
-import { StatusIndicator } from '@/components/ui/status-indicator';
+import { RefreshCw } from 'lucide-react';
 
-interface LoadingIndicatorProps {
-  message?: string;
-  description?: string;
-  minimal?: boolean;
-}
-
-const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({ 
-  message = "Teamgegevens laden...",
-  description = "Dit kan even duren als er veel gegevens zijn.",
-  minimal = false
-}) => {
+const LoadingIndicator: React.FC = () => {
   return (
-    <StatusIndicator
-      type="loading"
-      title={message}
-      message={minimal ? undefined : description}
-      minimal={minimal}
-    />
+    <div className="flex flex-col items-center justify-center py-12">
+      <RefreshCw size={32} className="animate-spin mb-4 text-primary" />
+      <p>Loading team data...</p>
+    </div>
   );
 };
 

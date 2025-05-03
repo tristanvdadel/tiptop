@@ -91,7 +91,6 @@ export type Database = {
           amount: number
           balance: number | null
           created_at: string
-          hours: number | null
           id: string
           payout_id: string
           team_member_id: string
@@ -101,7 +100,6 @@ export type Database = {
           amount: number
           balance?: number | null
           created_at?: string
-          hours?: number | null
           id?: string
           payout_id: string
           team_member_id: string
@@ -111,7 +109,6 @@ export type Database = {
           amount?: number
           balance?: number | null
           created_at?: string
-          hours?: number | null
           id?: string
           payout_id?: string
           team_member_id?: string
@@ -177,7 +174,6 @@ export type Database = {
           payer_name: string | null
           payout_time: string
           team_id: string
-          total_hours: number | null
         }
         Insert: {
           created_at?: string
@@ -186,7 +182,6 @@ export type Database = {
           payer_name?: string | null
           payout_time?: string
           team_id: string
-          total_hours?: number | null
         }
         Update: {
           created_at?: string
@@ -195,7 +190,6 @@ export type Database = {
           payer_name?: string | null
           payout_time?: string
           team_id?: string
-          total_hours?: number | null
         }
         Relationships: [
           {
@@ -436,15 +430,7 @@ export type Database = {
         }
         Returns: string
       }
-      check_team_admin_safe: {
-        Args: { user_id_param: string; team_id_param: string }
-        Returns: boolean
-      }
       check_team_membership: {
-        Args: { user_id_param: string; team_id_param: string }
-        Returns: boolean
-      }
-      check_team_membership_safe: {
         Args: { user_id_param: string; team_id_param: string }
         Returns: boolean
       }
@@ -476,23 +462,6 @@ export type Database = {
           role: string
           team_id: string
           user_id: string
-        }[]
-      }
-      get_team_periods_safe: {
-        Args: { team_id_param: string }
-        Returns: {
-          id: string
-          team_id: string
-          name: string
-          start_date: string
-          end_date: string
-          is_active: boolean
-          is_paid: boolean
-          auto_close_date: string
-          average_tip_per_hour: number
-          created_at: string
-          notes: string
-          tips: Json
         }[]
       }
       get_user_teams: {

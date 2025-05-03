@@ -24,91 +24,44 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Prevent empty submissions or multiple attempts
-    if (!email || !password || loading) return;
-    
     setLoading(true);
-    setLoginProgress(40); // Start progress higher for faster feedback
+    setLoginProgress(20); // Start at 20 instead of 10
     
     try {
-      // Provide immediate feedback
-      setLoginProgress(60);
+      setLoginProgress(50); // Jump to 50 faster
       
-      // Cache the login attempt to avoid session deadlocks
-      const timestamp = Date.now().toString();
-      localStorage.setItem('login_attempt_time', timestamp);
-      
-      // Direct login without artificial waits
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const {
+        data,
+        error
+      } = await supabase.auth.signInWithPassword({
         email,
         password
       });
       
+      setLoginProgress(80); // Jump to 80 faster
+      
       if (error) throw error;
       
-      // Handle success immediately
+      setLoginProgress(100);
+      
       if (data.session) {
-        setLoginProgress(100);
-        
-        // Cache session token locally for faster auth check
-        localStorage.setItem('sb-auth-token-cached', data.session.access_token);
-        
         toast({
-          title: "Succesvol ingelogd",
-          description: "Je wordt doorgestuurd naar het dashboard"
+          title: "Succesvol ingelogd"
         });
         
-        // Immediate navigation, no delays
-        navigate('/', { replace: true });
-        return;
+        // Redirect faster
+        setTimeout(() => {
+          navigate('/', { replace: true });
+        }, 100); // Reduced from 300ms to 100ms
       }
-      
-      // Only reach here if there was no session but also no error
-      throw new Error("Geen sessie ontvangen van authenticatiesysteem");
-      
     } catch (error: any) {
-      setLoginProgress(0);
-      console.error("Login error:", error);
-      
-      // More specific error messages
-      let errorMessage = "Controleer je gegevens en probeer opnieuw.";
-      let errorTitle = "Fout bij inloggen";
-      
-      if (error.message?.includes("Invalid login credentials")) {
-        errorMessage = "Ongeldige inloggegevens. Controleer je e-mail en wachtwoord.";
-      } else if (error.message?.includes("Email not confirmed")) {
-        errorMessage = "E-mail nog niet bevestigd. Controleer je inbox.";
-      } else if (error.message?.includes("too many requests")) {
-        errorMessage = "Te veel inlogpogingen. Probeer het later opnieuw.";
-      } else if (error.message?.includes("network") || !navigator.onLine) {
-        errorTitle = "Netwerkfout";
-        errorMessage = "Controleer je internetverbinding en probeer opnieuw.";
-      } else if (error.message?.includes("timeout") || error.message?.includes("TIMEOUT")) {
-        errorTitle = "Time-out";
-        errorMessage = "Inlogpoging duurde te lang. Probeer het opnieuw.";
-      }
-      
       toast({
-        title: errorTitle,
-        description: errorMessage,
+        title: "Fout bij inloggen",
+        description: error.message,
         variant: "destructive"
       });
-    } finally {
       setLoading(false);
-      
-      // Safety timeout - if still on login page after 5 seconds, show warning
-      setTimeout(() => {
-        const currentPath = window.location.pathname;
-        if (currentPath.includes('/login') && loading) {
-          setLoading(false);
-          toast({
-            title: "Inloggen duurt lang",
-            description: "Probeer het opnieuw of ververs de pagina",
-            variant: "destructive"
-          });
-        }
-      }, 5000);
+      setLoginProgress(0);
     }
   };
 
@@ -124,9 +77,6 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
             required 
             value={email} 
             onChange={e => setEmail(e.target.value)}
-            disabled={loading}
-            autoComplete="email"
-            autoFocus
           />
         </div>
         <div className="space-y-2">
@@ -137,8 +87,6 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
             required 
             value={password} 
             onChange={e => setPassword(e.target.value)}
-            disabled={loading}
-            autoComplete="current-password"
           />
         </div>
         <Button
@@ -146,7 +94,6 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
           variant="link"
           className="p-0 h-auto text-amber-600 hover:text-amber-700 flex items-center gap-1"
           onClick={onResetPasswordClick}
-          disabled={loading}
         >
           <KeyRound size={16} />
           Wachtwoord vergeten?
@@ -155,19 +102,19 @@ const LoginForm = ({ onResetPasswordClick }: LoginFormProps) => {
       <CardFooter className="flex flex-col gap-4">
         {loginProgress > 0 && (
           <div className="w-full">
-            <Progress value={loginProgress} className="h-2 bg-amber-100" />
+            <Progress value={loginProgress} className="h-2 bg-amber-100">
+              <div 
+                className="h-full bg-gradient-to-r from-amber-400 to-amber-300"
+                style={{ width: `${loginProgress}%` }}
+              />
+            </Progress>
           </div>
         )}
-        <Button 
-          type="submit" 
-          className="w-full" 
-          variant="goldGradient" 
-          disabled={loading || !email || !password}
-        >
+        <Button type="submit" className="w-full" variant="goldGradient" disabled={loading}>
           {loading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Inloggen...
+              Bezig met inloggen...
             </> 
           ) : "Inloggen"}
         </Button>

@@ -1,203 +1,161 @@
-import { supabase } from '@/integrations/supabase/client';
-import { TeamMember } from '@/types';
+
+import { supabase } from "@/integrations/supabase/client";
+import { TeamMember } from '@/contexts/AppContext';
 
 /**
- * Fetch all team members for a team
+ * Saves a team member and their hour registrations to the database
  */
-export const fetchAllTeamMembers = async (teamId: string) => {
+export const saveTeamMember = async (teamId: string, member: TeamMember) => {
+  const { id, name, hours, balance, hourRegistrations } = member;
+  
   try {
-    console.log(`Fetching team members for team ${teamId}`);
+    console.log(`saveTeamMember: Saving member ${name} (${id}) to team ${teamId}`);
+    console.log(`saveTeamMember: Member data:`, { hours, balance, registrationsCount: hourRegistrations?.length || 0 });
     
-    // First get the team member records
-    const { data, error } = await supabase
+    // First check if this is a database team member or a local one
+    const { data: existingMember, error: checkError } = await supabase
       .from('team_members')
-      .select(`
-        id,
-        balance,
-        hours,
-        role,
-        user_id
-      `)
-      .eq('team_id', teamId);
+      .select('id, user_id')
+      .eq('id', id)
+      .maybeSingle();
     
-    if (error) {
-      console.error('Error fetching team members:', error);
-      throw error;
+    if (checkError && checkError.code !== 'PGRST116') throw checkError;
+    
+    // If it doesn't exist yet in the database, create it
+    if (!existingMember) {
+      console.log('Creating new team member in database:', name);
+      
+      const { data: newMember, error: createError } = await supabase
+        .from('team_members')
+        .insert([{
+          id,
+          team_id: teamId,
+          user_id: null, // Local team members don't have a user_id
+          role: 'member',
+          hours,
+          balance,
+          permissions: {
+            add_tips: false,
+            edit_tips: false,
+            add_hours: false,
+            view_team: true,
+            view_reports: false,
+            close_periods: false,
+            manage_payouts: false
+          }
+        }])
+        .select()
+        .single();
+      
+      if (createError) {
+        console.error('Error creating team member:', createError);
+        throw createError;
+      }
+      
+      console.log('Team member created successfully:', newMember);
+      
+      // After creating the team member, handle hour registrations if any
+      if (hourRegistrations && hourRegistrations.length > 0) {
+        console.log(`Adding ${hourRegistrations.length} hour registrations for new member ${name}`);
+        const { error: regsError } = await supabase
+          .from('hour_registrations')
+          .insert(hourRegistrations.map(reg => ({
+            id: reg.id,
+            team_member_id: id,
+            hours: reg.hours,
+            date: reg.date,
+            processed: false
+          })));
+        
+        if (regsError) {
+          console.error('Error adding hour registrations:', regsError);
+          throw regsError;
+        }
+        
+        console.log('Hour registrations added successfully');
+      }
+      
+      return newMember;
     }
     
-    // Transform to application format
-    return data.map(member => {
-      // Generate placeholder name since we can't join with profiles
-      const displayName = `Member ${member.id.slice(0, 4)}`;
-      
-      return {
-        id: member.id,
-        name: displayName,
-        hourlyRate: 10, // Default hourly rate since it's not in the database
-        balance: member.balance || 0,
-        hours: member.hours || 0,
-        hasAccount: !!member.user_id
-      };
-    });
-  } catch (error) {
-    console.error('Error in fetchAllTeamMembers:', error);
-    return [];
-  }
-};
-
-/**
- * Saves a team member to the database.
- */
-export const saveTeamMember = async (teamId: string, name: string, hourlyRate: number) => {
-  try {
-    console.log(`Saving team member for team ${teamId}`);
-    
-    // Create user profile (placeholder)
-    // In a real implementation, we'd handle user creation differently
-    const userId = crypto.randomUUID();
-    
-    // Create team member with role = 'member'
-    const { data, error } = await supabase
+    // For existing members, update details
+    console.log(`Updating existing team member ${name} (ID: ${id})`);
+    const { data: updatedMember, error: memberError } = await supabase
       .from('team_members')
-      .insert([
-        { 
-          team_id: teamId,
-          user_id: userId, 
-          role: 'member' // This is required by the schema
-        }
-      ])
+      .update({
+        hours,
+        balance
+      })
+      .eq('id', id)
       .select()
       .single();
     
-    if (error) {
-      console.error('Error saving team member:', error);
-      throw error;
+    if (memberError) {
+      console.error('Error updating team member:', memberError);
+      throw memberError;
     }
     
-    // Create a profile with the name
-    const nameParts = name.split(' ');
-    const firstName = nameParts[0];
-    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+    console.log('Team member updated successfully:', updatedMember);
     
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .insert([{
-        id: userId,
-        first_name: firstName,
-        last_name: lastName
-      }]);
-    
-    if (profileError) {
-      console.error('Error creating profile:', profileError);
-      // Continue anyway as this is non-critical
-    }
-    
-    // Transform to application format
-    return {
-      id: data.id,
-      name: name,
-      hourlyRate: hourlyRate,
-      balance: data.balance || 0,
-      hours: data.hours || 0,
-      hasAccount: true
-    };
-  } catch (error) {
-    console.error('Error in saveTeamMember:', error);
-    throw error;
-  }
-};
-
-/**
- * Update a team member
- */
-export const updateTeamMember = async (teamMemberId: string, updates: Partial<TeamMember>) => {
-  try {
-    console.log(`Updating team member ${teamMemberId}`);
-    
-    // First get the current team member record
-    const { data: member, error: fetchError } = await supabase
-      .from('team_members')
-      .select('id, user_id, balance, hours')
-      .eq('id', teamMemberId)
-      .single();
-    
-    if (fetchError) {
-      console.error('Error fetching team member:', fetchError);
-      throw fetchError;
-    }
-    
-    // Update team member record
-    const dbUpdates: any = {};
-    if (updates.balance !== undefined) dbUpdates.balance = updates.balance;
-    if (updates.hours !== undefined) dbUpdates.hours = updates.hours;
-    
-    if (Object.keys(dbUpdates).length > 0) {
-      const { error: updateError } = await supabase
-        .from('team_members')
-        .update(dbUpdates)
-        .eq('id', teamMemberId);
+    // Handle hour registrations if any
+    if (hourRegistrations && hourRegistrations.length > 0) {
+      // Get existing registrations
+      console.log(`Syncing ${hourRegistrations.length} hour registrations for member ${name}`);
+      const { data: existingRegs, error: getRegsError } = await supabase
+        .from('hour_registrations')
+        .select('id')
+        .eq('team_member_id', id);
       
-      if (updateError) {
-        console.error('Error updating team member:', updateError);
-        throw updateError;
+      if (getRegsError) {
+        console.error('Error fetching existing hour registrations:', getRegsError);
+        throw getRegsError;
       }
-    }
-    
-    // Update profile name if needed
-    if (updates.name && member.user_id) {
-      const nameParts = updates.name.split(' ');
-      const firstName = nameParts[0];
-      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
       
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          first_name: firstName,
-          last_name: lastName
-        })
-        .eq('id', member.user_id);
+      const existingRegIds = existingRegs.map(r => r.id);
+      const currentRegIds = hourRegistrations.map(r => r.id);
       
-      if (profileError) {
-        console.error('Error updating profile:', profileError);
-        // Continue anyway as this is non-critical
+      // Find registrations to delete
+      const regsToDelete = existingRegIds.filter(id => !currentRegIds.includes(id));
+      
+      if (regsToDelete.length > 0) {
+        console.log(`Deleting ${regsToDelete.length} outdated hour registrations`);
+        const { error: deleteError } = await supabase
+          .from('hour_registrations')
+          .delete()
+          .in('id', regsToDelete);
+        
+        if (deleteError) {
+          console.error('Error deleting hour registrations:', deleteError);
+          throw deleteError;
+        }
+        
+        console.log('Outdated hour registrations deleted successfully');
       }
+      
+      // Upsert all current registrations
+      console.log(`Upserting ${hourRegistrations.length} hour registrations`);
+      const { error: upsertError } = await supabase
+        .from('hour_registrations')
+        .upsert(hourRegistrations.map(reg => ({
+          id: reg.id,
+          team_member_id: id,
+          hours: reg.hours,
+          date: reg.date,
+          processed: false
+        })));
+      
+      if (upsertError) {
+        console.error('Error upserting hour registrations:', upsertError);
+        throw upsertError;
+      }
+      
+      console.log('Hour registrations upserted successfully');
     }
     
-    // Return updated team member
-    return {
-      id: member.id,
-      name: updates.name || 'Unknown member',
-      hourlyRate: updates.hourlyRate || 10,
-      balance: updates.balance !== undefined ? updates.balance : member.balance || 0,
-      hours: updates.hours !== undefined ? updates.hours : member.hours || 0,
-      hasAccount: !!member.user_id
-    };
+    console.log(`saveTeamMember: Successfully saved team member ${name} (${id})`);
+    return updatedMember;
   } catch (error) {
-    console.error('Error in updateTeamMember:', error);
-    throw error;
-  }
-};
-
-/**
- * Delete a team member
- */
-export const deleteTeamMember = async (teamMemberId: string) => {
-  try {
-    console.log(`Deleting team member ${teamMemberId}`);
-    
-    const { error } = await supabase
-      .from('team_members')
-      .delete()
-      .eq('id', teamMemberId);
-    
-    if (error) {
-      console.error('Error deleting team member:', error);
-      throw error;
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error in deleteTeamMember:', error);
+    console.error('Error saving team member:', error);
     throw error;
   }
 };

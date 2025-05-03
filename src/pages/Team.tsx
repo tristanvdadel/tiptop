@@ -1,97 +1,174 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
+import { useApp } from '@/contexts/AppContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PayoutSummary } from '@/components/PayoutSummary';
-import { TeamProvider } from '@/contexts/TeamContext';
-import TeamContent from '@/components/team/TeamContent';
-import { useTeamId } from '@/hooks/useTeamId';
-import { useToast } from '@/hooks/use-toast';
-import { StatusIndicator } from '@/components/ui/status-indicator';
-import { LoadingState } from '@/components/ui/loading-state';
-import { useAppData } from '@/contexts/AppDataContext';
+import TeamMemberList from '@/components/team/TeamMemberList';
+import PeriodSelector from '@/components/team/PeriodSelector';
+import { TeamProvider, useTeam } from '@/contexts/TeamContext';
+import TeamHeader from '@/components/team/TeamHeader';
+import ImportActions from '@/components/team/ImportActions';
+import TipDistributionSection from '@/components/team/TipDistributionSection';
+import LoadingIndicator from '@/components/team/LoadingIndicator';
+import { checkTeamMembersWithAccounts } from '@/services/teamDataService';
 
-const Team: React.FC = () => {
+const TeamContent: React.FC = () => {
+  const {
+    teamMembers,
+    addTeamMember,
+    removeTeamMember,
+    updateTeamMemberHours,
+    deleteHourRegistration,
+    refreshTeamData,
+    updateTeamMemberName,
+    periods,
+    teamId
+  } = useApp();
+  
+  const { 
+    loading, 
+    dataInitialized, 
+    handleRefresh, 
+    selectedPeriods, 
+    togglePeriodSelection,
+    sortedTeamMembers
+  } = useTeam();
+  
   const location = useLocation();
   const navigate = useNavigate();
-  const { teamId, loading: teamIdLoading } = useTeamId();
-  const { toast } = useToast();
-  const [showPayoutSummary, setShowPayoutSummary] = useState(false);
-  const { connectionState } = useAppData();
-  
+  const [showPayoutSummary, setShowPayoutSummary] = React.useState(false);
+
+  // Load team data on initial mount
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadInitialData = async () => {
+      if (dataInitialized) {
+        console.log("Team.tsx: Data already initialized, skipping initial load");
+        return;
+      }
+      
+      if (!teamId) {
+        console.error("Team.tsx: No team ID found, cannot load data");
+        return;
+      }
+      
+      try {
+        console.log("Team.tsx: Initial data loading for team:", teamId);
+        await handleRefresh();
+        if (isMounted) {
+          console.log("Team.tsx: Initial data loaded successfully");
+        }
+      } catch (error) {
+        console.error("Error loading team data:", error);
+      }
+    };
+    
+    console.log("Team.tsx: Initializing component, loading data");
+    loadInitialData();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [dataInitialized, handleRefresh, teamId]);
+
+  // Check URL parameters for showing the payout summary
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const showSummary = urlParams.get('payoutSummary') === 'true';
+    console.log("Team.tsx: URL param 'payoutSummary':", showSummary);
     setShowPayoutSummary(showSummary);
-  }, [location.search]);
-
-  const handleRefreshTeamId = async () => {
-    toast({
-      title: "Bezig met laden",
-      description: "We proberen je teamgegevens op te halen...",
-    });
     
-    try {
-      navigate('/management');
-    } catch (error) {
-      toast({
-        title: "Fout bij laden",
-        description: "Kon je team niet vinden. Probeer opnieuw in te loggen.",
-        variant: "destructive"
-      });
+    if (!showSummary) {
+      // Clear period selection when not showing payout summary
+      console.log("Team.tsx: Clearing period selection");
+      togglePeriodSelection('');
     }
-  };
-  
-  if (teamIdLoading) {
+  }, [location.search, togglePeriodSelection]);
+
+  // Update team members with account status
+  useEffect(() => {
+    let isMounted = true;
+
+    const updateTeamMembersWithAccounts = async () => {
+      if (teamMembers.length === 0) {
+        console.log("Team.tsx: No team members to check for accounts");
+        return;
+      }
+      
+      try {
+        console.log("Team.tsx: Checking team members with accounts, count:", teamMembers.length);
+        if (isMounted) {
+          await checkTeamMembersWithAccounts(teamMembers);
+          console.log("Team.tsx: Team members with accounts checked successfully");
+        }
+      } catch (error) {
+        console.error("Error checking team members with accounts:", error);
+      }
+    };
+    
+    updateTeamMembersWithAccounts();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [teamMembers]);
+
+  // Show payout summary if payoutSummary URL param is present
+  if (showPayoutSummary) {
     return (
-      <div className="transition-opacity duration-300">
-        <StatusIndicator
-          type="loading"
-          title="Team ophalen..."
-          message="We zijn bezig je gegevens te laden"
-        />
+      <div className="pb-16">
+        <PayoutSummary onClose={() => {
+          console.log("Team.tsx: Closing payout summary");
+          setShowPayoutSummary(false);
+          navigate('/team');
+        }} />
       </div>
     );
   }
-  
-  if (!teamId && !teamIdLoading) {
-    return (
-      <div className="transition-opacity duration-300">
-        <StatusIndicator
-          type="error"
-          title="Geen team gevonden"
-          message="We konden je team niet vinden. Probeer het opnieuw."
-          actionLabel="Naar teambeheer"
-          onAction={handleRefreshTeamId}
-        />
-      </div>
-    );
+
+  // Show loading animation during first load process
+  if (loading && !dataInitialized) {
+    console.log("Team.tsx: Showing loading indicator");
+    return <LoadingIndicator />;
   }
-  
+
+  const unpaidClosedPeriods = periods.filter(period => !period.isPaid && !period.isActive).length > 0;
+  console.log("Team.tsx: Has unpaid closed periods:", unpaidClosedPeriods);
+
+  return (
+    <div className="pb-16">
+      <TeamHeader />
+      
+      <TeamMemberList 
+        teamMembers={sortedTeamMembers}
+        addTeamMember={addTeamMember}
+        removeTeamMember={removeTeamMember}
+        updateTeamMemberHours={updateTeamMemberHours}
+        deleteHourRegistration={deleteHourRegistration}
+        updateTeamMemberName={updateTeamMemberName}
+      />
+      
+      <ImportActions />
+      
+      <PeriodSelector 
+        periods={periods}
+        selectedPeriods={selectedPeriods}
+        onTogglePeriodSelection={togglePeriodSelection}
+      />
+      
+      {periods.filter(period => !period.isPaid && !period.isActive).length > 0 && 
+        <TipDistributionSection />
+      }
+    </div>
+  );
+};
+
+const Team: React.FC = () => {
+  console.log("Team.tsx: Rendering Team component with TeamProvider");
   return (
     <TeamProvider>
-      <div className="transition-opacity duration-300">
-        {connectionState === 'disconnected' && (
-          <div className="mb-4">
-            <StatusIndicator 
-              type="offline"
-              message="Je bent offline. De pagina wordt automatisch bijgewerkt wanneer er wijzigingen plaatsvinden zodra je weer online bent."
-            />
-          </div>
-        )}
-        
-        <LoadingState 
-          isLoading={false}
-          instant={true}
-        >
-          {showPayoutSummary ? (
-            <div className="pb-16">
-              <PayoutSummary />
-            </div>
-          ) : (
-            <TeamContent />
-          )}
-        </LoadingState>
-      </div>
+      <TeamContent />
     </TeamProvider>
   );
 };

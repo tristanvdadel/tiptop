@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload } from 'lucide-react';
-import { useImport } from '@/contexts/ImportContext';
+import { useTeam } from '@/contexts/TeamContext';
 import ImportHoursDialog from '@/components/team/ImportHoursDialog';
 
 const ImportActions: React.FC = () => {
@@ -13,7 +13,7 @@ const ImportActions: React.FC = () => {
     handleFileImport, 
     handleConfirmImportedHours, 
     closeImportDialog 
-  } = useImport();
+  } = useTeam();
 
   return (
     <>

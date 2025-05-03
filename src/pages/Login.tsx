@@ -41,15 +41,6 @@ const Login = () => {
     let isMounted = true;
     let timeoutId: number;
     
-    // First check for cached auth
-    const cachedToken = localStorage.getItem('sb-auth-token-cached');
-    if (cachedToken && isMounted) {
-      console.log("Found cached auth token, assuming logged in");
-      setAuthenticated(true);
-      setSessionChecked(true);
-      return;
-    }
-    
     const fastSessionCheck = async () => {
       try {
         console.log("Performing fast session check");
@@ -79,13 +70,13 @@ const Login = () => {
       }
     };
     
-    // Reduce timeout from 1000ms to 500ms for faster response
+    // Reduce timeout from 1500ms to 1000ms for faster response
     timeoutId = window.setTimeout(() => {
       if (isMounted && !sessionChecked) {
         console.log("Session check timeout - forcing completion");
         setSessionChecked(true);
       }
-    }, 500);
+    }, 1000);
     
     fastSessionCheck();
     
@@ -96,8 +87,6 @@ const Login = () => {
   }, []);
 
   if (authenticated) {
-    // Clear any login attempt markers when redirecting after authentication
-    localStorage.removeItem('login_attempt_time');
     return <Navigate to="/" replace />;
   }
 

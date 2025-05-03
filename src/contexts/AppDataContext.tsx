@@ -20,6 +20,7 @@ import {
 } from '@/services/teamMemberService';
 import {
   savePayoutToSupabase,
+  deletePayout,
 } from '@/services/payoutService';
 import {
   saveTeamSettings as saveTeamSettingsToSupabase,
@@ -293,21 +294,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       // Update state with fetched data
-      setPeriods(periodsData || []);
+      if (periodsData) {
+        // Ensure each period's tip has the periodId set
+        const formattedPeriods: Period[] = periodsData.map(period => ({
+          id: period.id,
+          teamId: period.teamId,
+          startDate: period.startDate,
+          endDate: period.endDate,
+          isActive: period.isActive,
+          isPaid: period.isPaid,
+          notes: period.notes,
+          name: period.name,
+          autoCloseDate: period.autoCloseDate,
+          averageTipPerHour: period.averageTipPerHour,
+          tips: period.tips?.map(tip => ({
+            ...tip,
+            periodId: period.id // Ensure periodId is set
+          })) || []
+        }));
+        setPeriods(formattedPeriods);
+      }
       
       // Transform team members data to match our interface
-      const transformedMembers = (membersData || []).map(member => ({
-        id: member.id,
-        teamId: member.team_id,
-        user_id: member.user_id,
-        role: member.role,
-        hours: member.hours || 0,
-        balance: member.balance || 0,
-        permissions: member.permissions as TeamMemberPermissions,
-        name: member.id.substring(0, 8), // Placeholder name
-      }));
-      
-      setTeamMembers(transformedMembers);
+      if (membersData) {
+        const transformedMembers: TeamMember[] = membersData.map(member => ({
+          id: member.id,
+          teamId: member.team_id,
+          user_id: member.user_id,
+          role: member.role,
+          hours: member.hours || 0,
+          balance: member.balance || 0,
+          permissions: member.permissions as TeamMemberPermissions,
+          name: member.id.substring(0, 8), // Placeholder name
+        }));
+        
+        setTeamMembers(transformedMembers);
+      }
       
       // Transform team settings
       if (settingsData) {
@@ -325,28 +347,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       // Transform payouts data
-      const transformedPayouts = (payoutsData || []).map(payout => ({
-        id: payout.id,
-        teamId: payout.team_id,
-        date: payout.date,
-        payerName: payout.payer_name,
-        payoutTime: payout.payout_time,
-        totalAmount: 0, // Placeholder
-        periodIds: [], // Placeholder
-        distribution: [] // Placeholder
-      }));
-      
-      setPayouts(transformedPayouts);
+      if (payoutsData) {
+        const transformedPayouts: Payout[] = payoutsData.map(payout => ({
+          id: payout.id,
+          teamId: payout.team_id,
+          date: payout.date,
+          payerName: payout.payer_name,
+          payoutTime: payout.payout_time,
+          totalAmount: 0, // Placeholder
+          periodIds: [], // Placeholder
+          distribution: [] // Placeholder
+        }));
+        
+        setPayouts(transformedPayouts);
+      }
       
       // Determine current and active periods
-      const now = new Date();
-      const active = periodsData?.find(
-        (period) => new Date(period.startDate) <= now && new Date(period.endDate || now) >= now
-      ) || null;
-      const current = active || periodsData?.[0] || null;
-      
-      setActivePeriod(active);
-      setCurrentPeriod(current);
+      if (periodsData) {
+        const now = new Date();
+        const active = periodsData.find(
+          (period) => new Date(period.startDate) <= now && new Date(period.endDate || now) >= now
+        ) || null;
+        const current = active || periodsData[0] || null;
+        
+        if (active) {
+          setActivePeriod({
+            ...active,
+            tips: active.tips?.map(tip => ({
+              ...tip,
+              periodId: active.id
+            }))
+          });
+        } else {
+          setActivePeriod(null);
+        }
+        
+        if (current) {
+          setCurrentPeriod({
+            ...current,
+            tips: current.tips?.map(tip => ({
+              ...tip,
+              periodId: current.id
+            }))
+          });
+        } else {
+          setCurrentPeriod(null);
+        }
+      }
       
       console.log('Team data refreshed successfully');
     } catch (err) {
@@ -395,23 +442,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const startDate = startOfMonth(now).toISOString();
       const endDate = endOfMonth(now).toISOString();
 
-      const newPeriod: Omit<Period, 'id'> = {
+      const newPeriod: Period = {
+        id: crypto.randomUUID(),
         teamId: teamId,
         startDate: startDate,
         endDate: endDate,
         name: null,
         isPaid: false,
         isActive: true,
+        tips: []
       };
 
       // Save the new period to the database
-      const savedPeriod = await savePeriodToSupabase(teamId, newPeriod as Period);
+      const savedPeriod = await savePeriodToSupabase(teamId, newPeriod);
 
       if (savedPeriod) {
+        const formattedPeriod: Period = {
+          id: savedPeriod.id,
+          teamId: savedPeriod.team_id,
+          startDate: savedPeriod.start_date,
+          endDate: savedPeriod.end_date,
+          isActive: savedPeriod.is_active,
+          isPaid: savedPeriod.is_paid,
+          notes: savedPeriod.notes,
+          name: savedPeriod.name,
+          autoCloseDate: savedPeriod.auto_close_date,
+          averageTipPerHour: savedPeriod.average_tip_per_hour,
+          tips: [] // New period has no tips yet
+        };
+
         // Update the local state with the new period
-        setPeriods(prevPeriods => [savedPeriod, ...prevPeriods]);
-        setCurrentPeriod(savedPeriod);
-        setActivePeriod(savedPeriod);
+        setPeriods(prevPeriods => [formattedPeriod, ...prevPeriods]);
+        setCurrentPeriod(formattedPeriod);
+        setActivePeriod(formattedPeriod);
 
         toast({
           title: "Nieuwe periode gestart",
@@ -450,15 +513,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       // Update the period with the new name
-      const updatedPeriod = { ...periodToUpdate, name };
+      const updatedPeriod: Period = { ...periodToUpdate, name };
       
       // Save the updated period to the database
       const savedPeriod = await savePeriodToSupabase(teamId, updatedPeriod);
       
       if (savedPeriod) {
+        // Format the saved period to match our interface
+        const formattedPeriod: Period = {
+          id: savedPeriod.id,
+          teamId: savedPeriod.team_id,
+          startDate: savedPeriod.start_date,
+          endDate: savedPeriod.end_date,
+          isActive: savedPeriod.is_active,
+          isPaid: savedPeriod.is_paid,
+          notes: savedPeriod.notes,
+          name: savedPeriod.name,
+          autoCloseDate: savedPeriod.auto_close_date,
+          averageTipPerHour: savedPeriod.average_tip_per_hour,
+          tips: periodToUpdate.tips
+        };
+        
         // Update the local state with the saved period
         setPeriods(prevPeriods =>
-          prevPeriods.map(period => (period.id === periodId ? savedPeriod : period))
+          prevPeriods.map(period => (period.id === periodId ? formattedPeriod : period))
         );
         
         toast({
@@ -495,28 +573,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setError(null);
 
     try {
-      const tipEntry: Omit<TipEntry, 'id'> = {
+      const tipEntry: TipEntry = {
+        id: crypto.randomUUID(),
         amount,
         date: date || new Date().toISOString(),
         note: note || null,
         periodId: currentPeriod.id,
+        addedBy: null // Set default value
       };
 
       // Update the period with the new tip
-      const updatedPeriod = {
+      const updatedPeriod: Period = {
         ...currentPeriod,
-        tips: [...(currentPeriod.tips || []), tipEntry as TipEntry],
+        tips: [...(currentPeriod.tips || []), tipEntry],
       };
 
       // Save the updated period to the database
       const savedPeriod = await savePeriodToSupabase(teamId, updatedPeriod);
 
       if (savedPeriod) {
+        // Format the saved period to match our interface
+        const formattedPeriod: Period = {
+          id: savedPeriod.id,
+          teamId: savedPeriod.team_id,
+          startDate: savedPeriod.start_date,
+          endDate: savedPeriod.end_date,
+          isActive: savedPeriod.is_active,
+          isPaid: savedPeriod.is_paid,
+          notes: savedPeriod.notes,
+          name: savedPeriod.name,
+          autoCloseDate: savedPeriod.auto_close_date,
+          averageTipPerHour: savedPeriod.average_tip_per_hour,
+          tips: savedPeriod.tips?.map(tip => ({
+            ...tip,
+            periodId: savedPeriod.id
+          }))
+        };
+
         // Update the local state with the saved period
         setPeriods(prevPeriods =>
-          prevPeriods.map(period => (period.id === currentPeriod.id ? savedPeriod : period))
+          prevPeriods.map(period => (period.id === currentPeriod.id ? formattedPeriod : period))
         );
-        setCurrentPeriod(savedPeriod);
+        setCurrentPeriod(formattedPeriod);
 
         toast({
           title: "Fooi toegevoegd",
@@ -576,10 +674,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       // Update the tip with the new values
-      const updatedTip = { ...tipToUpdate, amount, note: note || null, date: date || tipToUpdate.date };
+      const updatedTip: TipEntry = { 
+        ...tipToUpdate, 
+        amount, 
+        note: note || null, 
+        date: date || tipToUpdate.date,
+        periodId: periodId // Ensure periodId is correctly set
+      };
       
       // Update the period with the updated tip
-      const updatedPeriod = {
+      const updatedPeriod: Period = {
         ...periodToUpdate,
         tips: periodToUpdate.tips?.map(tip => (tip.id === tipId ? updatedTip : tip)),
       };
@@ -588,13 +692,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const savedPeriod = await savePeriodToSupabase(teamId, updatedPeriod);
       
       if (savedPeriod) {
+        // Format the saved period to match our interface
+        const formattedPeriod: Period = {
+          id: savedPeriod.id,
+          teamId: savedPeriod.team_id,
+          startDate: savedPeriod.start_date,
+          endDate: savedPeriod.end_date,
+          isActive: savedPeriod.is_active,
+          isPaid: savedPeriod.is_paid,
+          notes: savedPeriod.notes,
+          name: savedPeriod.name,
+          autoCloseDate: savedPeriod.auto_close_date,
+          averageTipPerHour: savedPeriod.average_tip_per_hour,
+          tips: savedPeriod.tips?.map(tip => ({
+            ...tip,
+            periodId: savedPeriod.id
+          }))
+        };
+        
         // Update the local state with the saved period
         setPeriods(prevPeriods =>
-          prevPeriods.map(period => (period.id === periodId ? savedPeriod : period))
+          prevPeriods.map(period => (period.id === periodId ? formattedPeriod : period))
         );
         
         if (currentPeriod?.id === periodId) {
-          setCurrentPeriod(savedPeriod);
+          setCurrentPeriod(formattedPeriod);
         }
         
         toast({
@@ -651,7 +773,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updatedTips = periodToUpdate.tips?.filter(tip => tip.id !== tipId) || [];
 
       // Update the period with the updated tips
-      const updatedPeriod = {
+      const updatedPeriod: Period = {
         ...periodToUpdate,
         tips: updatedTips,
       };
@@ -660,13 +782,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const savedPeriod = await savePeriodToSupabase(teamId, updatedPeriod);
 
       if (savedPeriod) {
+        // Format the saved period to match our interface
+        const formattedPeriod: Period = {
+          id: savedPeriod.id,
+          teamId: savedPeriod.team_id,
+          startDate: savedPeriod.start_date,
+          endDate: savedPeriod.end_date,
+          isActive: savedPeriod.is_active,
+          isPaid: savedPeriod.is_paid,
+          notes: savedPeriod.notes,
+          name: savedPeriod.name,
+          autoCloseDate: savedPeriod.auto_close_date,
+          averageTipPerHour: savedPeriod.average_tip_per_hour,
+          tips: savedPeriod.tips?.map(tip => ({
+            ...tip,
+            periodId: savedPeriod.id
+          }))
+        };
+        
         // Update the local state with the saved period
         setPeriods(prevPeriods =>
-          prevPeriods.map(period => (period.id === periodId ? savedPeriod : period))
+          prevPeriods.map(period => (period.id === periodId ? formattedPeriod : period))
         );
         
         if (currentPeriod?.id === periodId) {
-          setCurrentPeriod(savedPeriod);
+          setCurrentPeriod(formattedPeriod);
         }
 
         toast({
@@ -712,18 +852,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setError(null);
 
     try {
-      const newTeamMember: Partial<TeamMember> = {
+      const newMemberId = crypto.randomUUID();
+      const newTeamMember: TeamMember = {
+        id: newMemberId,
         teamId: teamId,
         name: name,
         hours: hours,
+        balance: 0,
+        role: 'member',
+        permissions: {
+          add_tips: false,
+          edit_tips: false,
+          add_hours: false,
+          view_team: true,
+          view_reports: false,
+          close_periods: false,
+          manage_payouts: false
+        }
       };
 
       // Save the new team member to the database
-      const savedTeamMember = await saveTeamMemberToSupabase(teamId, newTeamMember as TeamMember);
+      const savedTeamMember = await saveTeamMemberToSupabase(teamId, newTeamMember);
 
       if (savedTeamMember) {
-        // Transform the saved member to match our interface
-        const transformedMember: TeamMember = {
+        // Format the saved member to match our interface
+        const formattedMember: TeamMember = {
           id: savedTeamMember.id,
           teamId: savedTeamMember.team_id,
           user_id: savedTeamMember.user_id,
@@ -735,7 +888,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
         
         // Update the local state with the new team member
-        setTeamMembers(prevTeamMembers => [...prevTeamMembers, transformedMember]);
+        setTeamMembers(prevTeamMembers => [...prevTeamMembers, formattedMember]);
 
         toast({
           title: "Teamlid toegevoegd",
@@ -779,21 +932,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       // Update the team member with the new hours
-      const updatedTeamMember = { ...teamMemberToUpdate, hours };
+      const updatedTeamMember: TeamMember = { ...teamMemberToUpdate, hours };
 
       // Save the updated team member to the database
       const savedTeamMember = await saveTeamMemberToSupabase(teamId, updatedTeamMember);
 
       if (savedTeamMember) {
-        // Transform the saved member to match our interface
-        const transformedMember: TeamMember = {
+        // Format the saved member to match our interface
+        const formattedMember: TeamMember = {
           ...updatedTeamMember,
           hours,
         };
         
         // Update the local state with the saved team member
         setTeamMembers(prevTeamMembers =>
-          prevTeamMembers.map(member => (member.id === memberId ? transformedMember : member))
+          prevTeamMembers.map(member => (member.id === memberId ? formattedMember : member))
         );
 
         toast({
@@ -838,21 +991,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       // Update the team member with the new name
-      const updatedTeamMember = { ...teamMemberToUpdate, name };
+      const updatedTeamMember: TeamMember = { ...teamMemberToUpdate, name };
       
       // Save the updated team member to the database
       const savedTeamMember = await saveTeamMemberToSupabase(teamId, updatedTeamMember);
       
       if (savedTeamMember) {
-        // Transform the saved member to match our interface
-        const transformedMember: TeamMember = {
+        // Format the saved member to match our interface
+        const formattedMember: TeamMember = {
           ...updatedTeamMember,
           name,
         };
         
         // Update the local state with the saved team member
         setTeamMembers(prevTeamMembers =>
-          prevTeamMembers.map(member => (member.id === memberId ? transformedMember : member))
+          prevTeamMembers.map(member => (member.id === memberId ? formattedMember : member))
         );
         
         toast({
@@ -937,21 +1090,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       // Update the team member with the new role
-      const updatedTeamMember = { ...teamMemberToUpdate, role };
+      const updatedTeamMember: TeamMember = { ...teamMemberToUpdate, role };
       
       // Save the updated team member to the database
       const savedTeamMember = await saveTeamMemberToSupabase(teamId, updatedTeamMember);
       
       if (savedTeamMember) {
-        // Transform the saved member to match our interface
-        const transformedMember: TeamMember = {
+        // Format the saved member to match our interface
+        const formattedMember: TeamMember = {
           ...updatedTeamMember,
           role,
         };
         
         // Update the local state with the saved team member
         setTeamMembers(prevTeamMembers =>
-          prevTeamMembers.map(member => (member.id === memberId ? transformedMember : member))
+          prevTeamMembers.map(member => (member.id === memberId ? formattedMember : member))
         );
         
         toast({
@@ -996,21 +1149,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       // Update the team member with the new permissions
-      const updatedTeamMember = { ...teamMemberToUpdate, permissions };
+      const updatedTeamMember: TeamMember = { ...teamMemberToUpdate, permissions };
       
       // Save the updated team member to the database
       const savedTeamMember = await saveTeamMemberToSupabase(teamId, updatedTeamMember);
       
       if (savedTeamMember) {
-        // Transform the saved member to match our interface
-        const transformedMember: TeamMember = {
+        // Format the saved member to match our interface
+        const formattedMember: TeamMember = {
           ...updatedTeamMember,
           permissions,
         };
         
         // Update the local state with the saved team member
         setTeamMembers(prevTeamMembers =>
-          prevTeamMembers.map(member => (member.id === memberId ? transformedMember : member))
+          prevTeamMembers.map(member => (member.id === memberId ? formattedMember : member))
         );
         
         toast({
@@ -1125,7 +1278,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
 
           // Update the period with the isPaid flag
-          const updatedPeriod = { ...periodToUpdate, isPaid: true };
+          const updatedPeriod: Period = { ...periodToUpdate, isPaid: true };
 
           // Save the updated period to the database
           await savePeriodToSupabase(teamId, updatedPeriod);
@@ -1133,29 +1286,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
 
       // Create payout data
-      const payoutData = {
+      const payoutData: PayoutData = {
         id: crypto.randomUUID(),
-        teamId: teamId,
-        periodIds: periodIds,
         date: new Date().toISOString(),
         payoutTime: new Date().toISOString(),
+        periodIds: periodIds,
         distribution: distribution,
-        totalTips: distribution.reduce((acc, member) => acc + (member.amount || 0), 0),
-        totalHours: teamMembers.reduce((acc, member) => acc + (member.hours || 0), 0),
       };
 
       // Save the payout to the database
-      await savePayoutToSupabase(teamId, payoutData as any);
+      await savePayoutToSupabase(teamId, payoutData);
       
       // Add the payout to the local state
       const newPayout: Payout = {
         id: payoutData.id,
-        teamId: payoutData.teamId,
+        teamId: teamId,
         date: payoutData.date,
         payoutTime: payoutData.payoutTime,
-        periodIds: payoutData.periodIds,
-        totalAmount: payoutData.totalTips,
-        distribution: payoutData.distribution,
+        periodIds: payoutData.periodIds || [],
+        totalAmount: distribution.reduce((acc, member) => acc + (member.amount || 0), 0),
+        distribution: payoutData.distribution || [],
       };
       
       setPayouts(prevPayouts => [...prevPayouts, newPayout]);
@@ -1245,23 +1395,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setError(null);
     
     try {
-      // Delete from database
-      const { error: deleteError } = await supabase
-        .from('payouts')
-        .delete()
-        .eq('id', payoutId);
+      // Use the imported deletePayout function from payoutService
+      const result = await deletePayout(payoutId);
+      
+      if (result && result.success) {
+        // Update the local state by filtering out the deleted payout
+        setPayouts(prevPayouts => prevPayouts.filter(payout => payout.id !== payoutId));
         
-      if (deleteError) {
-        throw deleteError;
+        toast({
+          title: "Uitbetaling verwijderd",
+          description: "De uitbetaling is succesvol verwijderd.",
+        });
+      } else {
+        toast({
+          title: "Fout",
+          description: "Er is een fout opgetreden bij het verwijderen van de uitbetaling",
+          variant: "destructive",
+        });
       }
-      
-      // Update the local state by filtering out the deleted payout
-      setPayouts(prevPayouts => prevPayouts.filter(payout => payout.id !== payoutId));
-      
-      toast({
-        title: "Uitbetaling verwijderd",
-        description: "De uitbetaling is succesvol verwijderd.",
-      });
     } catch (err) {
       console.error('Error deleting payout:', err);
       setError(err instanceof Error ? err : new Error('Failed to delete payout'));

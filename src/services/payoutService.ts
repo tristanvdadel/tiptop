@@ -1,5 +1,5 @@
 
-import { supabase } from './supabaseService';
+import { supabase } from '@/integrations/supabase/client';
 
 // Add debounce utility to prevent rapid state changes
 export const debounce = <F extends (...args: any[]) => any>(

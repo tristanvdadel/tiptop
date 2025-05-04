@@ -1345,7 +1345,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const markPeriodsAsPaid = async (periodIds: string[], distribution: any[]) => {
+  const markPeriodsAsPaid = async (periodIds: string[], distribution: PayoutDistribution[]) => {
     if (!teamId) {
       console.error('Cannot mark periods as paid without team ID');
       return;

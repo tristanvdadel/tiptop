@@ -1,4 +1,3 @@
-
 // Only updating the import section at the top of the file
 import React, {
   createContext,
@@ -532,7 +531,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           name: savedPeriod.name,
           autoCloseDate: savedPeriod.auto_close_date,
           averageTipPerHour: savedPeriod.average_tip_per_hour,
-          tips: periodToUpdate.tips
+          tips: periodToUpdate.tips ? periodToUpdate.tips.map(tip => ({
+            ...tip,
+            periodId: savedPeriod.id
+          })) : []
         };
         
         // Update the local state with the saved period
@@ -605,10 +607,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           name: savedPeriod.name,
           autoCloseDate: savedPeriod.auto_close_date,
           averageTipPerHour: savedPeriod.average_tip_per_hour,
-          tips: savedPeriod.tips?.map(tip => ({
+          tips: savedPeriod.tips ? savedPeriod.tips.map(tip => ({
             ...tip,
             periodId: savedPeriod.id
-          }))
+          })) : []
         };
 
         // Update the local state with the saved period
@@ -705,10 +707,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           name: savedPeriod.name,
           autoCloseDate: savedPeriod.auto_close_date,
           averageTipPerHour: savedPeriod.average_tip_per_hour,
-          tips: savedPeriod.tips?.map(tip => ({
+          tips: savedPeriod.tips ? savedPeriod.tips.map(tip => ({
             ...tip,
             periodId: savedPeriod.id
-          }))
+          })) : []
         };
         
         // Update the local state with the saved period
@@ -795,10 +797,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           name: savedPeriod.name,
           autoCloseDate: savedPeriod.auto_close_date,
           averageTipPerHour: savedPeriod.average_tip_per_hour,
-          tips: savedPeriod.tips?.map(tip => ({
+          tips: savedPeriod.tips ? savedPeriod.tips.map(tip => ({
             ...tip,
             periodId: savedPeriod.id
-          }))
+          })) : []
         };
         
         // Update the local state with the saved period
@@ -1206,7 +1208,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (savedSettings) {
         // Update the local state with the saved team settings
-        setTeamSettings(savedSettings);
+        const transformedSettings: TeamSettings = {
+          id: savedSettings.id,
+          teamId: savedSettings.team_id,
+          autoClosePeriods: savedSettings.auto_close_periods,
+          periodDuration: savedSettings.period_duration,
+          alignWithCalendar: savedSettings.align_with_calendar,
+          closingTime: savedSettings.closing_time
+        };
+        setTeamSettings(transformedSettings);
 
         toast({
           title: "Team instellingen opgeslagen",
@@ -1386,7 +1396,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
   
-  const deletePayout = async (payoutId: string) => {
+  const deletePayoutFunc = async (payoutId: string) => {
     if (!teamId) {
       console.error('Cannot delete payout without team ID');
       return;
@@ -1454,7 +1464,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     calculateTipDistribution,
     markPeriodsAsPaid,
     deletePeriod,
-    deletePayout,
+    deletePayout: deletePayoutFunc,
     subscribeToChannel,
     selectedMonth,
     setSelectedMonth,

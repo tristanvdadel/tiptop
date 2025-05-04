@@ -17,14 +17,15 @@ const Analytics = () => {
     periods,
     calculateAverageTipPerHour,
     teamMembers,
-    payouts
+    payouts,
+    currentPeriod
   } = useApp();
   
   const isMobile = useIsMobile();
   
   const averageTipPerHour = useMemo(() => {
     return calculateAverageTipPerHour(currentPeriod?.id || "");
-  }, [calculateAverageTipPerHour]);
+  }, [calculateAverageTipPerHour, currentPeriod]);
   
   const periodData = useMemo(() => {
     return periods.map(period => {

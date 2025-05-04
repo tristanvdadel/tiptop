@@ -33,6 +33,16 @@ import { AppContextType, TeamMember, TeamSettings, Period, Payout, TipEntry, Tea
 // Define the type for JSON data from Supabase
 type Json = string | number | boolean | { [key: string]: Json } | Json[] | null;
 
+// Define PayoutData interface that was missing
+interface PayoutData {
+  id: string;
+  date: string;
+  payerName?: string | null;
+  payoutTime: string;
+  distribution?: PayoutDistribution[];
+  periodIds?: string[];
+}
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -48,6 +58,160 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const { toast } = useToast();
   const [realtimeClient, setRealtimeClient] = useState<any>(null);
+  
+  // Add missing functions
+  const updatePeriod = async (periodId: string, data: any) => {
+    if (!teamId) {
+      console.error('Cannot update period without team ID');
+      return;
+    }
+    
+    try {
+      const periodToUpdate = periods.find(p => p.id === periodId);
+      if (!periodToUpdate) {
+        throw new Error('Period not found');
+      }
+      
+      const updatedPeriod = { ...periodToUpdate, ...data };
+      const result = await savePeriodToSupabase(teamId, updatedPeriod);
+      
+      if (result) {
+        setPeriods(prevPeriods => 
+          prevPeriods.map(p => p.id === periodId ? { ...p, ...data } : p)
+        );
+        
+        if (currentPeriod?.id === periodId) {
+          setCurrentPeriod(prev => prev ? { ...prev, ...data } : null);
+        }
+        
+        return result;
+      }
+    } catch (err) {
+      console.error('Error updating period:', err);
+      throw err;
+    }
+  };
+  
+  const endCurrentPeriod = async () => {
+    if (!currentPeriod || !teamId) {
+      console.error('No current period to end');
+      return;
+    }
+    
+    try {
+      const now = new Date();
+      const updatedPeriod = {
+        ...currentPeriod,
+        isActive: false,
+        endDate: now.toISOString()
+      };
+      
+      const result = await savePeriodToSupabase(teamId, updatedPeriod);
+      
+      if (result) {
+        setPeriods(prevPeriods => 
+          prevPeriods.map(p => p.id === currentPeriod.id 
+            ? { ...p, isActive: false, endDate: now.toISOString() } 
+            : p
+          )
+        );
+        
+        setCurrentPeriod({ ...currentPeriod, isActive: false, endDate: now.toISOString() });
+        setActivePeriod(null);
+      }
+    } catch (err) {
+      console.error('Error ending current period:', err);
+      throw err;
+    }
+  };
+  
+  const hasReachedPeriodLimit = () => {
+    // Implement logic for period limit check
+    const limit = 5; // Example limit
+    return periods.length >= limit;
+  };
+  
+  const calculateAverageTipPerHour = (periodId: string) => {
+    // If no specific period ID is provided, calculate across all periods
+    if (!periodId) {
+      const allTips = periods.flatMap(p => p.tips || []);
+      const totalTips = allTips.reduce((sum, tip) => sum + tip.amount, 0);
+      const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+      
+      return totalHours > 0 ? totalTips / totalHours : 0;
+    }
+    
+    // Calculate for a specific period
+    const period = periods.find(p => p.id === periodId);
+    if (!period) return 0;
+    
+    const periodTips = period.tips || [];
+    const totalTips = periodTips.reduce((sum, tip) => sum + tip.amount, 0);
+    const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+    
+    return totalHours > 0 ? totalTips / totalHours : 0;
+  };
+  
+  const updateTeamMemberBalance = async (memberId: string, balance: number) => {
+    if (!teamId) {
+      console.error('Cannot update team member balance without team ID');
+      return;
+    }
+    
+    try {
+      const teamMemberToUpdate = teamMembers.find(member => member.id === memberId);
+      if (!teamMemberToUpdate) {
+        throw new Error('Team member not found');
+      }
+      
+      const updatedTeamMember = { ...teamMemberToUpdate, balance };
+      const result = await saveTeamMemberToSupabase(teamId, updatedTeamMember);
+      
+      if (result) {
+        setTeamMembers(prevTeamMembers => 
+          prevTeamMembers.map(member => 
+            member.id === memberId ? { ...member, balance } : member
+          )
+        );
+      }
+    } catch (err) {
+      console.error('Error updating team member balance:', err);
+      throw err;
+    }
+  };
+  
+  const clearTeamMemberHours = async (memberId: string) => {
+    if (!teamId) {
+      console.error('Cannot clear team member hours without team ID');
+      return;
+    }
+    
+    try {
+      const teamMemberToUpdate = teamMembers.find(member => member.id === memberId);
+      if (!teamMemberToUpdate) {
+        throw new Error('Team member not found');
+      }
+      
+      const updatedTeamMember = { ...teamMemberToUpdate, hours: 0 };
+      const result = await saveTeamMemberToSupabase(teamId, updatedTeamMember);
+      
+      if (result) {
+        setTeamMembers(prevTeamMembers => 
+          prevTeamMembers.map(member => 
+            member.id === memberId ? { ...member, hours: 0 } : member
+          )
+        );
+      }
+    } catch (err) {
+      console.error('Error clearing team member hours:', err);
+      throw err;
+    }
+  };
+  
+  const removeTeamMember = async (memberId: string) => {
+    // Alias for deleteTeamMember to maintain API compatibility
+    return deleteTeamMember(memberId);
+  };
   
   const formatMonth = (date: Date) => {
     return format(date, 'MMMM yyyy', { locale: nl });
@@ -184,16 +348,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Ensure each period's tip has the periodId set
         const formattedPeriods: Period[] = periodsData.map(period => ({
           id: period.id,
-          teamId: period.teamId,
-          startDate: period.startDate,
-          endDate: period.endDate,
-          isActive: period.isActive,
-          isPaid: period.isPaid,
+          teamId: period.team_id,
+          startDate: period.start_date,
+          endDate: period.end_date,
+          isActive: period.is_active,
+          isPaid: period.is_paid,
           notes: period.notes,
           name: period.name,
-          autoCloseDate: period.autoCloseDate,
-          averageTipPerHour: period.averageTipPerHour,
-          tips: period.tips?.map(tip => ({
+          autoCloseDate: period.auto_close_date,
+          averageTipPerHour: period.average_tip_per_hour,
+          tips: (period.tips as any)?.map((tip: any) => ({
             ...tip,
             periodId: period.id // Ensure periodId is set
           })) || []
@@ -252,27 +416,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (periodsData) {
         const now = new Date();
         const active = periodsData.find(
-          (period) => new Date(period.startDate) <= now && new Date(period.endDate || now) >= now
+          (period) => new Date(period.start_date) <= now && new Date(period.end_date || now) >= now
         ) || null;
         const current = active || periodsData[0] || null;
         
         if (active) {
-          const activeTips = active.tips?.map(tip => ({
+          const activeTips = (active.tips as any)?.map((tip: any) => ({
             ...tip,
             periodId: active.id
           })) || [];
           
           setActivePeriod({
             id: active.id,
-            teamId: active.teamId,
-            startDate: active.startDate,
-            endDate: active.endDate,
-            isActive: active.isActive,
-            isPaid: active.isPaid,
+            teamId: active.team_id,
+            startDate: active.start_date,
+            endDate: active.end_date,
+            isActive: active.is_active,
+            isPaid: active.is_paid,
             notes: active.notes,
             name: active.name,
-            autoCloseDate: active.autoCloseDate,
-            averageTipPerHour: active.averageTipPerHour,
+            autoCloseDate: active.auto_close_date,
+            averageTipPerHour: active.average_tip_per_hour,
             tips: activeTips
           });
         } else {
@@ -280,22 +444,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         
         if (current) {
-          const currentTips = current.tips?.map(tip => ({
+          const currentTips = (current.tips as any)?.map((tip: any) => ({
             ...tip,
             periodId: current.id
           })) || [];
           
           setCurrentPeriod({
             id: current.id,
-            teamId: current.teamId,
-            startDate: current.startDate,
-            endDate: current.endDate,
-            isActive: current.isActive,
-            isPaid: current.isPaid,
+            teamId: current.team_id,
+            startDate: current.start_date,
+            endDate: current.end_date,
+            isActive: current.is_active,
+            isPaid: current.is_paid,
             notes: current.notes,
             name: current.name,
-            autoCloseDate: current.autoCloseDate,
-            averageTipPerHour: current.averageTipPerHour,
+            autoCloseDate: current.auto_close_date,
+            averageTipPerHour: current.average_tip_per_hour,
             tips: currentTips
           });
         } else {
@@ -884,10 +1048,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
   
-  const updateTeamMemberName = async (memberId: string, name: string) => {
+  const updateTeamMemberName = async (memberId: string, name: string): Promise<boolean> => {
     if (!teamId) {
       console.error('Cannot update team member without team ID');
-      return;
+      return false;
     }
     
     setLoading(true);
@@ -898,7 +1062,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const teamMemberToUpdate = teamMembers.find(member => member.id === memberId);
       if (!teamMemberToUpdate) {
         console.error('Team member not found in local state');
-        return;
+        return false;
       }
       
       // Update the team member with the new name
@@ -923,12 +1087,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           title: "Naam gewijzigd",
           description: "De naam van het teamlid is succesvol gewijzigd.",
         });
+        
+        return true;
       } else {
         toast({
           title: "Fout",
           description: "Er is een fout opgetreden bij het wijzigen van de naam van het teamlid",
           variant: "destructive",
         });
+        return false;
       }
     } catch (err) {
       console.error('Error updating team member name:', err);
@@ -938,6 +1105,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         description: "Er is een fout opgetreden bij het wijzigen van de naam van het teamlid",
         variant: "destructive",
       });
+      return false;
     } finally {
       setLoading(false);
     }
@@ -1382,7 +1550,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     prevMonth,
     formatMonth,
     
-    // Add the missing properties
+    // Add the previously missing properties with their implementations
     updatePeriod,
     endCurrentPeriod,
     hasReachedPeriodLimit,

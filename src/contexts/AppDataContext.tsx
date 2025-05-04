@@ -28,6 +28,10 @@ import {
 import { 
   calculateTipDistributionTotals,
 } from '@/services/teamDataService';
+import { TeamMember, TeamMemberPermissions, Period, TipEntry, TeamSettings, Payout, PayoutData, PayoutDistribution } from './AppContext';
+
+// Define the type for JSON data from Supabase
+type Json = string | number | boolean | { [key: string]: Json } | Json[] | null;
 
 // Define the missing types locally since they are not exported from the client
 export interface TipEntry {
@@ -371,24 +375,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const current = active || periodsData[0] || null;
         
         if (active) {
+          const activeTips = active.tips?.map(tip => ({
+            ...tip,
+            periodId: active.id
+          })) || [];
+          
           setActivePeriod({
-            ...active,
-            tips: active.tips?.map(tip => ({
-              ...tip,
-              periodId: active.id
-            }))
+            id: active.id,
+            teamId: active.teamId,
+            startDate: active.startDate,
+            endDate: active.endDate,
+            isActive: active.isActive,
+            isPaid: active.isPaid,
+            notes: active.notes,
+            name: active.name,
+            autoCloseDate: active.autoCloseDate,
+            averageTipPerHour: active.averageTipPerHour,
+            tips: activeTips
           });
         } else {
           setActivePeriod(null);
         }
         
         if (current) {
+          const currentTips = current.tips?.map(tip => ({
+            ...tip,
+            periodId: current.id
+          })) || [];
+          
           setCurrentPeriod({
-            ...current,
-            tips: current.tips?.map(tip => ({
-              ...tip,
-              periodId: current.id
-            }))
+            id: current.id,
+            teamId: current.teamId,
+            startDate: current.startDate,
+            endDate: current.endDate,
+            isActive: current.isActive,
+            isPaid: current.isPaid,
+            notes: current.notes,
+            name: current.name,
+            autoCloseDate: current.autoCloseDate,
+            averageTipPerHour: current.averageTipPerHour,
+            tips: currentTips
           });
         } else {
           setCurrentPeriod(null);
@@ -612,7 +638,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             periodId: savedPeriod.id
           })) : []
         };
-
+        
         // Update the local state with the saved period
         setPeriods(prevPeriods =>
           prevPeriods.map(period => (period.id === currentPeriod.id ? formattedPeriod : period))
@@ -1396,6 +1422,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
   
+  // Fix the deletePayoutFunc to properly handle type checking
   const deletePayoutFunc = async (payoutId: string) => {
     if (!teamId) {
       console.error('Cannot delete payout without team ID');
@@ -1409,7 +1436,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Use the imported deletePayout function from payoutService
       const result = await deletePayout(payoutId);
       
-      if (result && result.success) {
+      if (result) {
         // Update the local state by filtering out the deleted payout
         setPayouts(prevPayouts => prevPayouts.filter(payout => payout.id !== payoutId));
         

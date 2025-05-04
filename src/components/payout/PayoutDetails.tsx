@@ -42,6 +42,7 @@ const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDe
     (payout?.distribution.map(item => {
       const member = {
         id: item.memberId,
+        teamId: '', // Required by TeamMember type
         name: '', // This will be filled by TeamMember lookup in the parent component
         hours: 0,
         tipAmount: item.amount,

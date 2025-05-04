@@ -1,5 +1,6 @@
 
 import { createContext } from 'react';
+import { AppProvider, useApp } from './AppDataContext';
 
 export interface TipEntry {
   id: string;
@@ -45,6 +46,7 @@ export interface TeamMember {
   permissions?: TeamMemberPermissions;
   hasAccount?: boolean;
   hourRegistrations?: any[];
+  tipAmount?: number; // Add this to fix type issues
 }
 
 export interface TeamSettings {
@@ -85,5 +87,21 @@ export interface PayoutData {
 
 // Create the App Context with default undefined value
 const AppContext = createContext<any>(undefined);
+
+// Re-export the provider and hook
+export { AppProvider, useApp };
+
+export enum PeriodDuration {
+  DAY = 'day',
+  WEEK = 'week',
+  MONTH = 'month'
+}
+
+export interface HourRegistration {
+  id: string;
+  date: string;
+  hours: number;
+  processed: boolean;
+}
 
 export default AppContext;

@@ -8,6 +8,8 @@ const handleUpdateTeamMemberName = (memberId: string, name: string): Promise<boo
 };
 
 const Team: React.FC = () => {
+  const { updateTeamMemberName } = useApp();
+  
   // Component implementation
   return (
     <div>Team Page</div>

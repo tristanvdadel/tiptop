@@ -45,8 +45,8 @@ export interface TeamMember {
   role?: string;
   permissions?: TeamMemberPermissions;
   hasAccount?: boolean;
-  hourRegistrations?: any[];
-  tipAmount?: number; // Add this to fix type issues
+  hourRegistrations?: HourRegistration[];
+  tipAmount?: number; // Bedrag aan fooi dat aan dit teamlid wordt toegekend
 }
 
 export interface TeamSettings {
@@ -63,6 +63,7 @@ export interface PayoutDistribution {
   amount: number;
   actualAmount?: number;
   balance?: number;
+  hours?: number; // Historisch aantal uren tijdens de uitbetaling
 }
 
 export interface Payout {
@@ -96,7 +97,7 @@ export interface AppContextType {
   activePeriod: Period | null;
   loading: boolean;
   error: Error | null;
-  isLoading: boolean; // Added for MyOverview.tsx
+  isLoading: boolean; 
   refreshTeamData: () => Promise<void>;
   startNewPeriod: () => Promise<void>;
   savePeriodName: (periodId: string, name: string) => Promise<void>;
@@ -105,13 +106,13 @@ export interface AppContextType {
   deleteTip: (periodId: string, tipId: string) => Promise<void>;
   addTeamMember: (name: string, hours: number) => Promise<void>;
   updateTeamMemberHours: (memberId: string, hours: number) => Promise<void>;
-  updateTeamMemberName: (memberId: string, name: string) => Promise<void>;
+  updateTeamMemberName: (memberId: string, name: string) => Promise<boolean>;
   deleteTeamMember: (memberId: string) => Promise<void>;
   saveTeamMemberRole: (memberId: string, role: string) => Promise<void>;
   saveTeamMemberPermissions: (memberId: string, permissions: any) => Promise<void>;
   saveTeamSettingsContext: (settings: TeamSettings) => Promise<void>;
   calculateTipDistribution: (periodIds?: string[]) => TeamMember[];
-  markPeriodsAsPaid: (periodIds: string[], distribution: any[]) => Promise<void>;
+  markPeriodsAsPaid: (periodIds: string[], distribution: PayoutDistribution[]) => Promise<void>;
   deletePeriod: (periodId: string) => Promise<void>;
   deletePayout: (payoutId: string) => Promise<void>;
   subscribeToChannel: (channelName: string) => Promise<void>;
@@ -121,7 +122,7 @@ export interface AppContextType {
   prevMonth: () => void;
   formatMonth: (date: Date) => string;
   
-  // Missing methods identified in error messages
+  // Aanvullende methoden
   updatePeriod: (periodId: string, data: any) => Promise<void>;
   endCurrentPeriod: () => void;
   hasReachedPeriodLimit: () => boolean;

@@ -44,7 +44,8 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     markPeriodsAsPaid,
     periods,
     refreshTeamData,
-    teamId
+    teamId,
+    updateTeamMemberBalance
   } = useApp();
   
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
@@ -86,7 +87,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [debouncedTogglePeriod]);
 
-  // Effect to calculate distribution when selectedPeriods or teamMembers change
+  // Effect om distribution te berekenen wanneer selectedPeriods of teamMembers veranderen
   React.useEffect(() => {
     if (selectedPeriods.length === 0 || teamMembers.length === 0) {
       setDistribution([]);
@@ -97,7 +98,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setDistribution(calculatedDistribution);
   }, [selectedPeriods, calculateTipDistribution, teamMembers.length]);
 
-  // Effect to sort team members by name
+  // Effect om teamleden te sorteren op naam
   React.useEffect(() => {
     if (teamMembers.length === 0) return;
     
@@ -122,11 +123,13 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       memberId: member.id,
       amount: member.tipAmount || 0,
       actualAmount: (member.tipAmount || 0) + (member.balance || 0),
-      balance: member.balance
+      balance: member.balance,
+      hours: member.hours // Bewaar het aantal uren voor historische referentie
     }));
     
     console.log('Formatted distribution for payout:', customDistribution);
     
+    // Markeer periodes als betaald maar behoud alle historische data
     markPeriodsAsPaid(selectedPeriods, customDistribution);
     navigate('/team?payoutSummary=true');
   };
@@ -157,7 +160,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       console.log(`Extracted ${extractedData.length} hour entries from file`);
       
-      const existingNames = new Set(teamMembers.map(m => m.name.toLowerCase()));
+      const existingNames = new Map(teamMembers.map(m => [m.name.toLowerCase(), m]));
       const processedData = extractedData.map(item => ({
         ...item,
         exists: existingNames.has(item.name.toLowerCase())
@@ -174,16 +177,26 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const handleConfirmImportedHours = (confirmedHours: ImportedHour[]) => {
     console.log(`Confirming import of ${confirmedHours.length} hour entries`);
-    const { processImportedHours } = require('@/services/teamDataService');
     
-    for (const hourData of confirmedHours) {
-      console.log(`Processing hours for ${hourData.name}: ${hourData.hours} hours on ${hourData.date}`);
-      processImportedHours(
-        hourData, 
-        teamMembers, 
-        addTeamMember, 
-        updateTeamMemberHours
+    const processImportedHours = (hourData: ImportedHour) => {
+      const existingMember = teamMembers.find(
+        member => member.name.toLowerCase() === hourData.name.toLowerCase()
       );
+      
+      if (existingMember) {
+        // Update uren voor bestaand teamlid
+        console.log(`Updating hours for existing team member ${hourData.name}: ${hourData.hours} hours`);
+        updateTeamMemberHours(existingMember.id, hourData.hours);
+      } else {
+        // Voeg nieuw teamlid toe
+        console.log(`Adding new team member ${hourData.name} with ${hourData.hours} hours`);
+        addTeamMember(hourData.name, hourData.hours);
+      }
+    };
+    
+    // Verwerk alle bevestigde uren
+    for (const hourData of confirmedHours) {
+      processImportedHours(hourData);
     }
     
     console.log('Import process completed');

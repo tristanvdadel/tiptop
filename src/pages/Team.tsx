@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -15,7 +16,7 @@ const TeamContent: React.FC = () => {
   const {
     teamMembers,
     addTeamMember,
-    deleteTeamMember, // Changed from removeTeamMember to match AppContextType
+    deleteTeamMember, 
     updateTeamMemberHours,
     deleteHourRegistration,
     refreshTeamData,
@@ -37,7 +38,7 @@ const TeamContent: React.FC = () => {
   const navigate = useNavigate();
   const [showPayoutSummary, setShowPayoutSummary] = React.useState(false);
 
-  // Load team data on initial mount
+  // Laad team data bij eerste mount
   useEffect(() => {
     let isMounted = true;
     
@@ -71,7 +72,7 @@ const TeamContent: React.FC = () => {
     };
   }, [dataInitialized, handleRefresh, teamId]);
 
-  // Check URL parameters for showing the payout summary
+  // Controleer URL parameters voor het tonen van de uitbetalingssamenvatting
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const showSummary = urlParams.get('payoutSummary') === 'true';
@@ -79,13 +80,13 @@ const TeamContent: React.FC = () => {
     setShowPayoutSummary(showSummary);
     
     if (!showSummary) {
-      // Clear period selection when not showing payout summary
+      // Wis periodeselectie wanneer geen uitbetalingssamenvatting wordt getoond
       console.log("Team.tsx: Clearing period selection");
       togglePeriodSelection('');
     }
   }, [location.search, togglePeriodSelection]);
 
-  // Update team members with account status
+  // Update teamleden met accountstatus
   useEffect(() => {
     let isMounted = true;
 
@@ -113,7 +114,7 @@ const TeamContent: React.FC = () => {
     };
   }, [teamMembers]);
 
-  // Show payout summary if payoutSummary URL param is present
+  // Toon uitbetalingssamenvatting indien payoutSummary URL param aanwezig is
   if (showPayoutSummary) {
     return (
       <div className="pb-16">
@@ -126,7 +127,7 @@ const TeamContent: React.FC = () => {
     );
   }
 
-  // Show loading animation during first load process
+  // Toon laadanimatie tijdens eerste laadproces
   if (loading && !dataInitialized) {
     console.log("Team.tsx: Showing loading indicator");
     return <LoadingIndicator />;
@@ -135,17 +136,28 @@ const TeamContent: React.FC = () => {
   const unpaidClosedPeriods = periods.filter(period => !period.isPaid && !period.isActive).length > 0;
   console.log("Team.tsx: Has unpaid closed periods:", unpaidClosedPeriods);
 
+  // Zorg ervoor dat we de juiste functie doorgeven aan TeamMemberList
+  const handleAddTeamMember = (name: string) => {
+    return addTeamMember(name, 0);
+  };
+
+  // Zorg ervoor dat we de juiste functie doorgeven aan TeamMemberList
+  const handleUpdateTeamMemberName = (memberId: string, name: string) => {
+    updateTeamMemberName(memberId, name);
+    return true; // Return a boolean to match the expected type
+  };
+
   return (
     <div className="pb-16">
       <TeamHeader />
       
       <TeamMemberList 
         teamMembers={sortedTeamMembers}
-        addTeamMember={addTeamMember}
-        removeTeamMember={deleteTeamMember} // Match the name expected by TeamMemberList
+        addTeamMember={handleAddTeamMember}
+        removeTeamMember={deleteTeamMember} 
         updateTeamMemberHours={updateTeamMemberHours}
         deleteHourRegistration={deleteHourRegistration}
-        updateTeamMemberName={updateTeamMemberName}
+        updateTeamMemberName={handleUpdateTeamMemberName}
       />
       
       <ImportActions />

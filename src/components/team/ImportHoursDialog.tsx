@@ -82,7 +82,7 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
     setIsUploading(true);
     try {
       // Process the file and call the parent's onImport function
-      onImport(file);
+      await onImport(file);
       
       // Show the review dialog
       setShowReview(true);

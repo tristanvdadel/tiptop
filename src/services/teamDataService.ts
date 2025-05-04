@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { TeamMember } from '@/contexts/AppContext';
 
@@ -41,60 +40,53 @@ export const checkTeamMembersWithAccounts = async (teamMembers: TeamMember[]): P
 
 // Process imported hours data
 export const processImportedHours = (
-  hourData: { name: string; hours: number; date: string },
-  teamMembers: TeamMember[],
-  addTeamMember: (name: string) => void,
-  updateTeamMemberHours: (memberId: string, hours: number) => void
+  hourData: { name: string, hours: number, date: string },
+  teamMembers: Array<any>,
+  addTeamMember: (name: string, hours: number) => Promise<void>,
+  updateTeamMemberHours: (memberId: string, hours: number) => Promise<void>
 ) => {
-  // First try to find an existing team member with the same name
-  let teamMember = teamMembers.find(
+  const existingMember = teamMembers.find(
     member => member.name.toLowerCase() === hourData.name.toLowerCase()
   );
-  
-  // If no team member found, create a new one
-  if (!teamMember) {
-    addTeamMember(hourData.name);
-    
-    // Find the newly added member by name
-    teamMember = teamMembers.find(member => 
-      member.name.toLowerCase() === hourData.name.toLowerCase()
-    );
+
+  if (existingMember) {
+    // Update bestaand teamlid
+    console.log(`Updating hours for existing member ${hourData.name}: ${hourData.hours}`);
+    updateTeamMemberHours(existingMember.id, hourData.hours);
+  } else {
+    // Voeg nieuw teamlid toe
+    console.log(`Adding new team member ${hourData.name} with ${hourData.hours} hours`);
+    addTeamMember(hourData.name, hourData.hours);
   }
-  
-  // If we have a valid team member (existing or new), update their hours
-  if (teamMember) {
-    updateTeamMemberHours(teamMember.id, hourData.hours);
-    return true;
-  }
-  
-  return false;
 };
 
 // Calculate tip distribution totals
 export const calculateTipDistributionTotals = (
-  selectedPeriods: string[], 
-  periods: any[], 
-  teamMembers: TeamMember[]
+  selectedPeriodIds: string[],
+  periods: Array<any>,
+  teamMembers: Array<any>
 ) => {
-  if (selectedPeriods.length === 0) {
-    return {
-      totalTips: 0,
-      totalHours: 0
-    };
+  // Als er geen periodes zijn geselecteerd, return 0
+  if (selectedPeriodIds.length === 0) {
+    return { totalTips: 0, totalHours: 0 };
   }
-  
-  const totalTips = selectedPeriods.reduce((sum, periodId) => {
-    const period = periods.find(p => p.id === periodId);
-    if (period) {
-      return sum + period.tips.reduce((s, tip) => s + tip.amount, 0);
-    }
-    return sum;
+
+  // Filter de geselecteerde periodes
+  const selectedPeriods = periods.filter(period => 
+    selectedPeriodIds.includes(period.id)
+  );
+
+  // Bereken totaal aantal fooi
+  const totalTips = selectedPeriods.reduce((sum, period) => {
+    // Zorg ervoor dat we veilig omgaan met ontbrekende tips array
+    const periodTips = period.tips || [];
+    const periodTipsTotal = Array.isArray(periodTips) ? 
+      periodTips.reduce((tipSum: number, tip: any) => tipSum + (Number(tip.amount) || 0), 0) : 0;
+    return sum + periodTipsTotal;
   }, 0);
-  
-  const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
-  
-  return {
-    totalTips,
-    totalHours
-  };
+
+  // Bereken totaal aantal uren
+  const totalHours = teamMembers.reduce((sum, member) => sum + (Number(member.hours) || 0), 0);
+
+  return { totalTips, totalHours };
 };

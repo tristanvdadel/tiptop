@@ -96,7 +96,7 @@ const Periods = () => {
   const tierPeriodLimit = Infinity;
   const unpaidPeriodesCount = getUnpaidPeriodsCount();
   const paidPeriodesCount = periods.filter(p => p.isPaid).length;
-  const averageTipPerHour = calculateAverageTipPerHour();
+  const averageTipPerHour = calculateAverageTipPerHour("");
   
   const handleStartNewPeriod = () => {
     if (currentPeriod) {

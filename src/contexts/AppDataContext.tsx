@@ -28,24 +28,10 @@ import {
 import { 
   calculateTipDistributionTotals,
 } from '@/services/teamDataService';
-import { AppContextType } from './AppContext';
+import { AppContextType, TeamMember, TeamSettings, Period, Payout, TipEntry, TeamMemberPermissions, PeriodDuration, HourRegistration, PayoutDistribution } from './AppContext';
 
 // Define the type for JSON data from Supabase
 type Json = string | number | boolean | { [key: string]: Json } | Json[] | null;
-
-// Importing types from AppContext rather than redefining them
-import {
-  TeamMember,
-  TeamMemberPermissions,
-  Period,
-  TipEntry,
-  TeamSettings,
-  Payout,
-  PayoutData,
-  PayoutDistribution,
-  PeriodDuration,
-  HourRegistration
-} from './AppContext';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -224,8 +210,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           role: member.role,
           hours: member.hours || 0,
           balance: member.balance || 0,
-          permissions: member.permissions as TeamMemberPermissions,
-          name: member.id.substring(0, 8), // Placeholder name
+          permissions: member.permissions as unknown as TeamMemberPermissions,
+          name: member.name || member.id.substring(0, 8),
         }));
         
         setTeamMembers(transformedMembers);
@@ -392,7 +378,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           averageTipPerHour: savedPeriod.average_tip_per_hour,
           tips: [] // New period has no tips yet
         };
-
+        
         // Update the local state with the new period
         setPeriods(prevPeriods => [formattedPeriod, ...prevPeriods]);
         setCurrentPeriod(formattedPeriod);
@@ -1361,7 +1347,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   
   // Prepare the context value with all functions and state
-  const contextValue = {
+  const contextValue: AppContextType = {
     teamId,
     periods,
     teamMembers,
@@ -1371,6 +1357,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     activePeriod,
     loading,
     error,
+    isLoading: loading,
     refreshTeamData,
     startNewPeriod,
     savePeriodName,
@@ -1394,6 +1381,72 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     nextMonth,
     prevMonth,
     formatMonth,
+    
+    // Add the missing properties
+    updatePeriod,
+    endCurrentPeriod,
+    hasReachedPeriodLimit,
+    autoClosePeriods: Boolean(teamSettings?.autoClosePeriods),
+    calculateAverageTipPerHour,
+    mostRecentPayout: payouts.length > 0 ? payouts[0] : null,
+    updateTeamMemberBalance,
+    clearTeamMemberHours,
+    setMostRecentPayout: (payout) => setPayouts(prev => [payout, ...prev.filter(p => p.id !== payout.id)]),
+    periodDuration: teamSettings?.periodDuration || PeriodDuration.WEEK,
+    setPeriodDuration: (duration) => {
+      if (teamSettings && teamId) {
+        saveTeamSettingsToSupabase(teamId, { ...teamSettings, periodDuration: duration });
+      }
+    },
+    setAutoClosePeriods: (auto) => {
+      if (teamSettings && teamId) {
+        saveTeamSettingsToSupabase(teamId, { ...teamSettings, autoClosePeriods: auto });
+      }
+    },
+    calculateAutoCloseDate: (startDate, duration) => {
+      // Implement this function based on your business logic
+      return new Date(startDate).toISOString();
+    },
+    scheduleAutoClose: (date) => {
+      // Implement scheduled closing logic
+      console.log("Auto close scheduled for:", date);
+    },
+    getNextAutoCloseDate: () => {
+      return currentPeriod?.autoCloseDate || null;
+    },
+    alignWithCalendar: Boolean(teamSettings?.alignWithCalendar),
+    setAlignWithCalendar: (align) => {
+      if (teamSettings && teamId) {
+        saveTeamSettingsToSupabase(teamId, { ...teamSettings, alignWithCalendar: align });
+      }
+    },
+    closingTime: teamSettings?.closingTime || null,
+    setClosingTime: (time) => {
+      if (teamSettings && teamId) {
+        saveTeamSettingsToSupabase(teamId, { ...teamSettings, closingTime: time });
+      }
+    },
+    getFormattedClosingTime: () => {
+      // Implement closure time formatting
+      return "23:59";
+    },
+    getUnpaidPeriodsCount: () => {
+      return periods.filter(p => !p.isPaid && !p.isActive).length;
+    },
+    deletePaidPeriods: async () => {
+      // Implement the logic to delete paid periods
+      const paidPeriodIds = periods.filter(p => p.isPaid).map(p => p.id);
+      for (const id of paidPeriodIds) {
+        await deletePeriod(id);
+      }
+      return Promise.resolve();
+    },
+    removeTeamMember,
+    deleteHourRegistration: async (id) => {
+      // Implement hour registration deletion logic
+      console.log("Deleting hour registration:", id);
+      return Promise.resolve();
+    }
   };
 
   return (

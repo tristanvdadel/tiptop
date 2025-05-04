@@ -1,27 +1,13 @@
-import React, { useState, KeyboardEvent } from 'react';
+import React from 'react';
 import { TeamMember, HourRegistration } from '@/contexts/AppContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Check, Clock, Calendar, PlusCircle, MinusCircle, ChevronDown, ChevronUp, Pencil, UserCheck, User } from 'lucide-react';
-import { Separator } from "@/components/ui/separator";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format } from 'date-fns';
-import { nl } from 'date-fns/locale';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
 
-interface TeamMemberListProps {
+export interface TeamMemberListProps {
   teamMembers: TeamMember[];
-  addTeamMember: (name: string) => void;
-  removeTeamMember: (id: string) => void;
-  updateTeamMemberHours: (id: string, hours: number) => void;
-  deleteHourRegistration: (memberId: string, registrationId: string) => void;
-  updateTeamMemberName: (id: string, name: string) => boolean;
+  addTeamMember: (name: string, hours: number) => Promise<void>;
+  removeTeamMember: (memberId: string) => Promise<void>;
+  updateTeamMemberHours: (memberId: string, hours: number) => Promise<void>;
+  deleteHourRegistration: (id: string) => Promise<void>;
+  updateTeamMemberName: (memberId: string, name: string) => Promise<void>;
 }
 
 const TeamMemberList: React.FC<TeamMemberListProps> = ({
@@ -64,7 +50,7 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
         });
         return;
       }
-      addTeamMember(newMemberName);
+      addTeamMember(newMemberName, 0);
       setNewMemberName('');
     }
   };

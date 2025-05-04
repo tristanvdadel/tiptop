@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -16,7 +15,7 @@ const TeamContent: React.FC = () => {
   const {
     teamMembers,
     addTeamMember,
-    removeTeamMember,
+    deleteTeamMember, // Changed from removeTeamMember to match AppContextType
     updateTeamMemberHours,
     deleteHourRegistration,
     refreshTeamData,
@@ -143,7 +142,7 @@ const TeamContent: React.FC = () => {
       <TeamMemberList 
         teamMembers={sortedTeamMembers}
         addTeamMember={addTeamMember}
-        removeTeamMember={removeTeamMember}
+        removeTeamMember={deleteTeamMember} // Match the name expected by TeamMemberList
         updateTeamMemberHours={updateTeamMemberHours}
         deleteHourRegistration={deleteHourRegistration}
         updateTeamMemberName={updateTeamMemberName}

@@ -28,128 +28,24 @@ import {
 import { 
   calculateTipDistributionTotals,
 } from '@/services/teamDataService';
-import { TeamMember, TeamMemberPermissions, Period, TipEntry, TeamSettings, Payout, PayoutData, PayoutDistribution } from './AppContext';
+import { AppContextType } from './AppContext';
 
 // Define the type for JSON data from Supabase
 type Json = string | number | boolean | { [key: string]: Json } | Json[] | null;
 
-// Define the missing types locally since they are not exported from the client
-export interface TipEntry {
-  id: string;
-  periodId: string;
-  amount: number;
-  date: string;
-  note?: string | null;
-  addedBy?: string | null;
-}
-
-export interface Period {
-  id: string;
-  teamId: string;
-  startDate: string;
-  endDate?: string | null;
-  isActive: boolean;
-  isPaid: boolean;
-  notes?: string | null;
-  name?: string | null;
-  autoCloseDate?: string | null;
-  averageTipPerHour?: number | null;
-  tips?: TipEntry[];
-}
-
-export interface TeamMemberPermissions {
-  add_tips: boolean;
-  edit_tips: boolean;
-  add_hours: boolean;
-  view_team: boolean;
-  view_reports: boolean;
-  close_periods: boolean;
-  manage_payouts: boolean;
-}
-
-export interface TeamMember {
-  id: string;
-  teamId: string;
-  user_id?: string;
-  name: string;
-  hours: number;
-  balance?: number;
-  role?: string;
-  permissions?: TeamMemberPermissions;
-  hasAccount?: boolean;
-  hourRegistrations?: any[];
-}
-
-export interface TeamSettings {
-  id?: string;
-  teamId: string;
-  autoClosePeriods?: boolean;
-  periodDuration?: string;
-  alignWithCalendar?: boolean;
-  closingTime?: any;
-}
-
-export interface PayoutDistribution {
-  memberId: string;
-  amount: number;
-  actualAmount?: number;
-  balance?: number;
-}
-
-export interface Payout {
-  id: string;
-  teamId: string;
-  date: string;
-  payerName?: string | null;
-  payoutTime: string;
-  totalAmount: number;
-  periodIds: string[];
-  distribution: PayoutDistribution[];
-}
-
-export interface PayoutData {
-  id: string;
-  date: string;
-  payerName?: string | null;
-  payoutTime: string;
-  distribution?: PayoutDistribution[];
-  periodIds?: string[];
-}
-
-interface AppContextType {
-  teamId: string | null;
-  periods: Period[];
-  teamMembers: TeamMember[];
-  teamSettings: TeamSettings | null;
-  payouts: Payout[];
-  currentPeriod: Period | null;
-  activePeriod: Period | null;
-  loading: boolean;
-  error: Error | null;
-  refreshTeamData: () => Promise<void>;
-  startNewPeriod: () => Promise<void>;
-  savePeriodName: (periodId: string, name: string) => Promise<void>;
-  addTip: (amount: number, note?: string, date?: string) => Promise<void>;
-  updateTip: (periodId: string, tipId: string, amount: number, note?: string, date?: string) => Promise<void>;
-  deleteTip: (periodId: string, tipId: string) => Promise<void>;
-  addTeamMember: (name: string, hours: number) => Promise<void>;
-  updateTeamMemberHours: (memberId: string, hours: number) => Promise<void>;
-  updateTeamMemberName: (memberId: string, name: string) => Promise<void>;
-  deleteTeamMember: (memberId: string) => Promise<void>;
-  saveTeamMemberRole: (memberId: string, role: string) => Promise<void>;
-  saveTeamMemberPermissions: (memberId: string, permissions: any) => Promise<void>;
-  saveTeamSettingsContext: (settings: TeamSettings) => Promise<void>;
-  calculateTipDistribution: (periodIds?: string[]) => TeamMember[];
-  markPeriodsAsPaid: (periodIds: string[], distribution: any[]) => Promise<void>;
-  deletePeriod: (periodId: string) => Promise<void>;
-  deletePayout: (payoutId: string) => Promise<void>;
-  subscribeToChannel: (channelName: string) => Promise<void>;
-  selectedMonth: Date;
-  setSelectedMonth: (date: Date) => void;
-  nextMonth: () => void;
-  prevMonth: () => void;
-  formatMonth: (date: Date) => string;
-}
+// Importing types from AppContext rather than redefining them
+import {
+  TeamMember,
+  TeamMemberPermissions,
+  Period,
+  TipEntry,
+  TeamSettings,
+  Payout,
+  PayoutData,
+  PayoutDistribution,
+  PeriodDuration,
+  HourRegistration
+} from './AppContext';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 

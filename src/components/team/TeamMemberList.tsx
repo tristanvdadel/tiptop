@@ -1,5 +1,44 @@
-import React from 'react';
+
+import React, { useState, KeyboardEvent } from 'react';
 import { TeamMember, HourRegistration } from '@/contexts/AppContext';
+import { format } from 'date-fns';
+import { nl } from 'date-fns/locale';
+import { useToast } from '@/hooks/use-toast';
+import {
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Check,
+  Pencil,
+  Trash2,
+  Calendar,
+  PlusCircle,
+  MinusCircle,
+  Plus,
+  User,
+  UserCheck
+} from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog';
 
 export interface TeamMemberListProps {
   teamMembers: TeamMember[];
@@ -283,7 +322,7 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
                                         <Button 
                                           variant="ghost" 
                                           size="icon" 
-                                          onClick={() => deleteHourRegistration(member.id, registration.id)} 
+                                          onClick={() => deleteHourRegistration(registration.id)} 
                                           className="h-7 w-7 text-gray-500 hover:text-red-500"
                                         >
                                           <Trash2 className="h-3 w-3" />

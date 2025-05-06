@@ -1,6 +1,13 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Period } from '@/contexts/AppContext';
+import { 
+  mapDbPeriodToPeriod, 
+  mapPeriodToDbPeriod,
+  mapDbTipToTipEntry,
+  mapTipEntryToDbTip
+} from '@/models/mappers';
+import { DbPeriod, DbTip } from '@/models/DbModels';
 
 /**
  * Saves a period and its associated tips to the database
@@ -20,20 +27,23 @@ export const savePeriod = async (teamId: string, period: Period) => {
       averageTipPerHour
     });
     
+    // Convert to DB format
+    const dbPeriod = mapPeriodToDbPeriod(period);
+    
     // First update or insert the period
-    const { data: updatedPeriod, error: periodError } = await supabase
+    const { data: savedPeriod, error: periodError } = await supabase
       .from('periods')
       .upsert({
-        id,
-        team_id: teamId,
-        start_date: startDate,
-        end_date: endDate,
-        is_active: isActive,
-        is_paid: isPaid,
-        notes,
-        name,
-        auto_close_date: autoCloseDate,
-        average_tip_per_hour: averageTipPerHour
+        id: dbPeriod.id,
+        team_id: dbPeriod.team_id,
+        start_date: dbPeriod.start_date,
+        end_date: dbPeriod.end_date,
+        is_active: dbPeriod.is_active,
+        is_paid: dbPeriod.is_paid,
+        notes: dbPeriod.notes,
+        name: dbPeriod.name,
+        auto_close_date: dbPeriod.auto_close_date,
+        average_tip_per_hour: dbPeriod.average_tip_per_hour
       })
       .select()
       .single();
@@ -43,7 +53,7 @@ export const savePeriod = async (teamId: string, period: Period) => {
       throw periodError;
     }
     
-    console.log('periodService: Period saved successfully:', updatedPeriod);
+    console.log('periodService: Period saved successfully:', savedPeriod);
     
     // Then handle tips (if any)
     if (tips && tips.length > 0) {
@@ -60,7 +70,7 @@ export const savePeriod = async (teamId: string, period: Period) => {
         throw getTipsError;
       }
       
-      const existingTipIds = existingTips.map(t => t.id);
+      const existingTipIds = existingTips.map((t: any) => t.id);
       const currentTipIds = tips.map(t => t.id);
       
       // Find tips to delete (in existing but not in current)
@@ -90,7 +100,7 @@ export const savePeriod = async (teamId: string, period: Period) => {
         const chunk = tips.slice(i, i + CHUNK_SIZE);
         const formattedTips = chunk.map(tip => ({
           id: tip.id,
-          period_id: id,
+          period_id: tip.periodId,
           amount: tip.amount,
           date: tip.date,
           note: tip.note,
@@ -111,7 +121,7 @@ export const savePeriod = async (teamId: string, period: Period) => {
     }
     
     console.log(`periodService: Successfully saved period ${id} with all its tips`);
-    return updatedPeriod;
+    return savedPeriod as DbPeriod;
   } catch (error) {
     console.error('periodService: Error saving period:', error);
     throw error;
@@ -121,12 +131,12 @@ export const savePeriod = async (teamId: string, period: Period) => {
 /**
  * Fetches all periods for a team from the database
  */
-export const fetchTeamPeriods = async (teamId: string) => {
+export const fetchTeamPeriods = async (teamId: string): Promise<Period[]> => {
   try {
     console.log(`periodService: Fetching periods for team ${teamId}`);
     
     // Get periods for the team
-    const { data: periods, error: periodsError } = await supabase
+    const { data: dbPeriods, error: periodsError } = await supabase
       .from('periods')
       .select('*')
       .eq('team_id', teamId)
@@ -137,58 +147,29 @@ export const fetchTeamPeriods = async (teamId: string) => {
       throw periodsError;
     }
     
-    console.log(`periodService: Fetched ${periods.length} periods for team ${teamId}`);
+    console.log(`periodService: Fetched ${dbPeriods.length} periods for team ${teamId}`);
     
     // For each period, get the associated tips
-    const periodsWithTips = await Promise.all(periods.map(async (period) => {
+    const periodsWithTips = await Promise.all(dbPeriods.map(async (dbPeriod: DbPeriod) => {
       try {
-        const { data: tips, error: tipsError } = await supabase
+        const { data: dbTips, error: tipsError } = await supabase
           .from('tips')
           .select('*')
-          .eq('period_id', period.id);
+          .eq('period_id', dbPeriod.id);
         
         if (tipsError) {
-          console.error(`periodService: Error fetching tips for period ${period.id}:`, tipsError);
+          console.error(`periodService: Error fetching tips for period ${dbPeriod.id}:`, tipsError);
           throw tipsError;
         }
         
-        console.log(`periodService: Fetched ${tips.length} tips for period ${period.id}`);
+        console.log(`periodService: Fetched ${dbTips.length} tips for period ${dbPeriod.id}`);
         
-        return {
-          id: period.id,
-          teamId: period.team_id,
-          startDate: period.start_date,
-          endDate: period.end_date,
-          isActive: period.is_active,
-          isPaid: period.is_paid,
-          notes: period.notes,
-          name: period.name,
-          autoCloseDate: period.auto_close_date,
-          averageTipPerHour: period.average_tip_per_hour,
-          tips: tips.map(tip => ({
-            id: tip.id,
-            amount: tip.amount,
-            date: tip.date,
-            note: tip.note,
-            addedBy: tip.added_by
-          }))
-        };
+        // Use mapper to convert DB format to frontend format
+        return mapDbPeriodToPeriod(dbPeriod, dbTips);
       } catch (error) {
-        console.error(`periodService: Error processing period ${period.id}:`, error);
+        console.error(`periodService: Error processing period ${dbPeriod.id}:`, error);
         // Return period without tips in case of error, so we don't lose all periods
-        return {
-          id: period.id,
-          teamId: period.team_id,
-          startDate: period.start_date,
-          endDate: period.end_date,
-          isActive: period.is_active,
-          isPaid: period.is_paid,
-          notes: period.notes,
-          name: period.name,
-          autoCloseDate: period.auto_close_date,
-          averageTipPerHour: period.average_tip_per_hour,
-          tips: []
-        };
+        return mapDbPeriodToPeriod(dbPeriod, []);
       }
     }));
     

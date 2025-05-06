@@ -1,4 +1,3 @@
-
 import React, {
   createContext,
   useContext,
@@ -17,6 +16,7 @@ import {
 } from '@/services/periodService';
 import {
   saveTeamMember as saveTeamMemberToSupabase,
+  addTeamMemberAndReturnVoid
 } from '@/services/teamMemberService';
 import {
   savePayoutToSupabase,
@@ -29,9 +29,13 @@ import {
   calculateTipDistributionTotals,
 } from '@/services/teamDataService';
 import { AppContextType, TeamMember, TeamSettings, Period, Payout, TipEntry, TeamMemberPermissions, PeriodDuration, HourRegistration, PayoutDistribution } from './AppContext';
-
-// Define the type for JSON data from Supabase
-type Json = string | number | boolean | { [key: string]: Json } | Json[] | null;
+import {
+  mapDbPeriodToPeriod,
+  mapPeriodToDbPeriod,
+  mapDbTeamMemberToTeamMember,
+  mapTeamMemberToDbTeamMember
+} from '@/models/mappers';
+import { DbPeriod, DbTeamMember } from '@/models/DbModels';
 
 // Define PayoutData interface that was missing
 interface PayoutData {
@@ -41,34 +45,6 @@ interface PayoutData {
   payoutTime: string;
   distribution?: PayoutDistribution[];
   periodIds?: string[];
-}
-
-// Interface for the period data as returned from Supabase
-interface DbPeriod {
-  id: string;
-  team_id: string;
-  start_date: string;
-  end_date?: string | null;
-  is_active: boolean;
-  is_paid: boolean;
-  notes?: string | null;
-  name?: string | null;
-  auto_close_date?: string | null;
-  average_tip_per_hour?: number | null;
-  created_at: string;
-  tips?: any[];
-}
-
-// Interface for the team member data as returned from Supabase
-interface DbTeamMember {
-  id: string;
-  team_id: string;
-  user_id?: string;
-  role?: string;
-  hours?: number;
-  balance?: number;
-  permissions?: any;
-  created_at: string;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -86,46 +62,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const { toast } = useToast();
   const [realtimeClient, setRealtimeClient] = useState<any>(null);
-  
-  // Helper function to convert DbPeriod to Period
-  const mapDbPeriodToPeriod = (dbPeriod: DbPeriod): Period => {
-    return {
-      id: dbPeriod.id,
-      teamId: dbPeriod.team_id,
-      startDate: dbPeriod.start_date,
-      endDate: dbPeriod.end_date || null,
-      isActive: dbPeriod.is_active,
-      isPaid: dbPeriod.is_paid,
-      notes: dbPeriod.notes || null,
-      name: dbPeriod.name || null,
-      autoCloseDate: dbPeriod.auto_close_date || null,
-      averageTipPerHour: dbPeriod.average_tip_per_hour || null,
-      tips: (dbPeriod.tips || []).map(tip => ({
-        id: tip.id,
-        periodId: dbPeriod.id,
-        amount: tip.amount,
-        date: tip.date,
-        note: tip.note || null,
-        addedBy: tip.added_by || null
-      }))
-    };
-  };
-  
-  // Helper function to convert Period to DbPeriod format
-  const mapPeriodToDbPeriod = (period: Period): any => {
-    return {
-      id: period.id,
-      team_id: period.teamId,
-      start_date: period.startDate,
-      end_date: period.endDate,
-      is_active: period.isActive,
-      is_paid: period.isPaid,
-      notes: period.notes,
-      name: period.name,
-      auto_close_date: period.autoCloseDate,
-      average_tip_per_hour: period.averageTipPerHour
-    };
-  };
+  const [mostRecentPayout, setMostRecentPayout] = useState<Payout | null>(null);
   
   // Add missing functions
   const updatePeriod = async (periodId: string, data: any) => {
@@ -141,20 +78,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       const updatedPeriod = { ...periodToUpdate, ...data };
-      const dbPeriod = mapPeriodToDbPeriod(updatedPeriod);
       
       const result = await savePeriodToSupabase(teamId, updatedPeriod);
       
       if (result) {
+        // Convert DB result to frontend model
+        const formattedPeriod = mapDbPeriodToPeriod(result);
+        
         setPeriods(prevPeriods => 
-          prevPeriods.map(p => p.id === periodId ? { ...p, ...data } : p)
+          prevPeriods.map(p => p.id === periodId ? formattedPeriod : p)
         );
         
         if (currentPeriod?.id === periodId) {
-          setCurrentPeriod(prev => prev ? { ...prev, ...data } : null);
+          setCurrentPeriod(formattedPeriod);
         }
-        
-        return result;
       }
     } catch (err) {
       console.error('Error updating period:', err);
@@ -179,14 +116,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const result = await savePeriodToSupabase(teamId, updatedPeriod);
       
       if (result) {
+        // Convert DB result to frontend model
+        const formattedPeriod = mapDbPeriodToPeriod(result);
+        
         setPeriods(prevPeriods => 
-          prevPeriods.map(p => p.id === currentPeriod.id 
-            ? { ...p, isActive: false, endDate: now.toISOString() } 
-            : p
-          )
+          prevPeriods.map(p => p.id === currentPeriod.id ? formattedPeriod : p)
         );
         
-        setCurrentPeriod({ ...currentPeriod, isActive: false, endDate: now.toISOString() });
+        setCurrentPeriod(formattedPeriod);
         setActivePeriod(null);
       }
     } catch (err) {
@@ -376,8 +313,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const fetchedTeamId = teams.id;
       setTeamId(fetchedTeamId);
       
-      // Get team periods
+      // Get team periods using our service with mappers
       const periodsData = await fetchTeamPeriods(fetchedTeamId);
+      setPeriods(periodsData);
       
       // Get team members
       const { data: membersData, error: membersError } = await supabase
@@ -413,28 +351,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setError(payoutsError);
       }
       
-      // Update state with fetched data
-      if (periodsData) {
-        // Convert to application format
-        const formattedPeriods: Period[] = periodsData.map((period: DbPeriod) => 
-          mapDbPeriodToPeriod(period)
-        );
-        
-        setPeriods(formattedPeriods);
-      }
-      
-      // Transform team members data to match our interface
+      // Transform team members data using our mapper
       if (membersData) {
-        const transformedMembers: TeamMember[] = membersData.map((member: DbTeamMember) => ({
-          id: member.id,
-          teamId: member.team_id,
-          user_id: member.user_id,
-          role: member.role,
-          hours: member.hours || 0,
-          balance: member.balance || 0,
-          permissions: member.permissions as unknown as TeamMemberPermissions,
-          name: member.user_id ? `${member.user_id.substring(0, 8)}` : member.id.substring(0, 8),
-        }));
+        const transformedMembers: TeamMember[] = await Promise.all(
+          membersData.map(async (dbMember: DbTeamMember) => {
+            // For each member, get their hour registrations
+            const { data: hourRegs } = await supabase
+              .from('hour_registrations')
+              .select('*')
+              .eq('team_member_id', dbMember.id);
+              
+            return mapDbTeamMemberToTeamMember(dbMember, hourRegs || []);
+          })
+        );
         
         setTeamMembers(transformedMembers);
       }
@@ -456,80 +385,73 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       // Transform payouts data
       if (payoutsData) {
-        const transformedPayouts: Payout[] = payoutsData.map(payout => ({
-          id: payout.id,
-          teamId: payout.team_id,
-          date: payout.date,
-          payerName: payout.payer_name,
-          payoutTime: payout.payout_time,
-          totalAmount: 0, // Placeholder
-          periodIds: [], // Placeholder
-          distribution: [] // Placeholder
-        }));
+        const transformedPayouts: Payout[] = await Promise.all(
+          payoutsData.map(async (payout: any) => {
+            // Get distributions for this payout
+            const { data: distributions } = await supabase
+              .from('payout_distributions')
+              .select('*')
+              .eq('payout_id', payout.id);
+              
+            // Get period IDs for this payout  
+            const { data: payoutPeriods } = await supabase
+              .from('payout_periods')
+              .select('period_id')
+              .eq('payout_id', payout.id);
+              
+            const periodIds = payoutPeriods ? payoutPeriods.map((pp: any) => pp.period_id) : [];
+            
+            // Calculate total amount
+            const totalAmount = distributions 
+              ? distributions.reduce((sum: number, dist: any) => sum + (dist.amount || 0), 0) 
+              : 0;
+              
+            return {
+              id: payout.id,
+              teamId: payout.team_id,
+              date: payout.date,
+              payerName: payout.payer_name,
+              payoutTime: payout.payout_time,
+              totalAmount,
+              periodIds,
+              distribution: distributions ? distributions.map((dist: any) => ({
+                memberId: dist.team_member_id,
+                amount: dist.amount,
+                actualAmount: dist.actual_amount,
+                balance: dist.balance,
+                hours: dist.hours
+              })) : []
+            };
+          })
+        );
         
         setPayouts(transformedPayouts);
+        
+        // Set most recent payout if available
+        if (transformedPayouts.length > 0) {
+          const sortedPayouts = [...transformedPayouts].sort((a, b) => 
+            new Date(b.date).getTime() - new Date(a.date).getTime()
+          );
+          setMostRecentPayout(sortedPayouts[0]);
+        }
       }
       
-      // For each period, retrieve its tips
+      // For each period, determine which is active and current
       if (periodsData && periodsData.length > 0) {
         const now = new Date();
-        let active = null;
-        let current = null;
         
-        // Process each period and find active and current
-        for (const dbPeriod of periodsData) {
-          // Check if this period is active (current date falls between start and end dates)
-          if (dbPeriod.is_active && 
-              new Date(dbPeriod.start_date) <= now && 
-              (!dbPeriod.end_date || new Date(dbPeriod.end_date) >= now)) {
-            active = dbPeriod;
-          }
-        }
+        // Find active period (current date falls between start and end dates)
+        const active = periodsData.find(period => 
+          period.isActive && 
+          new Date(period.startDate) <= now && 
+          (!period.endDate || new Date(period.endDate) >= now)
+        );
         
-        // If no active period found, use the first one as current
-        current = active || periodsData[0];
+        // If no active period found, use the most recent one as current
+        const current = active || periodsData[0];
         
-        // If we have an active period, set it
-        if (active) {
-          // Get the tips for this period
-          const { data: periodTips, error: tipsError } = await supabase
-            .from('tips')
-            .select('*')
-            .eq('period_id', active.id);
-          
-          if (tipsError) {
-            console.error('Error fetching tips for active period:', tipsError);
-          }
-          
-          // Set the active period with its tips
-          setActivePeriod(mapDbPeriodToPeriod({
-            ...active,
-            tips: periodTips || []
-          }));
-        } else {
-          setActivePeriod(null);
-        }
-        
-        // If we have a current period, set it
-        if (current) {
-          // Get the tips for this period
-          const { data: periodTips, error: tipsError } = await supabase
-            .from('tips')
-            .select('*')
-            .eq('period_id', current.id);
-          
-          if (tipsError) {
-            console.error('Error fetching tips for current period:', tipsError);
-          }
-          
-          // Set the current period with its tips
-          setCurrentPeriod(mapDbPeriodToPeriod({
-            ...current,
-            tips: periodTips || []
-          }));
-        } else {
-          setCurrentPeriod(null);
-        }
+        setActivePeriod(active || null);
+        setCurrentPeriod(current);
       }
       
       console.log('Team data refreshed successfully');
@@ -1007,35 +929,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const savedTeamMember = await saveTeamMemberToSupabase(teamId, newTeamMember);
 
       if (savedTeamMember) {
-        // Format the saved member to match our interface
-        const formattedMember: TeamMember = {
-          id: savedTeamMember.id,
-          teamId: savedTeamMember.team_id,
-          user_id: savedTeamMember.user_id,
-          name: name,
-          hours: hours,
-          balance: 0,
-          role: 'member',
-          permissions: {
-            add_tips: false,
-            edit_tips: false,
-            add_hours: false,
-            view_team: true,
-            view_reports: false,
-            close_periods: false,
-            manage_payouts: false
-          }
-        };
-
         // Update the local state with the new team member
-        setTeamMembers(prevTeamMembers => [...prevTeamMembers, formattedMember]);
+        setTeamMembers(prevTeamMembers => [...prevTeamMembers, savedTeamMember]);
 
         toast({
           title: "Teamlid toegevoegd",
           description: `${name} is succesvol toegevoegd aan het team.`,
         });
-        
-        return formattedMember;
       } else {
         toast({
           title: "Fout",
@@ -1292,10 +1192,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         hasReachedPeriodLimit,
         autoClosePeriods: teamSettings?.autoClosePeriods || false,
         calculateAverageTipPerHour,
-        mostRecentPayout: null, // Placeholder
+        mostRecentPayout,
         updateTeamMemberBalance,
         clearTeamMemberHours,
-        setMostRecentPayout: () => {}, // Placeholder
+        setMostRecentPayout,
         periodDuration: teamSettings?.periodDuration || 'month',
         setPeriodDuration: () => {}, // Placeholder
         setAutoClosePeriods: () => {}, // Placeholder

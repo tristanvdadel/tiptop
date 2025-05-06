@@ -35,6 +35,13 @@ export interface TeamMemberPermissions {
   manage_payouts: boolean;
 }
 
+export interface HourRegistration {
+  id: string;
+  date: string;
+  hours: number;
+  processed: boolean;
+}
+
 export interface TeamMember {
   id: string;
   teamId: string;
@@ -106,7 +113,7 @@ export interface AppContextType {
   deleteTip: (periodId: string, tipId: string) => Promise<void>;
   addTeamMember: (name: string, hours: number) => Promise<void>;
   updateTeamMemberHours: (memberId: string, hours: number) => Promise<void>;
-  updateTeamMemberName: (memberId: string, name: string) => Promise<boolean>;
+  updateTeamMemberName: (memberId: string, name: string) => Promise<void>;
   deleteTeamMember: (memberId: string) => Promise<void>;
   saveTeamMemberRole: (memberId: string, role: string) => Promise<void>;
   saveTeamMemberPermissions: (memberId: string, permissions: any) => Promise<void>;
@@ -122,7 +129,7 @@ export interface AppContextType {
   prevMonth: () => void;
   formatMonth: (date: Date) => string;
   
-  // Aanvullende methoden
+  // Additional methods
   updatePeriod: (periodId: string, data: any) => Promise<void>;
   endCurrentPeriod: () => void;
   hasReachedPeriodLimit: () => boolean;
@@ -159,13 +166,6 @@ export enum PeriodDuration {
   DAY = 'day',
   WEEK = 'week',
   MONTH = 'month'
-}
-
-export interface HourRegistration {
-  id: string;
-  date: string;
-  hours: number;
-  processed: boolean;
 }
 
 export default AppContext;

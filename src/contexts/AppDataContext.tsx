@@ -33,7 +33,8 @@ import {
   mapDbPeriodToPeriod,
   mapPeriodToDbPeriod,
   mapDbTeamMemberToTeamMember,
-  mapTeamMemberToDbTeamMember
+  mapTeamMemberToDbTeamMember,
+  mapDbTipToTipEntry
 } from '@/models/mappers';
 import { DbPeriod, DbTeamMember } from '@/models/DbModels';
 
@@ -517,10 +518,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (savedPeriod) {
         // Format as Period
-        const formattedPeriod = mapDbPeriodToPeriod({
-          ...savedPeriod,
-          tips: []
-        } as DbPeriod);
+        const formattedPeriod = mapDbPeriodToPeriod(savedPeriod);
         
         // Update the local state with the new period
         setPeriods(prevPeriods => [formattedPeriod, ...prevPeriods]);
@@ -570,23 +568,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const savedPeriod = await savePeriodToSupabase(teamId, updatedPeriod);
       
       if (savedPeriod) {
-        // Format the saved period to match our interface
-        const formattedPeriod: Period = {
-          id: savedPeriod.id,
-          teamId: savedPeriod.team_id,
-          startDate: savedPeriod.start_date,
-          endDate: savedPeriod.end_date,
-          isActive: savedPeriod.is_active,
-          isPaid: savedPeriod.is_paid,
-          notes: savedPeriod.notes,
-          name: savedPeriod.name,
-          autoCloseDate: savedPeriod.auto_close_date,
-          averageTipPerHour: savedPeriod.average_tip_per_hour,
-          tips: periodToUpdate.tips ? periodToUpdate.tips.map(tip => ({
-            ...tip,
-            periodId: savedPeriod.id
-          })) : []
-        };
+        // Format the saved period using our mapper
+        const formattedPeriod = mapDbPeriodToPeriod(savedPeriod);
         
         // Update the local state with the saved period
         setPeriods(prevPeriods =>
@@ -646,23 +629,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const savedPeriod = await savePeriodToSupabase(teamId, updatedPeriod);
 
       if (savedPeriod) {
-        // Format the saved period to match our interface
-        const formattedPeriod: Period = {
-          id: savedPeriod.id,
-          teamId: savedPeriod.team_id,
-          startDate: savedPeriod.start_date,
-          endDate: savedPeriod.end_date,
-          isActive: savedPeriod.is_active,
-          isPaid: savedPeriod.is_paid,
-          notes: savedPeriod.notes,
-          name: savedPeriod.name,
-          autoCloseDate: savedPeriod.auto_close_date,
-          averageTipPerHour: savedPeriod.average_tip_per_hour,
-          tips: savedPeriod.tips ? savedPeriod.tips.map(tip => ({
-            ...tip,
-            periodId: savedPeriod.id
-          })) : []
-        };
+        // Format the saved period using our mapper
+        const formattedPeriod = mapDbPeriodToPeriod(savedPeriod);
         
         // Update the local state with the saved period
         setPeriods(prevPeriods =>
@@ -746,23 +714,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const savedPeriod = await savePeriodToSupabase(teamId, updatedPeriod);
       
       if (savedPeriod) {
-        // Format the saved period to match our interface
-        const formattedPeriod: Period = {
-          id: savedPeriod.id,
-          teamId: savedPeriod.team_id,
-          startDate: savedPeriod.start_date,
-          endDate: savedPeriod.end_date,
-          isActive: savedPeriod.is_active,
-          isPaid: savedPeriod.is_paid,
-          notes: savedPeriod.notes,
-          name: savedPeriod.name,
-          autoCloseDate: savedPeriod.auto_close_date,
-          averageTipPerHour: savedPeriod.average_tip_per_hour,
-          tips: savedPeriod.tips ? savedPeriod.tips.map(tip => ({
-            ...tip,
-            periodId: savedPeriod.id
-          })) : []
-        };
+        // Format the saved period using our mapper
+        const formattedPeriod = mapDbPeriodToPeriod(savedPeriod);
         
         // Update the local state with the saved period
         setPeriods(prevPeriods =>
@@ -836,23 +789,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const savedPeriod = await savePeriodToSupabase(teamId, updatedPeriod);
 
       if (savedPeriod) {
-        // Format the saved period to match our interface
-        const formattedPeriod: Period = {
-          id: savedPeriod.id,
-          teamId: savedPeriod.team_id,
-          startDate: savedPeriod.start_date,
-          endDate: savedPeriod.end_date,
-          isActive: savedPeriod.is_active,
-          isPaid: savedPeriod.is_paid,
-          notes: savedPeriod.notes,
-          name: savedPeriod.name,
-          autoCloseDate: savedPeriod.auto_close_date,
-          averageTipPerHour: savedPeriod.average_tip_per_hour,
-          tips: savedPeriod.tips ? savedPeriod.tips.map(tip => ({
-            ...tip,
-            periodId: savedPeriod.id
-          })) : []
-        };
+        // Format the saved period using our mapper
+        const formattedPeriod = mapDbPeriodToPeriod(savedPeriod);
         
         // Update the local state with the saved period
         setPeriods(prevPeriods =>
@@ -1009,10 +947,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
   
-  const updateTeamMemberName = async (memberId: string, name: string): Promise<boolean> => {
+  const updateTeamMemberName = async (memberId: string, name: string): Promise<void> => {
     if (!teamId) {
       console.error('Cannot update team member without team ID');
-      return false;
+      return;
     }
     
     setLoading(true);
@@ -1023,7 +961,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const teamMemberToUpdate = teamMembers.find(member => member.id === memberId);
       if (!teamMemberToUpdate) {
         console.error('Team member not found in local state');
-        return false;
+        return;
       }
       
       // Update the team member with the new name
@@ -1042,15 +980,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           title: "Naam gewijzigd",
           description: "De naam van het teamlid is succesvol gewijzigd.",
         });
-        
-        return true;
       } else {
         toast({
           title: "Fout",
           description: "Er is een fout opgetreden bij het wijzigen van de naam van het teamlid",
           variant: "destructive",
         });
-        return false;
       }
     } catch (err) {
       console.error('Error updating team member name:', err);
@@ -1060,7 +995,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         description: "Er is een fout opgetreden bij het wijzigen van de naam van het teamlid",
         variant: "destructive",
       });
-      return false;
     } finally {
       setLoading(false);
     }

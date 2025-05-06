@@ -1,3 +1,4 @@
+
 import React, {
   createContext,
   useContext,
@@ -469,22 +470,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setPayouts(transformedPayouts);
       }
       
-      // Determine current and active periods
-      if (periodsData) {
+      // For each period, retrieve its tips
+      if (periodsData && periodsData.length > 0) {
         const now = new Date();
-        const active = periodsData.find(
-          (period: DbPeriod) => new Date(period.start_date) <= now && new Date(period.end_date || now) >= now
-        ) || null;
-        const current = active || periodsData[0] || null;
+        let active = null;
+        let current = null;
         
+        // Process each period and find active and current
+        for (const dbPeriod of periodsData) {
+          // Check if this period is active (current date falls between start and end dates)
+          if (dbPeriod.is_active && 
+              new Date(dbPeriod.start_date) <= now && 
+              (!dbPeriod.end_date || new Date(dbPeriod.end_date) >= now)) {
+            active = dbPeriod;
+          }
+        }
+        
+        // If no active period found, use the first one as current
+        current = active || periodsData[0];
+        
+        // If we have an active period, set it
         if (active) {
-          setActivePeriod(mapDbPeriodToPeriod(active));
+          // Get the tips for this period
+          const { data: periodTips, error: tipsError } = await supabase
+            .from('tips')
+            .select('*')
+            .eq('period_id', active.id);
+          
+          if (tipsError) {
+            console.error('Error fetching tips for active period:', tipsError);
+          }
+          
+          // Set the active period with its tips
+          setActivePeriod(mapDbPeriodToPeriod({
+            ...active,
+            tips: periodTips || []
+          }));
         } else {
           setActivePeriod(null);
         }
         
+        // If we have a current period, set it
         if (current) {
-          setCurrentPeriod(mapDbPeriodToPeriod(current));
+          // Get the tips for this period
+          const { data: periodTips, error: tipsError } = await supabase
+            .from('tips')
+            .select('*')
+            .eq('period_id', current.id);
+          
+          if (tipsError) {
+            console.error('Error fetching tips for current period:', tipsError);
+          }
+          
+          // Set the current period with its tips
+          setCurrentPeriod(mapDbPeriodToPeriod({
+            ...current,
+            tips: periodTips || []
+          }));
         } else {
           setCurrentPeriod(null);
         }
@@ -971,3 +1013,316 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           teamId: savedTeamMember.team_id,
           user_id: savedTeamMember.user_id,
           name: name,
+          hours: hours,
+          balance: 0,
+          role: 'member',
+          permissions: {
+            add_tips: false,
+            edit_tips: false,
+            add_hours: false,
+            view_team: true,
+            view_reports: false,
+            close_periods: false,
+            manage_payouts: false
+          }
+        };
+
+        // Update the local state with the new team member
+        setTeamMembers(prevTeamMembers => [...prevTeamMembers, formattedMember]);
+
+        toast({
+          title: "Teamlid toegevoegd",
+          description: `${name} is succesvol toegevoegd aan het team.`,
+        });
+        
+        return formattedMember;
+      } else {
+        toast({
+          title: "Fout",
+          description: "Er is een fout opgetreden bij het toevoegen van het teamlid",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error('Error adding team member:', err);
+      setError(err instanceof Error ? err : new Error('Failed to add team member'));
+      toast({
+        title: "Fout",
+        description: "Er is een fout opgetreden bij het toevoegen van het teamlid",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const updateTeamMemberHours = async (memberId: string, hours: number) => {
+    if (!teamId) {
+      console.error('Cannot update team member hours without team ID');
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Find the team member in the local state
+      const teamMemberToUpdate = teamMembers.find(member => member.id === memberId);
+      if (!teamMemberToUpdate) {
+        console.error('Team member not found in local state');
+        return;
+      }
+      
+      // Update the team member with the new hours
+      const updatedTeamMember: TeamMember = { ...teamMemberToUpdate, hours };
+      
+      // Save the updated team member to the database
+      const savedTeamMember = await saveTeamMemberToSupabase(teamId, updatedTeamMember);
+      
+      if (savedTeamMember) {
+        // Update the local state with the saved team member
+        setTeamMembers(prevTeamMembers =>
+          prevTeamMembers.map(member => (member.id === memberId ? { ...member, hours } : member))
+        );
+        
+        toast({
+          title: "Uren gewijzigd",
+          description: "De uren van het teamlid zijn succesvol gewijzigd.",
+        });
+      } else {
+        toast({
+          title: "Fout",
+          description: "Er is een fout opgetreden bij het wijzigen van de uren van het teamlid",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error('Error updating team member hours:', err);
+      setError(err instanceof Error ? err : new Error('Failed to update team member hours'));
+      toast({
+        title: "Fout",
+        description: "Er is een fout opgetreden bij het wijzigen van de uren van het teamlid",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const updateTeamMemberName = async (memberId: string, name: string): Promise<boolean> => {
+    if (!teamId) {
+      console.error('Cannot update team member without team ID');
+      return false;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Find the team member in the local state
+      const teamMemberToUpdate = teamMembers.find(member => member.id === memberId);
+      if (!teamMemberToUpdate) {
+        console.error('Team member not found in local state');
+        return false;
+      }
+      
+      // Update the team member with the new name
+      const updatedTeamMember: TeamMember = { ...teamMemberToUpdate, name };
+      
+      // Save the updated team member to the database
+      const savedTeamMember = await saveTeamMemberToSupabase(teamId, updatedTeamMember);
+      
+      if (savedTeamMember) {
+        // Update the local state with the saved team member
+        setTeamMembers(prevTeamMembers =>
+          prevTeamMembers.map(member => (member.id === memberId ? { ...member, name } : member))
+        );
+        
+        toast({
+          title: "Naam gewijzigd",
+          description: "De naam van het teamlid is succesvol gewijzigd.",
+        });
+        
+        return true;
+      } else {
+        toast({
+          title: "Fout",
+          description: "Er is een fout opgetreden bij het wijzigen van de naam van het teamlid",
+          variant: "destructive",
+        });
+        return false;
+      }
+    } catch (err) {
+      console.error('Error updating team member name:', err);
+      setError(err instanceof Error ? err : new Error('Failed to update team member name'));
+      toast({
+        title: "Fout",
+        description: "Er is een fout opgetreden bij het wijzigen van de naam van het teamlid",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const deleteTeamMember = async (memberId: string) => {
+    if (!teamId) {
+      console.error('Cannot delete team member without team ID');
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Delete the team member from the database
+      const { error } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('id', memberId);
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Update the local state by removing the deleted team member
+      setTeamMembers(prevTeamMembers =>
+        prevTeamMembers.filter(member => member.id !== memberId)
+      );
+      
+      toast({
+        title: "Teamlid verwijderd",
+        description: "Het teamlid is succesvol verwijderd.",
+      });
+    } catch (err) {
+      console.error('Error deleting team member:', err);
+      setError(err instanceof Error ? err : new Error('Failed to delete team member'));
+      toast({
+        title: "Fout",
+        description: "Er is een fout opgetreden bij het verwijderen van het teamlid",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const deleteHourRegistration = async (id: string) => {
+    if (!teamId) {
+      console.error('Cannot delete hour registration without team ID');
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Delete the hour registration from the database
+      const { error } = await supabase
+        .from('hour_registrations')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Urenregistratie verwijderd",
+        description: "De urenregistratie is succesvol verwijderd.",
+      });
+      
+      // Refresh the data to get the updated team members with their hour registrations
+      await refreshTeamData();
+    } catch (err) {
+      console.error('Error deleting hour registration:', err);
+      setError(err instanceof Error ? err : new Error('Failed to delete hour registration'));
+      toast({
+        title: "Fout",
+        description: "Er is een fout opgetreden bij het verwijderen van de urenregistratie",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Add more functions as needed to fulfill the AppContext interface
+  
+  // Return the provider with all the context values and functions
+  return (
+    <AppContext.Provider
+      value={{
+        teamId,
+        periods,
+        teamMembers,
+        teamSettings,
+        payouts,
+        currentPeriod,
+        activePeriod,
+        loading,
+        error,
+        isLoading: loading,
+        refreshTeamData,
+        startNewPeriod,
+        savePeriodName,
+        addTip,
+        updateTip,
+        deleteTip,
+        addTeamMember,
+        updateTeamMemberHours,
+        updateTeamMemberName,
+        deleteTeamMember,
+        saveTeamMemberRole: async () => {}, // Placeholder
+        saveTeamMemberPermissions: async () => {}, // Placeholder
+        saveTeamSettingsContext: async () => {}, // Placeholder
+        calculateTipDistribution: () => [], // Placeholder
+        markPeriodsAsPaid: async () => {}, // Placeholder
+        deletePeriod: async () => {}, // Placeholder
+        deletePayout: async () => {}, // Placeholder
+        subscribeToChannel,
+        selectedMonth,
+        setSelectedMonth,
+        nextMonth,
+        prevMonth,
+        formatMonth,
+        updatePeriod,
+        endCurrentPeriod,
+        hasReachedPeriodLimit,
+        autoClosePeriods: teamSettings?.autoClosePeriods || false,
+        calculateAverageTipPerHour,
+        mostRecentPayout: null, // Placeholder
+        updateTeamMemberBalance,
+        clearTeamMemberHours,
+        setMostRecentPayout: () => {}, // Placeholder
+        periodDuration: teamSettings?.periodDuration || 'month',
+        setPeriodDuration: () => {}, // Placeholder
+        setAutoClosePeriods: () => {}, // Placeholder
+        calculateAutoCloseDate: () => '', // Placeholder
+        scheduleAutoClose: () => {}, // Placeholder
+        getNextAutoCloseDate: () => null, // Placeholder
+        alignWithCalendar: teamSettings?.alignWithCalendar || false,
+        setAlignWithCalendar: () => {}, // Placeholder
+        closingTime: null, // Placeholder
+        setClosingTime: () => {}, // Placeholder
+        getFormattedClosingTime: () => '', // Placeholder
+        getUnpaidPeriodsCount: () => 0, // Placeholder
+        deletePaidPeriods: async () => {}, // Placeholder
+        removeTeamMember,
+        deleteHourRegistration
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+// Export the hook to use the context
+export const useApp = (): AppContextType => {
+  const context = useContext(AppContext);
+  if (context === undefined) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
+};

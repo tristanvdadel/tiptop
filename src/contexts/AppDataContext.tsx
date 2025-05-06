@@ -374,7 +374,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           hours: member.hours || 0,
           balance: member.balance || 0,
           permissions: member.permissions as unknown as TeamMemberPermissions,
-          name: member.name || member.id.substring(0, 8),
+          name: member.user_id ? `${member.user_id.substring(0, 8)}` : member.id.substring(0, 8),
         }));
         
         setTeamMembers(transformedMembers);

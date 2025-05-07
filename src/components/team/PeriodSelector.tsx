@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Period } from '@/contexts/AppContext';
+import { Period } from '@/types/models';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";

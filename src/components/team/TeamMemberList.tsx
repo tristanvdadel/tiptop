@@ -1,5 +1,5 @@
-import React, { useState, KeyboardEvent } from 'react';
-import { TeamMember, HourRegistration } from '@/contexts/AppContext';
+import React from 'react';
+import { TeamMember, HourRegistration } from '@/types/models';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

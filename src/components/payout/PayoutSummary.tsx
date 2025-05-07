@@ -1,310 +1,148 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Check } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
-import PayoutHeader from './PayoutHeader';
-import PayoutDetails from './PayoutDetails';
-import RoundingSelector, { RoundingOption } from './RoundingSelector';
-import DistributionTable from './DistributionTable';
-import ActionButtons from './ActionButtons';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { format } from 'date-fns';
+import { nl } from 'date-fns/locale';
+import { Button } from '@/components/ui/button';
+import { Payout, PayoutData, TeamMember } from '@/types/models';
 
 interface PayoutSummaryProps {
-  onClose: () => void;
+  onPayoutCompleted?: () => void;
 }
 
-interface PayoutDetailWithEdits {
-  memberId: string;
-  amount: number;
-  actualAmount: number;
-  balance: number | undefined;
-  isEdited: boolean;
-}
-
-const PayoutSummary = ({
-  onClose
-}: PayoutSummaryProps) => {
-  const {
-    payouts,
-    teamMembers,
-    mostRecentPayout,
-    updateTeamMemberBalance,
-    clearTeamMemberHours,
-    setMostRecentPayout
-  } = useApp();
-  const {
-    toast
-  } = useToast();
-  const navigate = useNavigate();
-  const [isEditing, setIsEditing] = useState(true);
-  const [editedDistribution, setEditedDistribution] = useState<PayoutDetailWithEdits[]>([]);
-  const [roundingOption, setRoundingOption] = useState<RoundingOption>('none');
-  const [balancesUpdated, setBalancesUpdated] = useState(false);
+const PayoutSummary: React.FC<PayoutSummaryProps> = ({ onPayoutCompleted }) => {
+  const { teamId, periods, teamMembers, payouts, calculateTipDistribution, markPeriodsAsPaid, mostRecentPayout, refreshTeamData } = useApp();
+  const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
+  const [distribution, setDistribution] = useState<TeamMember[]>([]);
+  const [paidBy, setPaidBy] = useState<string>('');
+  const [totalTips, setTotalTips] = useState<number>(0);
+  const [totalHours, setTotalHours] = useState<number>(0);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   
-  const latestPayout = mostRecentPayout || (payouts.length > 0 ? payouts[payouts.length - 1] : null);
-  
-  const findTeamMember = (id: string) => {
-    return teamMembers.find(member => member.id === id);
-  };
-
   useEffect(() => {
-    if (latestPayout) {
-      const initialEditableDistribution = latestPayout.distribution.map(item => {
-        const calculatedAmount = item.amount;
-        const originalBalance = item.balance || 0;
-        const totalAmountWithBalance = calculatedAmount + originalBalance;
-        return {
-          memberId: item.memberId,
-          amount: calculatedAmount,
-          actualAmount: item.actualAmount || totalAmountWithBalance,
-          balance: item.balance,
-          isEdited: false
-        };
-      });
-      setEditedDistribution(initialEditableDistribution);
-    }
-  }, [latestPayout]);
-
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    if (!url.searchParams.has('payoutSummary')) {
-      url.searchParams.set('payoutSummary', 'true');
-      window.history.pushState({}, '', url.toString());
-    }
-    return () => {
-      const url = new URL(window.location.href);
-      if (url.searchParams.has('payoutSummary')) {
-        url.searchParams.delete('payoutSummary');
-        window.history.pushState({}, '', url.toString());
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isEditing) {
-      calculateNewBalances();
-    }
-  }, [editedDistribution, isEditing]);
-
-  const handleAmountChange = (memberId: string, actualAmount: string) => {
-    const amount = parseFloat(actualAmount);
-    if (isNaN(amount) || amount < 0) return;
-    setEditedDistribution(prev => prev.map(item => item.memberId === memberId ? {
-      ...item,
-      actualAmount: amount,
-      isEdited: true
-    } : item));
-  };
-
-  const calculateNewBalances = () => {
-    if (!editedDistribution.length) return;
-    const updatedDistribution = editedDistribution.map(item => {
-      const calculatedAmount = item.amount;
-      const originalBalance = latestPayout?.distribution.find(d => d.memberId === item.memberId)?.balance || 0;
-      const totalToReceive = calculatedAmount + originalBalance;
-      const actuallyPaid = item.actualAmount;
-      const newBalance = totalToReceive - actuallyPaid;
-      return {
-        ...item,
-        balance: parseFloat(newBalance.toFixed(2))
-      };
-    });
-    setEditedDistribution(updatedDistribution);
-  };
-
-  const saveChanges = () => {
-    if (!latestPayout || !editedDistribution.length) return;
-    editedDistribution.forEach(item => {
-      const member = teamMembers.find(m => m.id === item.memberId);
-      if (member) {
-        updateTeamMemberBalance(item.memberId, item.balance || 0);
-        clearTeamMemberHours(item.memberId);
-      }
-    });
-    const updatedDistribution = editedDistribution.map(item => ({
-      memberId: item.memberId,
-      amount: item.amount,
-      actualAmount: item.actualAmount,
-      balance: latestPayout.distribution.find(d => d.memberId === item.memberId)?.balance || 0
-    }));
-    const updatedPayout = {
-      ...latestPayout,
-      distribution: updatedDistribution
-    };
-    setMostRecentPayout(updatedPayout);
-    setIsEditing(false);
-    setBalancesUpdated(true);
-    toast({
-      title: "Gefeliciteerd!",
-      description: "De uitbetaling is voltooid. De saldo's zijn opgeslagen. Je kan de uitbetaling terugvinden in de geschiedenis.",
-      variant: "default"
-    });
-    setTimeout(() => {
-      navigate('/');
-    }, 1500);
-  };
-
-  const applyRounding = () => {
-    if (!editedDistribution.length || roundingOption === 'none') return;
-    const roundingValue = parseFloat(roundingOption);
-    const roundedDistribution = editedDistribution.map(item => {
-      const calculatedAmount = item.amount;
-      const originalBalance = latestPayout?.distribution.find(d => d.memberId === item.memberId)?.balance || 0;
-      const totalAmount = calculatedAmount + originalBalance;
-      let roundedAmount = totalAmount;
-      if (roundingValue === 0.50) {
-        roundedAmount = Math.floor(totalAmount / 0.50) * 0.50;
-      } else if (roundingValue === 1.00) {
-        roundedAmount = Math.floor(totalAmount);
-      } else if (roundingValue === 2.00) {
-        roundedAmount = Math.floor(totalAmount / 2.00) * 2.00;
-      } else if (roundingValue === 5.00) {
-        roundedAmount = Math.floor(totalAmount / 5.00) * 5.00;
-      } else if (roundingValue === 10.00) {
-        roundedAmount = Math.floor(totalAmount / 10.00) * 10.00;
-      }
-      return {
-        ...item,
-        actualAmount: parseFloat(roundedAmount.toFixed(2)),
-        isEdited: roundedAmount !== totalAmount
-      };
-    });
-    setEditedDistribution(roundedDistribution);
-    toast({
-      title: "Bedragen afgerond",
-      description: `Alle bedragen zijn naar beneden afgerond op €${roundingOption}.`
-    });
-  };
-
-  const reopenEditor = () => {
-    setBalancesUpdated(false);
-    setIsEditing(true);
-  };
-
-  const originalBalances = latestPayout ? latestPayout.distribution.reduce((acc, item) => {
-    acc[item.memberId] = item.balance;
-    return acc;
-  }, {} as {
-    [key: string]: number | undefined;
-  }) : {};
-
-  const tableDistribution: PayoutDetailWithEdits[] = isEditing ? editedDistribution : latestPayout?.distribution.map(item => ({
-    memberId: item.memberId,
-    amount: item.amount,
-    actualAmount: item.actualAmount || item.amount + (item.balance || 0),
-    balance: item.balance,
-    isEdited: false
-  })) || [];
-
-  const handleCopyToClipboard = () => {
-    if (!latestPayout) return;
-    
-    const payoutDate = new Date(latestPayout.date).toLocaleDateString('nl');
-    const memberDetails = latestPayout.distribution.map(item => {
-      const member = findTeamMember(item.memberId);
-      return `${member?.name || 'Onbekend lid'}: €${(item.actualAmount || item.amount).toFixed(2)}`;
-    }).join('\n');
-    
-    const totalAmount = latestPayout.distribution.reduce((sum, dist) => sum + (dist.actualAmount || dist.amount), 0);
-    
-    const payoutText = `Uitbetaling fooi: ${payoutDate}\n\n${memberDetails}\n\nTotaal: €${totalAmount.toFixed(2)}`;
-    
-    navigator.clipboard.writeText(payoutText).then(() => {
-      toast({
-        title: "Gekopieerd naar klembord",
-        description: "De uitbetalingsgegevens zijn gekopieerd naar het klembord."
-      });
-    });
-  };
-  
-  const downloadCSV = () => {
-    if (!latestPayout) return;
-    
-    const headers = "Naam,Berekend bedrag,Saldo,Totaal te ontvangen,Daadwerkelijk uitbetaald,Nieuw saldo\n";
-    const rows = latestPayout.distribution.map(item => {
-      const member = findTeamMember(item.memberId);
-      const calculatedAmount = item.amount;
-      const originalBalance = item.balance || 0;
-      const totalToReceive = calculatedAmount + originalBalance;
-      const actuallyPaid = item.actualAmount || totalToReceive;
-      const newBalance = totalToReceive - actuallyPaid;
+    if (teamId) {
+      const calculatedDistribution = calculateTipDistribution(selectedPeriods);
+      setDistribution(calculatedDistribution);
       
-      return `${member?.name || 'Onbekend lid'},${calculatedAmount.toFixed(2)},${originalBalance.toFixed(2)},${totalToReceive.toFixed(2)},${actuallyPaid.toFixed(2)},${newBalance.toFixed(2)}`;
-    }).join('\n');
+      // Calculate total tips from selected periods
+      const tips = selectedPeriods.reduce((acc, periodId) => {
+        const period = periods.find(p => p.id === periodId);
+        return acc + (period?.tips?.reduce((sum, tip) => sum + tip.amount, 0) || 0);
+      }, 0);
+      setTotalTips(tips);
+      
+      // Calculate total hours from team members
+      const hours = teamMembers.reduce((acc, member) => acc + member.hours, 0);
+      setTotalHours(hours);
+    }
+  }, [teamId, periods, teamMembers, selectedPeriods, calculateTipDistribution]);
+  
+  const handleTogglePeriodSelection = (periodId: string) => {
+    setSelectedPeriods(prev =>
+      prev.includes(periodId) ? prev.filter(id => id !== periodId) : [...prev, periodId]
+    );
+  };
+  
+  const handlePayout = async () => {
+    setIsSaving(true);
+    try {
+      if (!teamId || !selectedPeriods.length || !paidBy || !distribution.length) return;
+      
+      await markPeriodsAsPaid(selectedPeriods, distribution);
+      
+      // Refresh team data after payout
+      await refreshTeamData();
+      
+      // Reset state
+      setSelectedPeriods([]);
+      setPaidBy('');
+      
+      if (onPayoutCompleted) {
+        onPayoutCompleted();
+      }
+    } catch (error) {
+      console.error("Error during payout:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const savePayoutData = async () => {
+    if (!teamId || !selectedPeriods.length || !paidBy || !distribution.length) return;
     
-    const csv = headers + rows;
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const payoutDate = new Date(latestPayout.date).toLocaleDateString('nl').replace(/\//g, '-');
+    // Create payout data without totalAmount
+    const payoutData: PayoutData = {
+      teamId,
+      date: new Date().toISOString(),
+      payoutTime: new Date().toISOString(),
+      totalTips: totalTips,
+      totalHours: totalHours,
+      payerName: paidBy,
+      distribution: distribution.map(m => ({
+        memberId: m.id,
+        amount: m.tipAmount || 0,
+        hours: m.hours,
+        balance: m.balance
+      })),
+      periodIds: selectedPeriods,
+    };
     
-    link.setAttribute('href', url);
-    link.setAttribute('download', `fooi-uitbetaling-${payoutDate}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast({
-      title: "CSV gedownload",
-      description: "De uitbetalingsgegevens zijn gedownload als CSV-bestand."
+    try {
+      // Mark periods as paid and save payout data
+      await markPeriodsAsPaid(selectedPeriods, distribution);
+      
+      // Refresh team data after payout
+      await refreshTeamData();
+      
+      // Reset state
+      setSelectedPeriods([]);
+      setPaidBy('');
+      
+      if (onPayoutCompleted) {
+        onPayoutCompleted();
+      }
+    } catch (error) {
+      console.error("Error during payout:", error);
+    }
+  };
+
+  const formatDate = (dateString: string): string => {
+    return format(new Date(dateString), 'd MMMM yyyy', {
+      locale: nl
     });
   };
 
   return (
-    <Card className="w-full max-w-3xl mx-auto mb-28">
-      <PayoutHeader />
-      <CardContent className="p-6">
-        {latestPayout ? (
-          <div className="space-y-6">
-            <PayoutDetails payout={latestPayout} />
-            
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-medium">Verdeling:</h3>
-                {balancesUpdated ? (
-                  <Button variant="outline" size="sm" onClick={reopenEditor} className="h-8">
-                    Opnieuw aanpassen
-                  </Button>
-                ) : !isEditing && (
-                  <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8">
-                    Aanpassen
-                  </Button>
-                )}
-              </div>
-              
-              {isEditing && (
-                <RoundingSelector 
-                  roundingOption={roundingOption} 
-                  setRoundingOption={setRoundingOption} 
-                  applyRounding={applyRounding} 
-                />
-              )}
-              
-              <DistributionTable 
-                distribution={tableDistribution} 
-                isEditing={isEditing} 
-                findTeamMember={findTeamMember} 
-                originalBalances={originalBalances} 
-                handleAmountChange={handleAmountChange} 
-              />
-            </div>
-            
-            <ActionButtons 
-              isEditing={isEditing} 
-              balancesUpdated={balancesUpdated} 
-              saveChanges={saveChanges} 
-              handleCopyToClipboard={handleCopyToClipboard} 
-              downloadCSV={downloadCSV} 
-            />
-          </div>
-        ) : (
-          <div className="text-center py-6">
-            <p>Geen recente uitbetaling gevonden.</p>
-          </div>
-        )}
+    <Card className="mb-6">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg font-medium">
+          Uitbetaling
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-4">
+        {mostRecentPayout && <div className="mb-4 p-3 rounded-md bg-green-50 border border-green-200">
+            <h3 className="text-sm font-medium text-green-700">
+              Laatste uitbetaling
+            </h3>
+            <p className="text-xs text-green-600">
+              {formatDate(mostRecentPayout.date)}
+            </p>
+          </div>}
+        
+        <div className="mb-6">
+          <h2 className="text-lg font-medium mb-2">Betaald door</h2>
+          <input
+            type="text"
+            placeholder="Naam"
+            value={paidBy}
+            onChange={e => setPaidBy(e.target.value)}
+            className="w-full px-3 py-2 border rounded-md"
+          />
+        </div>
+        
+        <Button onClick={handlePayout} disabled={isSaving} className="bg-green-500 hover:bg-green-600 text-white">
+          {isSaving ? 'Uitbetalen...' : 'Uitbetalen'}
+        </Button>
       </CardContent>
     </Card>
   );

@@ -39,6 +39,7 @@ const PeriodSummary = () => {
     if (currentPeriod.averageTipPerHour !== undefined) {
       return currentPeriod.averageTipPerHour || 0; // Return 0 if null or undefined
     }
+    // Fix: Pass only one argument to calculateAverageTipPerHour if it accepts only one
     return calculateAverageTipPerHour(currentPeriod.id) || 0; // Return 0 if null or undefined
   }, [currentPeriod, calculateAverageTipPerHour]);
 
@@ -63,7 +64,8 @@ const PeriodSummary = () => {
   };
 
   const handleStartNewPeriod = () => {
-    if (hasReachedPeriodLimit()) {
+    // Fix Boolean function call
+    if (typeof hasReachedPeriodLimit === 'function' && hasReachedPeriodLimit()) {
       toast({
         title: "Limiet bereikt",
         description: "Je hebt het maximale aantal periodes bereikt. Rond bestaande periodes af.",

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { TeamMember } from '@/contexts/AppContext';
+import { TeamMember } from '@/types/models';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Receipt } from 'lucide-react';
 

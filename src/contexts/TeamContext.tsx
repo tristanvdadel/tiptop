@@ -1,11 +1,9 @@
-
-import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
-import { TeamMember } from '@/contexts/AppContext';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo } from 'react';
+import { TeamMember, ImportedHour } from '@/types/models';
 import { useApp } from '@/contexts/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { calculateTipDistributionTotals, processImportedHours } from '@/services/teamDataService';
 import { debounce } from '@/services/payoutService';
-import { fetchTeamPeriods } from '@/services/periodService';
 
 interface TeamContextType {
   selectedPeriods: string[];
@@ -24,13 +22,6 @@ interface TeamContextType {
   handleConfirmImportedHours: (confirmedHours: ImportedHour[]) => void;
   closeImportDialog: () => void;
   handleRefresh: () => Promise<void>;
-}
-
-export interface ImportedHour {
-  name: string;
-  hours: number;
-  date: string;
-  exists: boolean;
 }
 
 const TeamContext = createContext<TeamContextType | undefined>(undefined);

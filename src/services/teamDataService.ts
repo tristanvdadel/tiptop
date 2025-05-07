@@ -1,5 +1,5 @@
 
-import { TeamMember } from '@/types/models';
+import { TeamMember, ImportedHour } from '@/types/models';
 
 export const calculateTipDistributionTotals = (
   selectedPeriods: string[],
@@ -62,7 +62,7 @@ export const calculateDistribution = (periodIds: string[], periods: any[], teamM
 
 // Process imported hours and update team members
 export const processImportedHours = async (
-  hourData: { name: string; hours: number; date: string; exists: boolean },
+  hourData: ImportedHour,
   teamMembers: TeamMember[],
   addTeamMember: (name: string, hours: number) => Promise<void>,
   updateTeamMemberHours: (memberId: string, hours: number) => Promise<void>

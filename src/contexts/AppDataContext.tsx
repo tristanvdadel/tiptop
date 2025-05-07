@@ -4,7 +4,6 @@ import React, {
   useState,
   useEffect,
   useCallback,
-  useMemo,
 } from 'react';
 import {
   Period,
@@ -12,32 +11,26 @@ import {
   TipEntry,
   TeamSettings,
   Payout,
-} from '@/integrations/supabase/client';
+} from '@/types/models';
 import {
   fetchPeriods,
   savePeriod,
-  deletePeriod as deletePeriodService,
-} from '@/services/periodService';
-import {
+  deletePeriod,
   fetchTeamMembers,
   saveTeamMember,
-  deleteTeamMember as deleteTeamMemberService,
-  updateTeamMember as updateTeamMemberService,
-} from '@/services/teamMemberService';
-import {
+  deleteTeamMember,
+  updateTeamMember,
   fetchPayouts,
   savePayout,
-  deletePayout as deletePayoutService,
-} from '@/services/payoutService';
-import {
+  deletePayout,
   fetchTeamSettings,
   saveTeamSettings,
-} from '@/services/teamService';
+  calculateDistribution
+} from '@/services';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { calculateDistribution } from '@/services/teamDataService';
 
 interface AppContextType {
   teamId: string | null;
@@ -185,10 +178,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       // Fetch all data in parallel
       const [
-        { data: periodsData, error: periodsError },
-        { data: membersData, error: membersError },
-        { data: settingsData, error: settingsError },
-        { data: payoutsData, error: payoutsError },
+        periodsData,
+        membersData, 
+        settingsData,
+        payoutsData,
       ] = await Promise.all([
         fetchPeriods(fetchedTeamId),
         fetchTeamMembers(fetchedTeamId),
@@ -577,8 +570,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setError(null);
 
     try {
-      const newTeamMember: Omit<TeamMember, 'id' | 'role' | 'createdAt' | 'permissions'> = {
-        teamId: teamId,
+      const newTeamMember: Omit<TeamMember, 'id'> = {
+        team_id: teamId,
         name: name,
         hours: hours,
       };
@@ -588,7 +581,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (savedTeamMember) {
         // Update the local state with the new team member
-        setTeamMembers(prevTeamMembers => [...prevTeamMembers, savedTeamMember]);
+        setTeamMembers(prevTeamMembers => [...prevTeamMembers, savedTeamMember as TeamMember]);
 
         toast({
           title: "Teamlid toegevoegd",
@@ -961,7 +954,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     try {
       // Delete the period from the database
-      await deletePeriodService(periodId);
+      await deletePeriod(periodId);
       
       // Update the local state by filtering out the deleted period
       setPeriods(prevPeriods => prevPeriods.filter(period => period.id !== periodId));
@@ -999,7 +992,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     try {
       // Delete the payout from the database
-      await deletePayoutService(payoutId);
+      await deletePayout(payoutId);
       
       // Update the local state by filtering out the deleted payout
       setPayouts(prevPayouts => prevPayouts.filter(payout => payout.id !== payoutId));

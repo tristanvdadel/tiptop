@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -7,6 +6,7 @@ import {
   HourRegistration,
   TipEntry,
   Payout,
+  TeamMemberPermissions,
 } from '@/types/models';
 import { PeriodDuration } from '@/types/contextTypes';
 import {
@@ -81,12 +81,12 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
       // Map database format to application model format
       const mappedMembers: TeamMember[] = (data || []).map(member => ({
         id: member.id,
-        teamId: member.team_id,
+        teamId: member.team_id, // Map team_id to teamId
         name: member.name || `Member ${member.id.substring(0, 5)}`,
         hours: member.hours || 0,
         user_id: member.user_id,
         role: member.role,
-        permissions: member.permissions,
+        permissions: member.permissions as unknown as TeamMemberPermissions, // Fix permissions casting
         created_at: member.created_at,
         balance: member.balance || 0,
       }));
@@ -176,12 +176,13 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
         .upsert([
           {
             id: member.id,
-            team_id: member.teamId,
+            team_id: member.teamId, // Map teamId to team_id for database
             name: member.name,
             hours: member.hours,
             balance: member.balance || 0,
             role: member.role || 'member', // Add default role
-            user_id: member.user_id || null // Ensure user_id field is present
+            user_id: member.user_id || null, // Ensure user_id field is present
+            permissions: member.permissions // Ensure permissions is passed correctly
           }
         ]);
 

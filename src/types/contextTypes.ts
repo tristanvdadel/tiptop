@@ -1,5 +1,5 @@
 
-import { Period, TeamMember, HourRegistration, TipEntry, Payout } from '@/types/models';
+import { Period, TeamMember, HourRegistration, TipEntry, Payout, ImportedHour } from '@/types/models';
 
 export type PeriodDuration = 'day' | 'week' | 'month';
 
@@ -26,10 +26,12 @@ export interface AppContextType {
   setClosingTime: (closingTime: { hour: number; minute: number }) => void;
   isDemo: boolean;
   setIsDemo: (isDemo: boolean) => void;
+  isLoading?: boolean; // Add isLoading property
   refreshTeamData: () => Promise<void>;
   addTeamMember: (name: string, hours: number, balance: number) => Promise<void>;
   updateTeamMember: (id: string, updates: Partial<TeamMember>) => Promise<void>;
   deleteTeamMember: (id: string) => Promise<void>;
+  removeTeamMember?: (id: string) => Promise<void>; // Add compatibility with old code
   addTip: (amount: number, note?: string, date?: string) => Promise<void>;
   updateTip: (periodId: string, tipId: string, updates: Partial<TipEntry>) => Promise<void>;
   deleteTip: (periodId: string, tipId: string) => Promise<void>;
@@ -51,4 +53,5 @@ export interface AppContextType {
   scheduleAutoClose: (autoCloseDate: string) => Promise<void>;
   getNextAutoCloseDate: () => string | null;
   getFormattedClosingTime: () => string;
+  processImportedHours?: (hourData: ImportedHour[], addTeamMember: (name: string, hours: number) => Promise<void>, updateTeamMember: (id: string, hours: number) => Promise<void>) => Promise<{ success: boolean; message: string }[]>;
 }

@@ -42,8 +42,8 @@ export const useApp = () => {
 
 export default AppContext;
 
-// Export the PeriodDuration type 
-export { PeriodDuration } from '@/types/contextTypes';
+// Export the PeriodDuration type explicitly
+export type { PeriodDuration } from '@/types/contextTypes';
 
 // Re-export types for backward compatibility
 export type { Period, TeamMember, HourRegistration, TipEntry } from '@/types/models';

@@ -19,7 +19,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import EditTipDialog from './EditTipDialog';
 import { useToast } from "@/hooks/use-toast";
-import { supabase, TeamMemberPermissions } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
+
+// Import the correct TeamMemberPermissions type
+import type { TeamMemberPermissions } from "@/types/models";
 
 interface TipCardProps {
   tip: TipEntry;
@@ -87,6 +90,13 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
     });
   };
 
+  // This adapter is needed to handle the different function signatures
+  const handleUpdateTip = (periodId: string, tipId: string, updates: Partial<TipEntry>) => {
+    if (updateTip) {
+      updateTip(periodId, tipId, updates);
+    }
+  };
+
   return (
     <>
       <Card className="mb-3 relative group">
@@ -147,7 +157,7 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
         onClose={() => setIsEditDialogOpen(false)}
         tip={tip}
         periodId={actualPeriodId}
-        onSave={updateTip}
+        onSave={handleUpdateTip}
       />
     </>
   );

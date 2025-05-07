@@ -94,6 +94,7 @@ export interface Payout {
 
 export type PayoutData = Omit<Payout, 'id'>;
 
+// Use only one definition of PeriodDuration
 export type PeriodDuration = 'day' | 'week' | 'month';
 
 // Add ImportedHour type for the TeamContext

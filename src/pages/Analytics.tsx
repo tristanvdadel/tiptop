@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,15 +18,14 @@ const Analytics = () => {
     periods,
     calculateAverageTipPerHour,
     teamMembers,
-    payouts,
-    currentPeriod
+    payouts
   } = useApp();
   
   const isMobile = useIsMobile();
   
   const averageTipPerHour = useMemo(() => {
-    return calculateAverageTipPerHour(currentPeriod?.id || "");
-  }, [calculateAverageTipPerHour, currentPeriod]);
+    return calculateAverageTipPerHour();
+  }, [calculateAverageTipPerHour]);
   
   const periodData = useMemo(() => {
     return periods.map(period => {

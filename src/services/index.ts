@@ -10,7 +10,6 @@ export * from './teamMemberService';
 export { saveTeamMember as saveTeamMemberService } from './teamMemberService';
 
 export * from './payoutService';
-export { savePayoutToSupabase, deletePayout } from './payoutService';
 export * from './excelService';
 export * from './teamDataService';
 
@@ -18,5 +17,6 @@ export * from './teamDataService';
 export {
   savePeriod as savePeriodToSupabase,
   saveTeamMember as saveTeamMemberToSupabase,
+  savePayout as savePayoutToSupabase,
   saveTeamSettings as saveTeamSettingsToSupabase
 } from './supabaseService';

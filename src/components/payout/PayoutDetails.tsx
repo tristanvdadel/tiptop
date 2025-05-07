@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -41,7 +42,6 @@ const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDe
     (payout?.distribution.map(item => {
       const member = {
         id: item.memberId,
-        teamId: '', // Required by TeamMember type
         name: '', // This will be filled by TeamMember lookup in the parent component
         hours: 0,
         tipAmount: item.amount,

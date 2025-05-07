@@ -1,5 +1,4 @@
 
-import PayoutSummary, { PayoutSummaryProps } from './payout/PayoutSummary';
-export type { PayoutSummaryProps };
+import PayoutSummary from './payout/PayoutSummary';
 export { PayoutSummary };
 export default PayoutSummary;

@@ -1,52 +1,27 @@
-
 import React, { useState, KeyboardEvent } from 'react';
 import { TeamMember, HourRegistration } from '@/contexts/AppContext';
-import { format } from 'date-fns';
-import { nl } from 'date-fns/locale';
-import { useToast } from '@/hooks/use-toast';
-import {
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  Check,
-  Pencil,
-  Trash2,
-  Calendar,
-  PlusCircle,
-  MinusCircle,
-  Plus,
-  User,
-  UserCheck
-} from 'lucide-react';
-
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
-} from '@/components/ui/alert-dialog';
+import { useToast } from "@/hooks/use-toast";
+import { Plus, Trash2, Check, Clock, Calendar, PlusCircle, MinusCircle, ChevronDown, ChevronUp, Pencil, UserCheck, User } from 'lucide-react';
+import { Separator } from "@/components/ui/separator";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { format } from 'date-fns';
+import { nl } from 'date-fns/locale';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 
-export interface TeamMemberListProps {
+interface TeamMemberListProps {
   teamMembers: TeamMember[];
-  addTeamMember: (name: string, hours: number) => Promise<void>;
-  removeTeamMember: (memberId: string) => Promise<void>;
-  updateTeamMemberHours: (memberId: string, hours: number) => Promise<void>;
-  deleteHourRegistration: (id: string) => Promise<void>;
-  updateTeamMemberName: (memberId: string, name: string) => Promise<void>;
+  addTeamMember: (name: string) => void;
+  removeTeamMember: (id: string) => void;
+  updateTeamMemberHours: (id: string, hours: number) => void;
+  deleteHourRegistration: (memberId: string, registrationId: string) => void;
+  updateTeamMemberName: (id: string, name: string) => boolean;
 }
 
 const TeamMemberList: React.FC<TeamMemberListProps> = ({
@@ -89,7 +64,7 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
         });
         return;
       }
-      addTeamMember(newMemberName, 0);
+      addTeamMember(newMemberName);
       setNewMemberName('');
     }
   };
@@ -322,7 +297,7 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
                                         <Button 
                                           variant="ghost" 
                                           size="icon" 
-                                          onClick={() => deleteHourRegistration(registration.id)} 
+                                          onClick={() => deleteHourRegistration(member.id, registration.id)} 
                                           className="h-7 w-7 text-gray-500 hover:text-red-500"
                                         >
                                           <Trash2 className="h-3 w-3" />

@@ -96,7 +96,7 @@ const Periods = () => {
   const tierPeriodLimit = Infinity;
   const unpaidPeriodesCount = getUnpaidPeriodsCount();
   const paidPeriodesCount = periods.filter(p => p.isPaid).length;
-  const averageTipPerHour = calculateAverageTipPerHour("");
+  const averageTipPerHour = calculateAverageTipPerHour();
   
   const handleStartNewPeriod = () => {
     if (currentPeriod) {
@@ -213,17 +213,7 @@ const Periods = () => {
   };
   
   const goToTeamPayouts = () => {
-    // Redirect naar team pagina met specifieke periode IDs geselecteerd voor uitbetaling
-    const unpaidPeriods = periods.filter(p => !p.isPaid).map(p => p.id);
-    const searchParams = new URLSearchParams();
-    searchParams.set('payoutSummary', 'true');
-    
-    if (unpaidPeriods.length > 0) {
-      searchParams.set('periodIds', unpaidPeriods.join(','));
-    }
-    
-    navigate(`/team?${searchParams.toString()}`);
-    
+    navigate('/team');
     toast({
       title: "Ga naar uitbetalen",
       description: "Selecteer perioden en teamleden om de fooi uit te betalen."

@@ -22,7 +22,6 @@ const TipDistributionSection: React.FC = () => {
       return;
     }
     
-    // Voer de uitbetaling uit - TeamContext zorgt ervoor dat historische data bewaard blijft
     handlePayout();
   };
 

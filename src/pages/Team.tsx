@@ -1,59 +1,174 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import TeamHeader from '@/components/team/TeamHeader';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { PayoutSummary } from '@/components/PayoutSummary';
 import TeamMemberList from '@/components/team/TeamMemberList';
-import { TeamProvider } from '@/contexts/TeamContext';
-import { useSearchParams } from 'react-router-dom';
-// Changed to default import since that's how it's exported from PayoutSummary.tsx
-import PayoutSummary from '@/components/payout/PayoutSummary';
+import PeriodSelector from '@/components/team/PeriodSelector';
+import { TeamProvider, useTeam } from '@/contexts/TeamContext';
+import TeamHeader from '@/components/team/TeamHeader';
+import ImportActions from '@/components/team/ImportActions';
+import TipDistributionSection from '@/components/team/TipDistributionSection';
+import LoadingIndicator from '@/components/team/LoadingIndicator';
+import { checkTeamMembersWithAccounts } from '@/services/teamDataService';
 
-const Team: React.FC = () => {
-  const { 
+const TeamContent: React.FC = () => {
+  const {
     teamMembers,
-    addTeamMember, 
-    removeTeamMember, 
+    addTeamMember,
+    removeTeamMember,
     updateTeamMemberHours,
-    updateTeamMemberName,
     deleteHourRegistration,
-    periods
+    refreshTeamData,
+    updateTeamMemberName,
+    periods,
+    teamId
   } = useApp();
   
-  const [searchParams] = useSearchParams();
-  const showPayoutSummary = searchParams.get('payoutSummary') === 'true';
-  const periodParam = searchParams.get('periodIds');
+  const { 
+    loading, 
+    dataInitialized, 
+    handleRefresh, 
+    selectedPeriods, 
+    togglePeriodSelection,
+    sortedTeamMembers
+  } = useTeam();
   
-  // Extract period IDs from URL parameter if available
-  const periodIds = periodParam ? periodParam.split(',') : undefined;
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [showPayoutSummary, setShowPayoutSummary] = React.useState(false);
 
-  const handleClose = () => {
-    // Navigate back to team view without summary
-    const url = new URL(window.location.href);
-    url.searchParams.delete('payoutSummary');
-    url.searchParams.delete('periodIds');
-    window.history.pushState({}, '', url.toString());
-    window.location.reload(); // Simple reload to update the view
-  };
+  // Load team data on initial mount
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadInitialData = async () => {
+      if (dataInitialized) {
+        console.log("Team.tsx: Data already initialized, skipping initial load");
+        return;
+      }
+      
+      if (!teamId) {
+        console.error("Team.tsx: No team ID found, cannot load data");
+        return;
+      }
+      
+      try {
+        console.log("Team.tsx: Initial data loading for team:", teamId);
+        await handleRefresh();
+        if (isMounted) {
+          console.log("Team.tsx: Initial data loaded successfully");
+        }
+      } catch (error) {
+        console.error("Error loading team data:", error);
+      }
+    };
+    
+    console.log("Team.tsx: Initializing component, loading data");
+    loadInitialData();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [dataInitialized, handleRefresh, teamId]);
+
+  // Check URL parameters for showing the payout summary
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const showSummary = urlParams.get('payoutSummary') === 'true';
+    console.log("Team.tsx: URL param 'payoutSummary':", showSummary);
+    setShowPayoutSummary(showSummary);
+    
+    if (!showSummary) {
+      // Clear period selection when not showing payout summary
+      console.log("Team.tsx: Clearing period selection");
+      togglePeriodSelection('');
+    }
+  }, [location.search, togglePeriodSelection]);
+
+  // Update team members with account status
+  useEffect(() => {
+    let isMounted = true;
+
+    const updateTeamMembersWithAccounts = async () => {
+      if (teamMembers.length === 0) {
+        console.log("Team.tsx: No team members to check for accounts");
+        return;
+      }
+      
+      try {
+        console.log("Team.tsx: Checking team members with accounts, count:", teamMembers.length);
+        if (isMounted) {
+          await checkTeamMembersWithAccounts(teamMembers);
+          console.log("Team.tsx: Team members with accounts checked successfully");
+        }
+      } catch (error) {
+        console.error("Error checking team members with accounts:", error);
+      }
+    };
+    
+    updateTeamMembersWithAccounts();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [teamMembers]);
+
+  // Show payout summary if payoutSummary URL param is present
+  if (showPayoutSummary) {
+    return (
+      <div className="pb-16">
+        <PayoutSummary onClose={() => {
+          console.log("Team.tsx: Closing payout summary");
+          setShowPayoutSummary(false);
+          navigate('/team');
+        }} />
+      </div>
+    );
+  }
+
+  // Show loading animation during first load process
+  if (loading && !dataInitialized) {
+    console.log("Team.tsx: Showing loading indicator");
+    return <LoadingIndicator />;
+  }
+
+  const unpaidClosedPeriods = periods.filter(period => !period.isPaid && !period.isActive).length > 0;
+  console.log("Team.tsx: Has unpaid closed periods:", unpaidClosedPeriods);
 
   return (
+    <div className="pb-16">
+      <TeamHeader />
+      
+      <TeamMemberList 
+        teamMembers={sortedTeamMembers}
+        addTeamMember={addTeamMember}
+        removeTeamMember={removeTeamMember}
+        updateTeamMemberHours={updateTeamMemberHours}
+        deleteHourRegistration={deleteHourRegistration}
+        updateTeamMemberName={updateTeamMemberName}
+      />
+      
+      <ImportActions />
+      
+      <PeriodSelector 
+        periods={periods}
+        selectedPeriods={selectedPeriods}
+        onTogglePeriodSelection={togglePeriodSelection}
+      />
+      
+      {periods.filter(period => !period.isPaid && !period.isActive).length > 0 && 
+        <TipDistributionSection />
+      }
+    </div>
+  );
+};
+
+const Team: React.FC = () => {
+  console.log("Team.tsx: Rendering Team component with TeamProvider");
+  return (
     <TeamProvider>
-      <div className="space-y-6">
-        {showPayoutSummary ? (
-          <PayoutSummary onClose={handleClose} periodIds={periodIds} />
-        ) : (
-          <>
-            <TeamHeader />
-            <TeamMemberList 
-              teamMembers={teamMembers}
-              addTeamMember={addTeamMember}
-              removeTeamMember={removeTeamMember}
-              updateTeamMemberHours={updateTeamMemberHours}
-              updateTeamMemberName={updateTeamMemberName}
-              deleteHourRegistration={deleteHourRegistration}
-            />
-          </>
-        )}
-      </div>
+      <TeamContent />
     </TeamProvider>
   );
 };

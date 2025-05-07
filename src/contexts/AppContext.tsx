@@ -10,7 +10,9 @@ import {
   TeamMember,
   TeamSettings,
   Payout,
-  TipEntry
+  TipEntry,
+  TeamMemberPermissions,
+  HourRegistration
 } from '@/types/models';
 import { 
   fetchPeriods, 
@@ -31,6 +33,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { nl } from 'date-fns/locale';
+
+// Export type definitions
+export type PeriodDuration = 'day' | 'week' | 'month';
 
 interface AppContextType {
   teamId: string | null;
@@ -53,7 +58,7 @@ interface AppContextType {
   updateTeamMemberName: (memberId: string, name: string) => Promise<void>;
   deleteTeamMember: (memberId: string) => Promise<void>;
   saveTeamMemberRole: (memberId: string, role: string) => Promise<void>;
-  saveTeamMemberPermissions: (memberId: string, permissions: any) => Promise<void>;
+  saveTeamMemberPermissions: (memberId: string, permissions: TeamMemberPermissions) => Promise<void>;
   saveTeamSettingsContext: (settings: TeamSettings) => Promise<void>;
   calculateTipDistribution: (periodIds: string[]) => TeamMember[];
   markPeriodsAsPaid: (periodIds: string[], distribution: any[]) => Promise<void>;
@@ -65,6 +70,29 @@ interface AppContextType {
   nextMonth: () => void;
   prevMonth: () => void;
   formatMonth: (date: Date) => string;
+  // Adding missing properties required by PeriodSummary.tsx
+  updatePeriod?: (period: Period) => Promise<void>;
+  endCurrentPeriod?: () => Promise<void>;
+  hasReachedPeriodLimit?: boolean;
+  autoClosePeriods?: boolean;
+  calculateAverageTipPerHour?: (periodId: string) => number;
+  // Adding missing properties required by PeriodSettings.tsx
+  periodDuration?: PeriodDuration;
+  setPeriodDuration?: (duration: PeriodDuration) => void;
+  setAutoClosePeriods?: (auto: boolean) => void;
+  calculateAutoCloseDate?: (startDate: string, duration: PeriodDuration) => string;
+  scheduleAutoClose?: (date: string) => void;
+  getNextAutoCloseDate?: () => string | null;
+  alignWithCalendar?: boolean;
+  setAlignWithCalendar?: (align: boolean) => void;
+  closingTime?: { hour: number, minute: number };
+  setClosingTime?: (time: { hour: number, minute: number }) => void;
+  getFormattedClosingTime?: () => string;
+  // Adding missing properties required by PayoutSummary.tsx
+  mostRecentPayout?: Payout | null;
+  updateTeamMemberBalance?: (memberId: string, balance: number) => Promise<void>;
+  clearTeamMemberHours?: (memberId: string) => Promise<void>;
+  setMostRecentPayout?: (payout: Payout | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -190,18 +218,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           fetchPayouts(fetchedTeamId),
         ]);
 
-        // Update state with fetched data
-        setPeriods(periodsData || []);
+        // Update state with fetched data, ensuring proper mapping
+        setPeriods(periodsData?.map(mapDbPeriodToAppPeriod) || []);
         setTeamMembers(membersData || []);
         setTeamSettings(settingsData || null);
         setPayouts(payoutsData || []);
         
         // Determine current and active periods
         const now = new Date();
-        const active = periodsData?.find(
+        const mappedPeriods = periodsData?.map(mapDbPeriodToAppPeriod) || [];
+        const active = mappedPeriods.find(
           (period) => new Date(period.startDate) <= now && new Date(period.endDate) >= now
         ) || null;
-        const current = active || periodsData?.[0] || null;
+        const current = active || mappedPeriods[0] || null;
         
         setActivePeriod(active);
         setCurrentPeriod(current);
@@ -243,6 +272,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshTeamData();
   }, [refreshTeamData]);
 
+  const mapDbPeriodToAppPeriod = (dbPeriod: any): Period => {
+    return {
+      id: dbPeriod.id,
+      teamId: dbPeriod.team_id,
+      startDate: dbPeriod.start_date,
+      endDate: dbPeriod.end_date,
+      isActive: dbPeriod.is_active,
+      isPaid: dbPeriod.is_paid,
+      name: dbPeriod.name,
+      autoCloseDate: dbPeriod.auto_close_date,
+      averageTipPerHour: dbPeriod.average_tip_per_hour,
+      notes: dbPeriod.notes,
+      tips: dbPeriod.tips || [],
+      createdAt: dbPeriod.created_at
+    };
+  };
+
+  const mapAppPeriodToDbPeriod = (appPeriod: Period): any => {
+    return {
+      id: appPeriod.id,
+      team_id: appPeriod.teamId,
+      start_date: appPeriod.startDate,
+      end_date: appPeriod.endDate,
+      is_active: appPeriod.isActive,
+      is_paid: appPeriod.isPaid,
+      name: appPeriod.name,
+      auto_close_date: appPeriod.autoCloseDate,
+      average_tip_per_hour: appPeriod.averageTipPerHour,
+      notes: appPeriod.notes,
+      tips: appPeriod.tips,
+      created_at: appPeriod.createdAt
+    };
+  };
+
   const startNewPeriod = async () => {
     if (!teamId) {
       console.error('Cannot start a new period without a team ID');
@@ -267,24 +330,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       // Save the new period to the database
-      const savedPeriod = await savePeriod(newPeriod as Period);
+      const savedPeriod = await savePeriod(mapAppPeriodToDbPeriod(newPeriod as Period));
 
       if (savedPeriod) {
         // Map database response to application model
-        const mappedPeriod: Period = {
-          id: savedPeriod.id,
-          teamId: savedPeriod.team_id,
-          startDate: savedPeriod.start_date,
-          endDate: savedPeriod.end_date,
-          isActive: savedPeriod.is_active,
-          isPaid: savedPeriod.is_paid,
-          name: savedPeriod.name,
-          autoCloseDate: savedPeriod.auto_close_date,
-          averageTipPerHour: savedPeriod.average_tip_per_hour,
-          notes: savedPeriod.notes,
-          tips: [],
-          createdAt: savedPeriod.created_at
-        };
+        const mappedPeriod = mapDbPeriodToAppPeriod(savedPeriod);
 
         // Update the local state with the new period
         setPeriods(prevPeriods => [mappedPeriod, ...prevPeriods]);
@@ -383,18 +433,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Update the period with the new tip
       const updatedPeriod = {
         ...currentPeriod,
-        tips: [...(currentPeriod.tips || []), tipEntry],
+        tips: [...(currentPeriod.tips || []), tipEntry as TipEntry],
       };
 
-      // Save the updated period to the database
-      const savedPeriod = await savePeriod(updatedPeriod);
+      // Save the updated period to the database, mapping to DB format first
+      const dbPeriod = mapAppPeriodToDbPeriod(updatedPeriod);
+      const savedPeriod = await savePeriod(dbPeriod);
 
       if (savedPeriod) {
+        // Map back to app model and update state
+        const mappedPeriod = mapDbPeriodToAppPeriod(savedPeriod);
+        
         // Update the local state with the saved period
         setPeriods(prevPeriods =>
-          prevPeriods.map(period => (period.id === currentPeriod.id ? savedPeriod : period))
+          prevPeriods.map(period => (period.id === currentPeriod.id ? mappedPeriod : period))
         );
-        setCurrentPeriod(savedPeriod);
+        setCurrentPeriod(mappedPeriod);
 
         toast({
           title: "Fooi toegevoegd",
@@ -575,7 +629,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     try {
       const newTeamMember = {
-        team_id: teamId,
+        team_id: teamId,  // Using snake_case for database field
         name: name,
         hours: hours,
         role: 'member',
@@ -790,7 +844,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
   
-  const saveTeamMemberPermissions = async (memberId: string, permissions: any) => {
+  const saveTeamMemberPermissions = async (memberId: string, permissions: TeamMemberPermissions) => {
     setLoading(true);
     setError(null);
     
@@ -1021,6 +1075,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updatePeriod = async (period: Period) => {
+    console.log("Placeholder: updatePeriod not implemented", period);
+  };
+  
+  const endCurrentPeriod = async () => {
+    console.log("Placeholder: endCurrentPeriod not implemented");
+  };
+  
+  const calculateAverageTipPerHour = (periodId: string) => {
+    console.log("Placeholder: calculateAverageTipPerHour not implemented", periodId);
+    return 0;
+  };
+
+  const setPeriodDuration = (duration: PeriodDuration) => {
+    console.log("Placeholder: setPeriodDuration not implemented", duration);
+  };
+
+  const setAutoClosePeriods = (auto: boolean) => {
+    console.log("Placeholder: setAutoClosePeriods not implemented", auto);
+  };
+
+  const calculateAutoCloseDate = (startDate: string, duration: PeriodDuration) => {
+    console.log("Placeholder: calculateAutoCloseDate not implemented", startDate, duration);
+    return new Date().toISOString();
+  };
+
+  const scheduleAutoClose = (date: string) => {
+    console.log("Placeholder: scheduleAutoClose not implemented", date);
+  };
+
+  const getNextAutoCloseDate = () => {
+    console.log("Placeholder: getNextAutoCloseDate not implemented");
+    return null;
+  };
+
+  const setAlignWithCalendar = (align: boolean) => {
+    console.log("Placeholder: setAlignWithCalendar not implemented", align);
+  };
+
+  const setClosingTime = (time: { hour: number, minute: number }) => {
+    console.log("Placeholder: setClosingTime not implemented", time);
+  };
+
+  const getFormattedClosingTime = () => {
+    console.log("Placeholder: getFormattedClosingTime not implemented");
+    return "00:00";
+  };
+
+  const updateTeamMemberBalance = async (memberId: string, balance: number) => {
+    console.log("Placeholder: updateTeamMemberBalance not implemented", memberId, balance);
+  };
+
+  const clearTeamMemberHours = async (memberId: string) => {
+    console.log("Placeholder: clearTeamMemberHours not implemented", memberId);
+  };
+
+  const setMostRecentPayout = (payout: Payout | null) => {
+    console.log("Placeholder: setMostRecentPayout not implemented", payout);
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1055,7 +1169,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSelectedMonth,
         nextMonth,
         prevMonth,
-        formatMonth
+        formatMonth,
+        // Add the missing properties
+        updatePeriod,
+        endCurrentPeriod,
+        hasReachedPeriodLimit: false, // Default placeholder value
+        autoClosePeriods: true, // Default placeholder value
+        calculateAverageTipPerHour,
+        periodDuration: 'week', // Default placeholder value
+        setPeriodDuration,
+        setAutoClosePeriods,
+        calculateAutoCloseDate,
+        scheduleAutoClose,
+        getNextAutoCloseDate,
+        alignWithCalendar: false, // Default placeholder value
+        setAlignWithCalendar,
+        closingTime: { hour: 0, minute: 0 }, // Default placeholder value
+        setClosingTime,
+        getFormattedClosingTime,
+        mostRecentPayout: null, // Default placeholder value
+        updateTeamMemberBalance,
+        clearTeamMemberHours,
+        setMostRecentPayout
       }}
     >
       {children}

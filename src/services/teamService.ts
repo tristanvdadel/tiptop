@@ -108,3 +108,9 @@ export const getTeamMembersSafe = async (teamId: string) => {
     return [];
   }
 };
+
+// Export the fetchTeamData function as a placeholder if needed by components
+export const fetchTeamData = async (teamId: string) => {
+  console.log('Placeholder: fetchTeamData not fully implemented yet', teamId);
+  return {};
+};

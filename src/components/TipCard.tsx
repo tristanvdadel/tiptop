@@ -5,7 +5,8 @@ import { nl } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2 } from 'lucide-react';
-import { TipEntry, useApp } from '@/contexts/AppContext';
+import { useApp } from '@/contexts/AppContext';
+import { TipEntry } from '@/types/models';
 import {
   AlertDialog,
   AlertDialogAction,

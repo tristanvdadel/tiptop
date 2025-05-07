@@ -1,100 +1,86 @@
-
-import { supabase } from "@/integrations/supabase/client";
+import { calculateDistributionTotals } from './teamDataService';
 import { TeamMember } from '@/contexts/AppContext';
 
-/**
- * Service to manage team data with optimized data fetching
- */
-
-// Check which team members have accounts by fetching user profiles efficiently
-export const checkTeamMembersWithAccounts = async (teamMembers: TeamMember[]): Promise<TeamMember[]> => {
-  try {
-    if (teamMembers.length === 0) return [];
-    
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return teamMembers;
-    
-    // Use a single query to get all profiles
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id');
-    
-    if (!profiles) return teamMembers;
-    
-    const userIds = new Set(profiles.map(profile => profile.id));
-    
-    // Local processing without extra queries
-    const updatedTeamMembers = teamMembers.map(member => ({
-      ...member,
-      hasAccount: userIds.has(member.id)
-    }));
-    
-    // Sort alphabetically
-    return [...updatedTeamMembers].sort((a, b) => 
-      a.name.toLowerCase().localeCompare(b.name.toLowerCase())
-    );
-  } catch (error) {
-    console.error("Error checking team members with accounts:", error);
-    return teamMembers;
-  }
-};
-
-// Process imported hours data
-export const processImportedHours = (
-  hourData: { name: string; hours: number; date: string },
-  teamMembers: TeamMember[],
-  addTeamMember: (name: string) => void,
-  updateTeamMemberHours: (memberId: string, hours: number) => void
-) => {
-  // First try to find an existing team member with the same name
-  let teamMember = teamMembers.find(
-    member => member.name.toLowerCase() === hourData.name.toLowerCase()
-  );
-  
-  // If no team member found, create a new one
-  if (!teamMember) {
-    addTeamMember(hourData.name);
-    
-    // Find the newly added member by name
-    teamMember = teamMembers.find(member => 
-      member.name.toLowerCase() === hourData.name.toLowerCase()
-    );
-  }
-  
-  // If we have a valid team member (existing or new), update their hours
-  if (teamMember) {
-    updateTeamMemberHours(teamMember.id, hourData.hours);
-    return true;
-  }
-  
-  return false;
-};
-
-// Calculate tip distribution totals
 export const calculateTipDistributionTotals = (
-  selectedPeriods: string[], 
-  periods: any[], 
+  selectedPeriods: string[],
+  periods: any[],
   teamMembers: TeamMember[]
 ) => {
-  if (selectedPeriods.length === 0) {
-    return {
-      totalTips: 0,
-      totalHours: 0
-    };
-  }
-  
-  const totalTips = selectedPeriods.reduce((sum, periodId) => {
-    const period = periods.find(p => p.id === periodId);
-    if (period) {
-      return sum + period.tips.reduce((s, tip) => s + tip.amount, 0);
+  let totalTips = 0;
+  let totalHours = 0;
+
+  for (const periodId of selectedPeriods) {
+    const period = periods.find((p: any) => p.id === periodId);
+    if (period && period.tips) {
+      totalTips += period.tips.reduce((sum: number, tip: any) => sum + tip.amount, 0);
     }
-    return sum;
-  }, 0);
+
+    for (const member of teamMembers) {
+      totalHours += member.hours;
+    }
+  }
+
+  return { totalTips, totalHours };
+};
+
+export const checkTeamMembersWithAccounts = async (teamMembers: TeamMember[]) => {
+  console.log('Checking team members with accounts, count:', teamMembers.length);
   
-  const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+  for (const member of teamMembers) {
+    console.log(`Checking account status for team member: ${member.name} (ID: ${member.id})`);
+  }
+};
+
+export const calculateDistribution = (periodIds: string[], periods: any[], teamMembers: TeamMember[]) => {
+  let totalTips = 0;
+  let totalHours = 0;
+
+  // Calculate total tips and hours for selected periods
+  for (const periodId of periodIds) {
+    const period = periods.find((p: any) => p.id === periodId);
+    if (period && period.tips) {
+      totalTips += period.tips.reduce((sum: number, tip: any) => sum + tip.amount, 0);
+    }
+  }
+
+  for (const member of teamMembers) {
+    totalHours += member.hours;
+  }
+
+  // Calculate tip amount per team member
+  const distribution = teamMembers.map(member => {
+    const tipAmount = (member.hours / totalHours) * totalTips;
+    return {
+      ...member,
+      tipAmount: parseFloat(tipAmount.toFixed(2)),
+    };
+  });
+
+  return distribution;
+};
+
+// Process imported hours and update team members
+export const processImportedHours = (
+  hourData: { name: string; hours: number; date: string; exists: boolean },
+  teamMembers: any[],
+  addTeamMember: (name: string, hours: number) => Promise<void>,
+  updateTeamMemberHours: (memberId: string, hours: number) => Promise<void>
+) => {
+  const { name, hours, exists } = hourData;
   
-  return {
-    totalTips,
-    totalHours
-  };
+  // If the team member exists, update their hours
+  if (exists) {
+    const existingMember = teamMembers.find(
+      member => member.name.toLowerCase() === name.toLowerCase()
+    );
+    
+    if (existingMember) {
+      console.log(`Updating hours for existing team member: ${name}, hours: ${hours}`);
+      updateTeamMemberHours(existingMember.id, existingMember.hours + hours);
+    }
+  } else {
+    // If the team member doesn't exist, add them
+    console.log(`Adding new team member: ${name} with hours: ${hours}`);
+    addTeamMember(name, hours);
+  }
 };

@@ -19,31 +19,58 @@ export const extractHoursFromExcel = async (file: File): Promise<ExtractedHourDa
     const firstSheet = wb.Sheets[wb.SheetNames[0]];
     const data = XLSX.utils.sheet_to_json<any>(firstSheet);
 
-    // Probeer naam en uren kolommen te detecteren
+    if (data.length === 0) {
+      throw new Error("Geen gegevens gevonden in het bestand");
+    }
+
+    // Specifiek zoeken naar kolommen voor namen en gewerkte uren
     const headers = Object.keys(data[0] || {});
+    
+    // Verbeterde detectie voor naamkolom
     const nameColumnCandidates = headers.filter(header => 
-      /naam|name|persoon|medewerker|employee|werknemer/i.test(header)
+      /naam|name|persoon|medewerker|employee|werknemer|teamlid/i.test(header)
     );
+    
+    // Verbeterde detectie voor urenkolom
     const hoursColumnCandidates = headers.filter(header => 
-      /uren|uur|hours|hour/i.test(header)
+      /uren|uur|hours|hour|gewerkte|worked/i.test(header)
     );
     
     let nameColumn = nameColumnCandidates[0];
     let hoursColumn = hoursColumnCandidates[0];
 
-    // Als geen kolommen zijn gevonden, probeer de eerste twee kolommen
+    // Als de automatische detectie faalt, probeer kolommen te vinden die de woorden bevatten
+    if (!nameColumn) {
+      nameColumn = headers.find(h => h.toLowerCase().includes('naam') || 
+                                      h.toLowerCase().includes('name') || 
+                                      h.toLowerCase().includes('medewerker')) || '';
+    }
+    
+    if (!hoursColumn) {
+      hoursColumn = headers.find(h => h.toLowerCase().includes('uur') || 
+                                       h.toLowerCase().includes('uren') || 
+                                       h.toLowerCase().includes('gewerkt') || 
+                                       h.toLowerCase().includes('hour')) || '';
+    }
+
+    // Als nog steeds geen kolommen zijn gevonden, probeer de eerste twee kolommen
     if (!nameColumn && headers.length > 0) nameColumn = headers[0];
     if (!hoursColumn && headers.length > 1) hoursColumn = headers[1];
 
     // Als nog steeds geen kolommen zijn gevonden, return lege array
-    if (!nameColumn || !hoursColumn) return [];
+    if (!nameColumn || !hoursColumn) {
+      console.error("Geen geschikte kolommen gevonden voor naam en uren");
+      return [];
+    }
+
+    console.log(`Gedetecteerde kolommen: Naam=${nameColumn}, Uren=${hoursColumn}`);
 
     // Huidige datum als string in ISO formaat
     const currentDate = new Date().toISOString().split('T')[0];
     
-    // Extraheer de data
+    // Extraheer de data en filter lege rijen
     return data
-      .filter(row => row[nameColumn] && row[hoursColumn])
+      .filter(row => row[nameColumn] && row[hoursColumn] !== undefined)
       .map(row => {
         const name = String(row[nameColumn]).trim();
         // Converteer uren naar een nummer, vervang komma door punt indien nodig

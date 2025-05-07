@@ -28,6 +28,7 @@ const PayoutHistory = () => {
   const { toast } = useToast();
   const [selectedPayout, setSelectedPayout] = useState(null);
   const [downloadOptionsOpen, setDownloadOptionsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   
@@ -50,16 +51,27 @@ const PayoutHistory = () => {
 
   const handleRowClick = (payout) => {
     setSelectedPayout(payout);
+    setDetailsOpen(true);
+  };
+  
+  const openDownloadOptions = (payout) => {
+    setSelectedPayout(payout);
     setDownloadOptionsOpen(true);
   };
 
   const downloadCSV = () => {
     if (!selectedPayout) return;
     
-    const headers = "Naam,Berekend bedrag,Daadwerkelijk uitbetaald,Saldo,Uitgevoerd door,Datum\n";
+    const headers = "Naam,Berekend bedrag,Uren,Saldo,Daadwerkelijk uitbetaald,Nieuw saldo,Uitgevoerd door,Datum\n";
     const rows = selectedPayout.distribution.map(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
-      return `${member?.name || 'Onbekend lid'},${item.amount.toFixed(2)},${(item.actualAmount || item.amount).toFixed(2)},${(item.balance || 0).toFixed(2)},${selectedPayout.payerName || 'Onbekend'},${formatDate(selectedPayout.payoutTime || selectedPayout.date)}`;
+      const calculatedAmount = item.amount.toFixed(2);
+      const actualAmount = (item.actualAmount || item.amount).toFixed(2);
+      const hours = (item.hours || 0).toFixed(1);
+      const balance = (item.balance || 0).toFixed(2);
+      const newBalance = (parseFloat(balance) + (parseFloat(calculatedAmount) - parseFloat(actualAmount))).toFixed(2);
+      
+      return `${member?.name || 'Onbekend lid'},${calculatedAmount},${hours},${balance},${actualAmount},${newBalance},${selectedPayout.payerName || 'Onbekend'},${formatDate(selectedPayout.payoutTime || selectedPayout.date)}`;
     }).join('\n');
     
     const csv = headers + rows;
@@ -90,19 +102,20 @@ const PayoutHistory = () => {
     
     const headers = `TipTop Uitbetaling Overzicht\n\n`;
     const subHeaders = `Datum: ${formatDate(payoutDateTime)}\nUitgevoerd door: ${payer}\n\n`;
-    const tableHeaders = "Naam,Berekend bedrag,Balans,Uitbetaald bedrag,Nieuw saldo\n";
+    const tableHeaders = "Naam,Berekend bedrag,Uren,Balans,Uitbetaald bedrag,Nieuw saldo\n";
     
     const rows = selectedPayout.distribution.map(item => {
       const member = teamMembers.find(m => m.id === item.memberId);
       const originalAmount = item.amount;
       const originalBalance = item.balance || 0;
+      const hours = item.hours || 0;
       const actualAmount = item.actualAmount || item.amount;
       const newBalance = originalBalance + (originalAmount - actualAmount);
       
-      return `${member?.name || 'Onbekend lid'},${originalAmount.toFixed(2)},${originalBalance.toFixed(2)},${actualAmount.toFixed(2)},${newBalance.toFixed(2)}`;
+      return `${member?.name || 'Onbekend lid'},${originalAmount.toFixed(2)},${hours.toFixed(1)},${originalBalance.toFixed(2)},${actualAmount.toFixed(2)},${newBalance.toFixed(2)}`;
     }).join('\n');
     
-    const totalRow = `\nTotaal,,${selectedPayout.distribution.reduce((sum, item) => sum + (item.actualAmount || item.amount), 0).toFixed(2)}`;
+    const totalRow = `\nTotaal,${selectedPayout.distribution.reduce((sum, item) => sum + item.amount, 0).toFixed(2)},${selectedPayout.distribution.reduce((sum, item) => sum + (item.hours || 0), 0).toFixed(1)},,${selectedPayout.distribution.reduce((sum, item) => sum + (item.actualAmount || item.amount), 0).toFixed(2)},`;
     
     const excel = headers + subHeaders + tableHeaders + rows + totalRow;
     const blob = new Blob([excel], { type: 'application/vnd.ms-excel' });
@@ -147,29 +160,37 @@ const PayoutHistory = () => {
       doc.setFontSize(11);
       doc.setTextColor(100, 100, 100);
       doc.text("Naam", 20, 80);
-      doc.text("Berekend bedrag", 75, 80);
+      doc.text("Berekend", 70, 80);
+      doc.text("Uren", 95, 80);
       doc.text("Balans", 115, 80);
-      doc.text("Uitbetaald", 155, 80);
+      doc.text("Uitbetaald", 140, 80);
+      doc.text("Nieuw saldo", 175, 80);
       
       doc.setDrawColor(200, 200, 200);
       doc.line(20, 83, 190, 83);
       
       let y = 90;
       let total = 0;
+      let totalHours = 0;
       
       selectedPayout.distribution.forEach((item, index) => {
         const member = teamMembers.find(m => m.id === item.memberId);
         const name = member?.name || 'Onbekend lid';
         const amount = item.amount;
         const balance = item.balance || 0;
+        const hours = item.hours || 0;
         const actualAmount = item.actualAmount || item.amount;
+        const newBalance = balance + (amount - actualAmount);
         
         doc.text(name, 20, y);
-        doc.text(`€ ${amount.toFixed(2)}`, 75, y);
+        doc.text(`€ ${amount.toFixed(2)}`, 70, y);
+        doc.text(`${hours.toFixed(1)}`, 95, y);
         doc.text(`€ ${balance.toFixed(2)}`, 115, y);
-        doc.text(`€ ${actualAmount.toFixed(2)}`, 155, y);
+        doc.text(`€ ${actualAmount.toFixed(2)}`, 140, y);
+        doc.text(`€ ${newBalance.toFixed(2)}`, 175, y);
         
         total += actualAmount;
+        totalHours += hours;
         y += 10;
         
         if (y > 270 && index < selectedPayout.distribution.length - 1) {
@@ -181,8 +202,9 @@ const PayoutHistory = () => {
       doc.line(20, y, 190, y);
       y += 10;
       doc.setFont(undefined, 'bold');
-      doc.text("Totaal", 115, y);
-      doc.text(`€ ${total.toFixed(2)}`, 155, y);
+      doc.text("Totaal", 95, y);
+      doc.text(`${totalHours.toFixed(1)}`, 95, y);
+      doc.text(`€ ${total.toFixed(2)}`, 140, y);
       
       doc.setFontSize(9);
       doc.setTextColor(100, 100, 100);
@@ -240,6 +262,20 @@ const PayoutHistory = () => {
       ? <ArrowUp className="h-4 w-4 ml-1" /> 
       : <ArrowDown className="h-4 w-4 ml-1" />;
   };
+  
+  // Calculate if there are any adjustments (differences between calculated and actual amounts)
+  const hasAdjustments = (payout) => {
+    return payout.distribution.some(item => 
+      item.actualAmount !== undefined && item.actualAmount !== item.amount
+    );
+  };
+  
+  // Calculate if there are any outstanding balances
+  const hasBalances = (payout) => {
+    return payout.distribution.some(item => 
+      (item.balance || 0) !== 0
+    );
+  };
 
   return (
     <>
@@ -287,6 +323,7 @@ const PayoutHistory = () => {
                                     {renderSortIcon('calculatedAmount')}
                                   </div>
                                 </TableHead>
+                                <TableHead className="text-right min-w-[80px]">Uren</TableHead>
                                 <TableHead 
                                   className="text-right cursor-pointer hover:text-primary transition-colors min-w-[150px]"
                                   onClick={() => handleSortClick('actualAmount')}
@@ -296,6 +333,7 @@ const PayoutHistory = () => {
                                     {renderSortIcon('actualAmount')}
                                   </div>
                                 </TableHead>
+                                <TableHead className="text-center min-w-[100px]">Aanpassingen</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -309,6 +347,14 @@ const PayoutHistory = () => {
                                   (sum, dist) => sum + (dist.actualAmount || dist.amount), 
                                   0
                                 );
+                                
+                                const totalHours = payout.distribution.reduce(
+                                  (sum, dist) => sum + (dist.hours || 0),
+                                  0
+                                );
+                                
+                                const hasAdjustment = hasAdjustments(payout);
+                                const hasBalance = hasBalances(payout);
                                 
                                 return (
                                   <TableRow 
@@ -340,8 +386,25 @@ const PayoutHistory = () => {
                                     <TableCell className="text-right">
                                       €{calculatedAmount.toFixed(2)}
                                     </TableCell>
+                                    <TableCell className="text-right">
+                                      {totalHours.toFixed(1)}
+                                    </TableCell>
                                     <TableCell className="text-right font-medium">
                                       €{actualAmount.toFixed(2)}
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      <div className="flex justify-center gap-1">
+                                        {hasAdjustment && (
+                                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                                            Afronding
+                                          </Badge>
+                                        )}
+                                        {hasBalance && (
+                                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                            Saldo
+                                          </Badge>
+                                        )}
+                                      </div>
                                     </TableCell>
                                   </TableRow>
                                 );
@@ -367,6 +430,100 @@ const PayoutHistory = () => {
           <CarouselNext className="right-1" />
         </div>
       </Carousel>
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Uitbetaling Details
+            </DialogTitle>
+            <DialogDescription>
+              {selectedPayout && formatDate(selectedPayout.date)}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            {selectedPayout && (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground">Datum</p>
+                    <p className="font-medium">{formatDate(selectedPayout.date)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground">Uitgevoerd door</p>
+                    <p className="font-medium">{selectedPayout.payerName || 'Onbekend'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground">Totaal berekend</p>
+                    <p className="font-medium">€{selectedPayout.distribution.reduce((sum, dist) => sum + dist.amount, 0).toFixed(2)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground">Totaal uitbetaald</p>
+                    <p className="font-medium">€{selectedPayout.distribution.reduce((sum, dist) => sum + (dist.actualAmount || dist.amount), 0).toFixed(2)}</p>
+                  </div>
+                </div>
+                
+                <div className="rounded-md border mb-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Naam</TableHead>
+                        <TableHead className="text-right">Uren</TableHead>
+                        <TableHead className="text-right">Berekend</TableHead>
+                        <TableHead className="text-right">Balans</TableHead>
+                        <TableHead className="text-right">Uitbetaald</TableHead>
+                        <TableHead className="text-right">Nieuw saldo</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedPayout.distribution.map((item, idx) => {
+                        const member = teamMembers.find(m => m.id === item.memberId);
+                        const originalAmount = item.amount;
+                        const originalBalance = item.balance || 0;
+                        const hours = item.hours || 0;
+                        const actualAmount = item.actualAmount || item.amount;
+                        const newBalance = originalBalance + (originalAmount - actualAmount);
+                        const hasAdjustment = originalAmount !== actualAmount;
+                        
+                        return (
+                          <TableRow key={idx}>
+                            <TableCell>{member?.name || 'Onbekend lid'}</TableCell>
+                            <TableCell className="text-right">{hours.toFixed(1)}</TableCell>
+                            <TableCell className="text-right">€{originalAmount.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">€{originalBalance.toFixed(2)}</TableCell>
+                            <TableCell className={`text-right ${hasAdjustment ? 'font-medium text-yellow-700' : ''}`}>
+                              €{actualAmount.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              €{newBalance.toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+                
+                <div className="flex justify-end gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setDetailsOpen(false);
+                      openDownloadOptions(selectedPayout);
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Download rapport
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={downloadOptionsOpen} onOpenChange={setDownloadOptionsOpen}>
         <DialogContent className="sm:max-w-md">

@@ -1,5 +1,5 @@
 
-import { TeamMember } from '@/contexts/AppContext';
+import { TeamMember } from '@/types/models';
 
 export const calculateTipDistributionTotals = (
   selectedPeriods: string[],
@@ -53,6 +53,7 @@ export const calculateDistribution = (periodIds: string[], periods: any[], teamM
     return {
       ...member,
       tipAmount: parseFloat(tipAmount.toFixed(2)),
+      hours: member.hours // Include hours in the distribution
     };
   });
 

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TeamMember } from '@/contexts/AppContext';
+import { TeamMember } from '@/types/models';
 import { formatCurrency } from '@/lib/utils';
 
 interface PayoutDetailItem {
@@ -10,6 +10,7 @@ interface PayoutDetailItem {
   amount: number;
   actualAmount?: number;
   balance?: number;
+  hours?: number;
 }
 
 export interface PayoutData {
@@ -43,14 +44,16 @@ const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDe
       const member = {
         id: item.memberId,
         name: '', // This will be filled by TeamMember lookup in the parent component
-        hours: 0,
+        hours: item.hours || 0,
         tipAmount: item.amount,
-        balance: item.balance || 0
-      } as TeamMember;
+        balance: item.balance || 0,
+        actualAmount: item.actualAmount
+      } as TeamMember & { actualAmount?: number };
       return member;
     }) || []);
 
   const showBalance = displayDistribution.some(member => member.balance !== 0);
+  const showActualAmount = displayDistribution.some(member => member.actualAmount !== undefined && member.actualAmount !== member.tipAmount);
 
   return (
     <Card className="mb-4">
@@ -78,36 +81,47 @@ const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDe
           <TableHeader>
             <TableRow>
               <TableHead>Naam</TableHead>
-              {totalHours !== undefined && (
-                <TableHead className="text-right">Uren</TableHead>
-              )}
+              <TableHead className="text-right">Uren</TableHead>
               <TableHead className="text-right">Fooi</TableHead>
               {showBalance && (
                 <TableHead className="text-right">Balans</TableHead>
               )}
-              {showBalance && (
-                <TableHead className="text-right">Totaal</TableHead>
+              {showActualAmount && (
+                <TableHead className="text-right">Uitbetaald</TableHead>
+              )}
+              {(showBalance || showActualAmount) && (
+                <TableHead className="text-right">Nieuw saldo</TableHead>
               )}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {displayDistribution.map((member) => (
-              <TableRow key={member.id}>
-                <TableCell>{member.name}</TableCell>
-                {totalHours !== undefined && (
+            {displayDistribution.map((member) => {
+              const tipAmount = member.tipAmount || 0;
+              const balance = member.balance || 0;
+              const actualAmount = member.actualAmount !== undefined ? member.actualAmount : tipAmount;
+              const newBalance = balance + (tipAmount - actualAmount);
+              
+              return (
+                <TableRow key={member.id}>
+                  <TableCell>{member.name}</TableCell>
                   <TableCell className="text-right">{member.hours.toFixed(1)}</TableCell>
-                )}
-                <TableCell className="text-right">{formatCurrency(member.tipAmount || 0)}</TableCell>
-                {showBalance && (
-                  <TableCell className="text-right">{formatCurrency(member.balance || 0)}</TableCell>
-                )}
-                {showBalance && (
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency((member.tipAmount || 0) + (member.balance || 0))}
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
+                  <TableCell className="text-right">{formatCurrency(tipAmount)}</TableCell>
+                  {showBalance && (
+                    <TableCell className="text-right">{formatCurrency(balance)}</TableCell>
+                  )}
+                  {showActualAmount && (
+                    <TableCell className={`text-right ${tipAmount !== actualAmount ? 'font-medium text-yellow-700' : ''}`}>
+                      {formatCurrency(actualAmount)}
+                    </TableCell>
+                  )}
+                  {(showBalance || showActualAmount) && (
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(newBalance)}
+                    </TableCell>
+                  )}
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </CardContent>

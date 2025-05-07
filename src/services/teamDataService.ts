@@ -60,7 +60,7 @@ export const calculateDistribution = (periodIds: string[], periods: any[], teamM
 };
 
 // Process imported hours and update team members
-export const processImportedHours = (
+export const processImportedHours = async (
   hourData: { name: string; hours: number; date: string; exists: boolean },
   teamMembers: TeamMember[],
   addTeamMember: (name: string, hours: number) => Promise<void>,
@@ -70,25 +70,34 @@ export const processImportedHours = (
   
   console.log(`Processing import for: ${name}, hours: ${hours}, exists: ${exists}`);
   
-  // First check if this member already exists by comparing names (case insensitive)
-  const existingMember = teamMembers.find(
-    member => member.name.toLowerCase() === name.toLowerCase()
-  );
-  
-  if (existingMember) {
-    // If the team member exists, update their hours
-    const currentHours = existingMember.hours || 0;
-    console.log(`Updating hours for existing team member: ${name} (${existingMember.id}), current hours: ${currentHours}, adding: ${hours}`);
+  try {
+    // First check if this member already exists by comparing names (case insensitive)
+    const existingMember = teamMembers.find(
+      member => member.name.toLowerCase() === name.toLowerCase()
+    );
     
-    // Add the imported hours to the existing hours
-    const newTotalHours = currentHours + hours;
-    console.log(`New total hours will be: ${newTotalHours}`);
+    if (existingMember) {
+      // If the team member exists, update their hours
+      const currentHours = existingMember.hours || 0;
+      console.log(`Updating hours for existing team member: ${name} (${existingMember.id}), current hours: ${currentHours}, adding: ${hours}`);
+      
+      // Add the imported hours to the existing hours
+      const newTotalHours = currentHours + hours;
+      console.log(`New total hours will be: ${newTotalHours}`);
+      
+      // Wait for the update to complete
+      await updateTeamMemberHours(existingMember.id, newTotalHours);
+      console.log(`Hours updated successfully for ${name}: new total = ${newTotalHours}`);
+    } else {
+      // If the team member doesn't exist, add them
+      console.log(`Adding new team member: ${name} with hours: ${hours}`);
+      await addTeamMember(name, hours);
+      console.log(`Team member ${name} added successfully with ${hours} hours`);
+    }
     
-    // Update hours in the database
-    updateTeamMemberHours(existingMember.id, newTotalHours);
-  } else {
-    // If the team member doesn't exist, add them
-    console.log(`Adding new team member: ${name} with hours: ${hours}`);
-    addTeamMember(name, hours);
+    return true;
+  } catch (error) {
+    console.error(`Error processing hours for ${name}:`, error);
+    throw error;
   }
 };

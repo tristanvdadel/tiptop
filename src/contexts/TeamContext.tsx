@@ -175,14 +175,17 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const handleConfirmImportedHours = (confirmedHours: ImportedHour[]) => {
+  const handleConfirmImportedHours = async (confirmedHours: ImportedHour[]) => {
     console.log(`Confirming import of ${confirmedHours.length} hour entries`);
+    setLoading(true);
     
     try {
+      // Process each hour entry one by one to ensure proper handling
       for (const hourData of confirmedHours) {
         console.log(`Processing hours for ${hourData.name}: ${hourData.hours} hours on ${hourData.date}`);
         
-        processImportedHours(
+        // Wait for each processing to complete before continuing
+        await processImportedHours(
           hourData, 
           teamMembers, 
           addTeamMember, 
@@ -190,17 +193,18 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         );
       }
       
-      console.log('Import process completed');
+      console.log('Import process completed successfully');
       setShowImportDialog(false);
       
       // Force a team data refresh after the import
-      setTimeout(() => {
-        console.log('Refreshing team data after import');
-        refreshTeamData();
-      }, 500);
+      console.log('Refreshing team data after import');
+      await refreshTeamData();
+      console.log('Team data refreshed successfully');
       
     } catch (error) {
       console.error('Error during hour import:', error);
+    } finally {
+      setLoading(false);
     }
   };
 

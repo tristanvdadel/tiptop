@@ -1,18 +1,16 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Upload, FileUp, Check, FileX } from "lucide-react";
-import * as XLSX from 'xlsx';
 import ImportedHoursReview from './ImportedHoursReview';
 import { useApp } from '@/contexts/AppContext';
-import { extractHoursFromExcel } from '@/services/excelService';
 
 interface ImportHoursDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (file: File) => Promise<void>; // Updated to Promise<void>
+  onImport: (file: File) => Promise<void>;
   onConfirm: (hours: ImportedHour[]) => void;
   importedHours: ImportedHour[];
 }
@@ -38,6 +36,24 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
   const { toast } = useToast();
   const { teamMembers } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Reset state when dialog opens/closes
+  useEffect(() => {
+    if (!isOpen) {
+      setFile(null);
+      setIsDragging(false);
+      setIsUploading(false);
+      setShowReview(false);
+    }
+  }, [isOpen]);
+
+  // Show review when import completes
+  useEffect(() => {
+    if (importedHours.length > 0 && isOpen && !showReview && !isUploading) {
+      console.log("Showing hours review with", importedHours.length, "entries");
+      setShowReview(true);
+    }
+  }, [importedHours, isOpen, showReview, isUploading]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -111,10 +127,7 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
       console.log("Starting to process file:", file.name);
       // Process the file and call the parent's onImport function
       await onImport(file);
-      console.log("File processed successfully, imported data:", importedHours.length);
-      
-      // Show the review dialog
-      setShowReview(true);
+      console.log("File processed successfully");
     } catch (error) {
       console.error("Error processing Excel file:", error);
       toast({
@@ -122,7 +135,6 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
         description: "Er is een fout opgetreden bij het verwerken van het bestand.",
         variant: "destructive"
       });
-    } finally {
       setIsUploading(false);
     }
   };
@@ -134,7 +146,6 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
     onConfirm(confirmedHours);
     // Reset state
     setFile(null);
-    onClose();
   };
 
   const removeFile = () => {

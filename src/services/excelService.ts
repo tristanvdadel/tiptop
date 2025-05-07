@@ -116,11 +116,14 @@ export const extractHoursFromExcel = async (file: File): Promise<ExtractedHourDa
           hours = hourValue;
         }
         
+        // Ensure hours is a valid number
+        hours = isNaN(hours) ? 0 : Number(hours);
+        
         console.log(`Extracted: Name=${name}, Hours=${hours} (original value: ${row[hoursColumn]})`);
         
         return {
           name,
-          hours: isNaN(hours) ? 0 : hours,
+          hours,
           date: currentDate,
         };
       });

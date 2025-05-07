@@ -22,6 +22,7 @@ const ImportActions: React.FC = () => {
     try {
       console.log("ImportActions: Starting file import process");
       await handleFileImport(file);
+      console.log("ImportActions: File processed successfully");
       return Promise.resolve();
     } catch (error) {
       console.error("ImportActions: Error during import:", error);

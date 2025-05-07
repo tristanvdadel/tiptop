@@ -1,4 +1,4 @@
-import { calculateDistributionTotals } from './teamDataService';
+
 import { TeamMember } from '@/contexts/AppContext';
 
 export const calculateTipDistributionTotals = (

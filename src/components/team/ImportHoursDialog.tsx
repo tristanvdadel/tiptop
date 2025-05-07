@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -37,9 +37,11 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
   const [showReview, setShowReview] = useState(false);
   const { toast } = useToast();
   const { teamMembers } = useApp();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
+      console.log("File selected:", e.target.files[0].name);
       validateAndSetFile(e.target.files[0]);
     }
   };
@@ -48,6 +50,7 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
     // Currently supporting CSV and Excel files
     const validTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
     if (!validTypes.includes(uploadedFile.type)) {
+      console.log("Invalid file type:", uploadedFile.type);
       toast({
         title: "Ongeldig bestandstype",
         description: "Upload een CSV of Excel bestand.",
@@ -55,6 +58,7 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
       });
       return;
     }
+    console.log("File validated and set:", uploadedFile.name);
     setFile(uploadedFile);
   };
 
@@ -76,13 +80,20 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
     }
   };
 
+  const handleSelectFileClick = () => {
+    // Manually trigger the file input click
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
   const processExcelFile = async () => {
     if (!file) return;
     
     setIsUploading(true);
     try {
       // Process the file and call the parent's onImport function
-      onImport(file);
+      await onImport(file);
       
       // Show the review dialog
       setShowReview(true);
@@ -151,17 +162,22 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
                   Ondersteunde formaten: CSV, Excel
                 </p>
               </div>
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  className="hidden"
-                  accept=".csv,.xls,.xlsx"
-                  onChange={handleFileChange}
-                />
-                <Button variant="outline" type="button" size="sm">
-                  Bestand selecteren
-                </Button>
-              </label>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept=".csv,.xls,.xlsx"
+                onChange={handleFileChange}
+                onClick={(e) => console.log("File input clicked")}
+              />
+              <Button 
+                variant="outline" 
+                type="button" 
+                size="sm" 
+                onClick={handleSelectFileClick}
+              >
+                Bestand selecteren
+              </Button>
             </div>
           </div>
         ) : (

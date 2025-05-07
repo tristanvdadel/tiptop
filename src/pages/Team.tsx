@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useApp } from '@/contexts/AppContext';
 import TeamHeader from '@/components/team/TeamHeader';
 import TeamMemberList from '@/components/team/TeamMemberList';
 import { TeamProvider } from '@/contexts/TeamContext';
 import { useSearchParams } from 'react-router-dom';
-import { PayoutSummary } from '@/components/payout/PayoutSummary';
+// Changed to default import since that's how it's exported from PayoutSummary.tsx
+import PayoutSummary from '@/components/payout/PayoutSummary';
 
 const Team: React.FC = () => {
   const { 

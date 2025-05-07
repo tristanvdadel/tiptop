@@ -1,1076 +1,714 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-} from 'react';
+
+import React, { createContext, useState, useEffect, useCallback } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import {
   Period,
   TeamMember,
+  HourRegistration,
   TipEntry,
-  TeamSettings,
   Payout,
 } from '@/types/models';
+import { PeriodDuration } from '@/types/contextTypes';
 import {
-  fetchPeriods,
-  savePeriod,
-  deletePeriod,
-  fetchTeamMembers,
-  saveTeamMember,
-  deleteTeamMember,
-  updateTeamMember,
-  fetchPayouts,
-  savePayout,
-  deletePayout,
-  fetchTeamSettings,
-  saveTeamSettings,
-  calculateDistribution
-} from '@/services';
+  calculateAverageTipPerHour,
+  calculateAutoCloseDate,
+  mapDatabasePeriodToModel,
+} from './AppContextHelpers';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from "@/hooks/use-toast";
-import { format, addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns';
-import { nl } from 'date-fns/locale';
 
-interface AppContextType {
-  teamId: string | null;
-  periods: Period[];
-  teamMembers: TeamMember[];
-  teamSettings: TeamSettings | null;
-  payouts: Payout[];
-  currentPeriod: Period | null;
-  activePeriod: Period | null;
-  loading: boolean;
-  error: Error | null;
-  refreshTeamData: () => Promise<void>;
-  startNewPeriod: () => Promise<void>;
-  savePeriodName: (periodId: string, name: string) => Promise<void>;
-  addTip: (amount: number, note?: string, date?: string) => Promise<void>;
-  updateTip: (periodId: string, tipId: string, amount: number, note?: string, date?: string) => Promise<void>;
-  deleteTip: (periodId: string, tipId: string) => Promise<void>;
-  addTeamMember: (name: string, hours: number) => Promise<void>;
-  updateTeamMemberHours: (memberId: string, hours: number) => Promise<void>;
-  updateTeamMemberName: (memberId: string, name: string) => Promise<void>;
-  deleteTeamMember: (memberId: string) => Promise<void>;
-  saveTeamMemberRole: (memberId: string, role: string) => Promise<void>;
-  saveTeamMemberPermissions: (memberId: string, permissions: any) => Promise<void>;
-  saveTeamSettingsContext: (settings: TeamSettings) => Promise<void>;
-  calculateTipDistribution: (periodIds: string[]) => TeamMember[];
-  markPeriodsAsPaid: (periodIds: string[], distribution: any[]) => Promise<void>;
-  deletePeriod: (periodId: string) => Promise<void>;
-  deletePayout: (payoutId: string) => Promise<void>;
-  subscribeToChannel: (channelName: string) => Promise<void>;
-  selectedMonth: Date;
-  setSelectedMonth: (date: Date) => void;
-  nextMonth: () => void;
-  prevMonth: () => void;
-  formatMonth: (date: Date) => string;
+// Create a context for managing app data
+const AppDataContext = createContext<any>(undefined);
+
+interface AppDataProviderProps {
+  children: React.ReactNode;
 }
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
-
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) => {
+  // State
   const [teamId, setTeamId] = useState<string | null>(null);
-  const [periods, setPeriods] = useState<Period[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [teamSettings, setTeamSettings] = useState<TeamSettings | null>(null);
+  const [periods, setPeriods] = useState<Period[]>([]);
   const [payouts, setPayouts] = useState<Payout[]>([]);
-  const [currentPeriod, setCurrentPeriod] = useState<Period | null>(null);
-  const [activePeriod, setActivePeriod] = useState<Period | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
-  const { toast } = useToast();
-  const [realtimeClient, setRealtimeClient] = useState<any>(null);
-  
-  const formatMonth = (date: Date) => {
-    return format(date, 'MMMM yyyy', { locale: nl });
-  };
-  
-  const nextMonth = () => {
-    setSelectedMonth(addMonths(selectedMonth, 1));
-  };
-  
-  const prevMonth = () => {
-    setSelectedMonth(subMonths(selectedMonth, 1));
-  };
-  
-  const subscribeToChannel = async (channelName: string) => {
-    if (!realtimeClient) {
-      console.warn('Realtime client not initialized, skipping subscription');
-      return;
-    }
-    
-    try {
-      const channel = realtimeClient.channel(channelName, {
-        config: {
-          broadcast: { ack: false, self: false },
-          presence: { key: channelName },
-        },
-      });
-      
-      channel
-        .on('broadcast', { event: 'tips-updated' }, () => {
-          console.log('Received tips-updated event, refreshing team data');
-          refreshTeamData();
-        })
-        .on('presence', { event: 'sync' }, async () => {
-          const presenceMap = channel.presence.list();
-          console.log('Initial presence sync:', presenceMap);
-        })
-        .on('presence', { event: 'join' }, async ({ key, newCount }) => {
-          console.log('User joined channel', channelName, { key, newCount });
-        })
-        .on('presence', { event: 'leave' }, async ({ key, newCount }) => {
-          console.log('User left channel', channelName, { key, newCount });
-        })
-        .subscribe(async (status: string) => {
-          console.log(`Realtime subscription status: ${status}`);
-          if (status !== 'SUBSCRIBED') {
-            console.warn(`Realtime subscription failed, status: ${status}`);
-          }
-        });
-    } catch (err) {
-      console.error('Failed to subscribe to realtime channel', err);
-    }
-  };
+  const [currentPeriod, setCurrentPeriod] = useState<Period | undefined>(undefined);
+  const [mostRecentPayout, setMostRecentPayout] = useState<Payout | undefined>(undefined);
+  const [periodDuration, setPeriodDuration] = useState<PeriodDuration>('day');
+  const [autoClosePeriods, setAutoClosePeriods] = useState<boolean>(false);
+  const [alignWithCalendar, setAlignWithCalendar] = useState<boolean>(false);
+  const [closingTime, setClosingTime] = useState<{ hour: number; minute: number }>({ hour: 2, minute: 0 });
+  const [isDemo, setIsDemo] = useState<boolean>(false);
 
-  const refreshTeamData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Fetch session to get user ID safely
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) {
-        console.error('No session found, cannot refresh team data');
-        return;
-      }
-      
-      // Fetch team ID for the user
-      const { data: teams, error: teamError } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('created_by', session.user.id)
-        .limit(1)
-        .single();
-      
-      if (teamError) {
-        console.error('Error fetching team ID:', teamError);
-        setError(teamError);
-        return;
-      }
-      
-      if (!teams) {
-        console.warn('No team found for user:', session.user.id);
-        setTeamId(null);
-        setPeriods([]);
-        setTeamMembers([]);
-        setTeamSettings(null);
-        setPayouts([]);
-        setCurrentPeriod(null);
-        setActivePeriod(null);
-        return;
-      }
-      
-      const fetchedTeamId = teams.id;
-      setTeamId(fetchedTeamId);
-      
-      // Fetch all data in parallel
-      try {
-        const [
-          periodsData,
-          membersData, 
-          settingsData,
-          payoutsData,
-        ] = await Promise.all([
-          fetchPeriods(fetchedTeamId),
-          fetchTeamMembers(fetchedTeamId),
-          fetchTeamSettings(fetchedTeamId),
-          fetchPayouts(fetchedTeamId),
-        ]);
-
-        // Update state with fetched data
-        setPeriods(periodsData || []);
-        setTeamMembers(membersData || []);
-        setTeamSettings(settingsData || null);
-        setPayouts(payoutsData || []);
-        
-        // Determine current and active periods
-        const now = new Date();
-        const active = periodsData?.find(
-          (period) => new Date(period.startDate) <= now && new Date(period.endDate) >= now
-        ) || null;
-        const current = active || periodsData?.[0] || null;
-        
-        setActivePeriod(active);
-        setCurrentPeriod(current);
-        
-        console.log('Team data refreshed successfully');
-      } catch (err) {
-        console.error('Error fetching team data:', err);
-        setError(err instanceof Error ? err : new Error('Failed to fetch team data'));
-      }
-    } catch (err) {
-      console.error('Error refreshing team data:', err);
-      setError(err instanceof Error ? err : new Error('Failed to refresh team data'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // Load team ID from localStorage on component mount
   useEffect(() => {
-    const initializeRealtime = async () => {
-      if (!supabase) {
-        console.error('Supabase client not initialized');
-        return;
-      }
-      
-      setRealtimeClient(supabase.realtime);
-    };
-    
-    initializeRealtime();
+    const storedTeamId = localStorage.getItem('teamId');
+    if (storedTeamId) {
+      setTeamId(storedTeamId);
+    }
   }, []);
-  
+
+  // Save team ID to localStorage whenever it changes
   useEffect(() => {
     if (teamId) {
-      subscribeToChannel(`team-${teamId}`);
+      localStorage.setItem('teamId', teamId);
+    } else {
+      localStorage.removeItem('teamId');
     }
   }, [teamId]);
 
+  // Check if user is a demo user
   useEffect(() => {
-    // Initial data load on component mount
-    refreshTeamData();
-  }, [refreshTeamData]);
-
-  const startNewPeriod = async () => {
-    if (!teamId) {
-      console.error('Cannot start a new period without a team ID');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const now = new Date();
-      const startDate = startOfMonth(now).toISOString();
-      const endDate = endOfMonth(now).toISOString();
-
-      const newPeriod = {
-        teamId: teamId,
-        startDate: startDate,
-        endDate: endDate,
-        name: null,
-        isPaid: false,
-        isActive: true,
-      };
-
-      // Save the new period to the database
-      const savedPeriod = await savePeriod(newPeriod as Period);
-
-      if (savedPeriod) {
-        // Map database response to application model
-        const mappedPeriod: Period = {
-          id: savedPeriod.id,
-          teamId: savedPeriod.team_id,
-          startDate: savedPeriod.start_date,
-          endDate: savedPeriod.end_date,
-          isActive: savedPeriod.is_active,
-          isPaid: savedPeriod.is_paid,
-          name: savedPeriod.name,
-          autoCloseDate: savedPeriod.auto_close_date,
-          averageTipPerHour: savedPeriod.average_tip_per_hour,
-          notes: savedPeriod.notes,
-          tips: [],
-          createdAt: savedPeriod.created_at
-        };
-
-        // Update the local state with the new period
-        setPeriods(prevPeriods => [mappedPeriod, ...prevPeriods]);
-        setCurrentPeriod(mappedPeriod);
-        setActivePeriod(mappedPeriod);
-
-        toast({
-          title: "Nieuwe periode gestart",
-          description: `Een nieuwe periode van ${format(now, 'MMMM yyyy', { locale: nl })} is succesvol gestart.`,
-        });
+    const checkIfDemo = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.user?.email === 'demo@example.com') {
+        setIsDemo(true);
       } else {
-        toast({
-          title: "Fout",
-          description: "Er is een fout opgetreden bij het starten van een nieuwe periode",
-          variant: "destructive",
-        });
+        setIsDemo(false);
       }
-    } catch (err) {
-      console.error('Error starting a new period:', err);
-      setError(err instanceof Error ? err : new Error('Failed to start a new period'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het starten van een nieuwe periode",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const savePeriodName = async (periodId: string, name: string) => {
-    setLoading(true);
-    setError(null);
+    };
     
+    checkIfDemo();
+  }, []);
+
+  // Fetch team members
+  const fetchTeamMembers = useCallback(async (teamId: string) => {
     try {
-      // Find the period in the local state
-      const periodToUpdate = periods.find(period => period.id === periodId);
-      if (!periodToUpdate) {
-        console.error('Period not found in local state');
-        return;
-      }
-      
-      // Update the period with the new name
-      const updatedPeriod = { ...periodToUpdate, name };
-      
-      // Save the updated period to the database
-      const savedPeriod = await savePeriod(updatedPeriod);
-      
-      if (savedPeriod) {
-        // Update the local state with the saved period
-        setPeriods(prevPeriods =>
-          prevPeriods.map(period => (period.id === periodId ? savedPeriod : period))
-        );
-        
-        toast({
-          title: "Periode naam gewijzigd",
-          description: "De naam van de periode is succesvol gewijzigd.",
-        });
-      } else {
-        toast({
-          title: "Fout",
-          description: "Er is een fout opgetreden bij het wijzigen van de periode naam",
-          variant: "destructive",
-        });
-      }
-    } catch (err) {
-      console.error('Error saving period name:', err);
-      setError(err instanceof Error ? err : new Error('Failed to save period name'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het wijzigen van de periode naam",
-        variant: "destructive",
+      const { data, error } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('team_id', teamId);
+
+      if (error) throw error;
+      return data as TeamMember[];
+    } catch (error) {
+      console.error('Error fetching team members:', error);
+      throw error;
+    }
+  }, []);
+
+  // Fetch periods
+  const fetchTeamPeriods = useCallback(async (teamId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('get_team_periods_safe', {
+        team_id_param: teamId
       });
-    } finally {
-      setLoading(false);
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error fetching periods:', error);
+      throw error;
     }
-  };
+  }, []);
 
-  const addTip = async (amount: number, note?: string, date?: string) => {
-    if (!currentPeriod) {
-      console.error('Cannot add tip without a current period');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
+  // Fetch payouts
+  const fetchPayouts = useCallback(async (teamId: string) => {
     try {
-      const tipEntry: Omit<TipEntry, 'id'> = {
-        amount,
-        date: date || new Date().toISOString(),
-        note: note || null,
-        periodId: currentPeriod.id,
-      };
+      const { data, error } = await supabase
+        .from('payouts')
+        .select(`
+          *,
+          payout_distributions(*)
+        `)
+        .eq('team_id', teamId)
+        .order('date', { ascending: false });
 
-      // Update the period with the new tip
-      const updatedPeriod = {
-        ...currentPeriod,
-        tips: [...(currentPeriod.tips || []), tipEntry],
-      };
-
-      // Save the updated period to the database
-      const savedPeriod = await savePeriod(updatedPeriod);
-
-      if (savedPeriod) {
-        // Update the local state with the saved period
-        setPeriods(prevPeriods =>
-          prevPeriods.map(period => (period.id === currentPeriod.id ? savedPeriod : period))
-        );
-        setCurrentPeriod(savedPeriod);
-
-        toast({
-          title: "Fooi toegevoegd",
-          description: "De fooi is succesvol toegevoegd.",
-        });
-      } else {
-        toast({
-          title: "Fout",
-          description: "Er is een fout opgetreden bij het toevoegen van de fooi",
-          variant: "destructive",
-        });
-      }
+      if (error) throw error;
       
-      // Trigger a broadcast event to notify other clients
-      if (teamId) {
-        await supabase.realtime.channel(`team-${teamId}`).send({
-          type: 'broadcast',
-          event: 'tips-updated',
-          payload: { teamId },
-        });
-      }
-    } catch (err) {
-      console.error('Error adding tip:', err);
-      setError(err instanceof Error ? err : new Error('Failed to add tip'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het toevoegen van de fooi",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const updateTip = async (periodId: string, tipId: string, amount: number, note?: string, date?: string) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Find the period in the local state
-      const periodToUpdate = periods.find(period => period.id === periodId);
-      if (!periodToUpdate) {
-        console.error('Period not found in local state');
-        return;
-      }
-      
-      // Find the tip in the period
-      const tipToUpdate = periodToUpdate.tips?.find(tip => tip.id === tipId);
-      if (!tipToUpdate) {
-        console.error('Tip not found in local state');
-        return;
-      }
-      
-      // Update the tip with the new values
-      const updatedTip = { ...tipToUpdate, amount, note: note || null, date: date || new Date().toISOString() };
-      
-      // Update the period with the updated tip
-      const updatedPeriod = {
-        ...periodToUpdate,
-        tips: periodToUpdate.tips?.map(tip => (tip.id === tipId ? updatedTip : tip)),
-      };
-      
-      // Save the updated period to the database
-      const savedPeriod = await savePeriod(updatedPeriod);
-      
-      if (savedPeriod) {
-        // Update the local state with the saved period
-        setPeriods(prevPeriods =>
-          prevPeriods.map(period => (period.id === periodId ? savedPeriod : period))
-        );
-        setCurrentPeriod(savedPeriod);
-        
-        toast({
-          title: "Fooi gewijzigd",
-          description: "De fooi is succesvol gewijzigd.",
-        });
-      } else {
-        toast({
-          title: "Fout",
-          description: "Er is een fout opgetreden bij het wijzigen van de fooi",
-          variant: "destructive",
-        });
-      }
-      
-      // Trigger a broadcast event to notify other clients
-      if (teamId) {
-        await supabase.realtime.channel(`team-${teamId}`).send({
-          type: 'broadcast',
-          event: 'tips-updated',
-          payload: { teamId },
-        });
-      }
-    } catch (err) {
-      console.error('Error updating tip:', err);
-      setError(err instanceof Error ? err : new Error('Failed to update tip'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het wijzigen van de fooi",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+      // Map database payouts to model
+      const mappedPayouts = data.map((payout: any) => ({
+        id: payout.id,
+        teamId: payout.team_id,
+        date: payout.date,
+        payoutTime: payout.payout_time,
+        totalTips: payout.total_tips || 0,
+        totalHours: payout.total_hours || 0,
+        payerName: payout.payer_name || '',
+        distribution: payout.payout_distributions?.map((dist: any) => ({
+          memberId: dist.team_member_id,
+          amount: dist.amount,
+          actualAmount: dist.actual_amount,
+          hours: dist.hours || 0,
+          balance: dist.balance
+        })) || [],
+        periodIds: [], // We'll need to fetch these separately
+      }));
 
-  const deleteTip = async (periodId: string, tipId: string) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Find the period in the local state
-      const periodToUpdate = periods.find(period => period.id === periodId);
-      if (!periodToUpdate) {
-        console.error('Period not found in local state');
-        return;
-      }
-
-      // Filter out the tip to be deleted
-      const updatedTips = periodToUpdate.tips?.filter(tip => tip.id !== tipId) || [];
-
-      // Update the period with the updated tips
-      const updatedPeriod = {
-        ...periodToUpdate,
-        tips: updatedTips,
-      };
-
-      // Save the updated period to the database
-      const savedPeriod = await savePeriod(updatedPeriod);
-
-      if (savedPeriod) {
-        // Update the local state with the saved period
-        setPeriods(prevPeriods =>
-          prevPeriods.map(period => (period.id === periodId ? savedPeriod : period))
-        );
-        setCurrentPeriod(savedPeriod);
-
-        toast({
-          title: "Fooi verwijderd",
-          description: "De fooi is succesvol verwijderd.",
-        });
-      } else {
-        toast({
-          title: "Fout",
-          description: "Er is een fout opgetreden bij het verwijderen van de fooi",
-          variant: "destructive",
-        });
-      }
-      
-      // Trigger a broadcast event to notify other clients
-      if (teamId) {
-        await supabase.realtime.channel(`team-${teamId}`).send({
-          type: 'broadcast',
-          event: 'tips-updated',
-          payload: { teamId },
-        });
-      }
-    } catch (err) {
-      console.error('Error deleting tip:', err);
-      setError(err instanceof Error ? err : new Error('Failed to delete tip'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het verwijderen van de fooi",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const addTeamMember = async (name: string, hours: number) => {
-    if (!teamId) {
-      console.error('Cannot add team member without a team ID');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const newTeamMember = {
-        team_id: teamId,
-        name: name,
-        hours: hours,
-        role: 'member',
-        permissions: {
-          add_tips: true,
-          add_hours: true,
-          view_team: true,
-          view_reports: true
+      // Fetch period IDs for each payout
+      for (const payout of mappedPayouts) {
+        const { data: periodData, error: periodError } = await supabase
+          .from('payout_periods')
+          .select('period_id')
+          .eq('payout_id', payout.id);
+          
+        if (periodError) {
+          console.error('Error fetching payout periods:', periodError);
+          continue;
         }
-      };
-
-      // Save the new team member to the database
-      const savedTeamMember = await saveTeamMember(newTeamMember as unknown as TeamMember);
-
-      if (savedTeamMember) {
-        // Update the local state with the new team member
-        setTeamMembers(prevTeamMembers => [...prevTeamMembers, savedTeamMember]);
-
-        toast({
-          title: "Teamlid toegevoegd",
-          description: "Het teamlid is succesvol toegevoegd.",
-        });
-      } else {
-        toast({
-          title: "Fout",
-          description: "Er is een fout opgetreden bij het toevoegen van het teamlid",
-          variant: "destructive",
-        });
-      }
-    } catch (err) {
-      console.error('Error adding team member:', err);
-      setError(err instanceof Error ? err : new Error('Failed to add team member'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het toevoegen van het teamlid",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const updateTeamMemberHours = async (memberId: string, hours: number) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Find the team member in the local state
-      const teamMemberToUpdate = teamMembers.find(member => member.id === memberId);
-      if (!teamMemberToUpdate) {
-        console.error('Team member not found in local state');
-        return;
-      }
-
-      // Update the team member with the new hours
-      const updatedTeamMember = { ...teamMemberToUpdate, hours };
-
-      // Save the updated team member to the database
-      const savedTeamMember = await updateTeamMemberService(memberId, updatedTeamMember);
-
-      if (savedTeamMember) {
-        // Update the local state with the saved team member
-        setTeamMembers(prevTeamMembers =>
-          prevTeamMembers.map(member => (member.id === memberId ? savedTeamMember : member))
-        );
-
-        toast({
-          title: "Uren gewijzigd",
-          description: "De uren van het teamlid zijn succesvol gewijzigd.",
-        });
-      } else {
-        toast({
-          title: "Fout",
-          description: "Er is een fout opgetreden bij het wijzigen van de uren van het teamlid",
-          variant: "destructive",
-        });
-      }
-    } catch (err) {
-      console.error('Error updating team member hours:', err);
-      setError(err instanceof Error ? err : new Error('Failed to update team member hours'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het wijzigen van de uren van het teamlid",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const updateTeamMemberName = async (memberId: string, name: string) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Find the team member in the local state
-      const teamMemberToUpdate = teamMembers.find(member => member.id === memberId);
-      if (!teamMemberToUpdate) {
-        console.error('Team member not found in local state');
-        return;
-      }
-      
-      // Update the team member with the new name
-      const updatedTeamMember = { ...teamMemberToUpdate, name };
-      
-      // Save the updated team member to the database
-      const savedTeamMember = await updateTeamMemberService(memberId, updatedTeamMember);
-      
-      if (savedTeamMember) {
-        // Update the local state with the saved team member
-        setTeamMembers(prevTeamMembers =>
-          prevTeamMembers.map(member => (member.id === memberId ? savedTeamMember : member))
-        );
         
-        toast({
-          title: "Naam gewijzigd",
-          description: "De naam van het teamlid is succesvol gewijzigd.",
-        });
-      } else {
-        toast({
-          title: "Fout",
-          description: "Er is een fout opgetreden bij het wijzigen van de naam van het teamlid",
-          variant: "destructive",
-        });
+        payout.periodIds = periodData.map(p => p.period_id);
       }
-    } catch (err) {
-      console.error('Error updating team member name:', err);
-      setError(err instanceof Error ? err : new Error('Failed to update team member name'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het wijzigen van de naam van het teamlid",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      
+      return mappedPayouts;
+    } catch (error) {
+      console.error('Error fetching payouts:', error);
+      throw error;
     }
-  };
-  
-  const deleteTeamMember = async (memberId: string) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Delete the team member from the database
-      await deleteTeamMemberService(memberId);
-      
-      // Update the local state by filtering out the deleted team member
-      setTeamMembers(prevTeamMembers => prevTeamMembers.filter(member => member.id !== memberId));
-      
-      toast({
-        title: "Teamlid verwijderd",
-        description: "Het teamlid is succesvol verwijderd.",
-      });
-    } catch (err) {
-      console.error('Error deleting team member:', err);
-      setError(err instanceof Error ? err : new Error('Failed to delete team member'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het verwijderen van het teamlid",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const saveTeamMemberRole = async (memberId: string, role: string) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Find the team member in the local state
-      const teamMemberToUpdate = teamMembers.find(member => member.id === memberId);
-      if (!teamMemberToUpdate) {
-        console.error('Team member not found in local state');
-        return;
-      }
-      
-      // Update the team member with the new role
-      const updatedTeamMember = { ...teamMemberToUpdate, role };
-      
-      // Save the updated team member to the database
-      const savedTeamMember = await updateTeamMemberService(memberId, updatedTeamMember);
-      
-      if (savedTeamMember) {
-        // Update the local state with the saved team member
-        setTeamMembers(prevTeamMembers =>
-          prevTeamMembers.map(member => (member.id === memberId ? savedTeamMember : member))
-        );
-        
-        toast({
-          title: "Rol gewijzigd",
-          description: "De rol van het teamlid is succesvol gewijzigd.",
-        });
-      } else {
-        toast({
-          title: "Fout",
-          description: "Er is een fout opgetreden bij het wijzigen van de rol van het teamlid",
-          variant: "destructive",
-        });
-      }
-    } catch (err) {
-      console.error('Error updating team member role:', err);
-      setError(err instanceof Error ? err : new Error('Failed to update team member role'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het wijzigen van de rol van het teamlid",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const saveTeamMemberPermissions = async (memberId: string, permissions: any) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Find the team member in the local state
-      const teamMemberToUpdate = teamMembers.find(member => member.id === memberId);
-      if (!teamMemberToUpdate) {
-        console.error('Team member not found in local state');
-        return;
-      }
-      
-      // Update the team member with the new permissions
-      const updatedTeamMember = { ...teamMemberToUpdate, permissions };
-      
-      // Save the updated team member to the database
-      const savedTeamMember = await updateTeamMemberService(memberId, updatedTeamMember);
-      
-      if (savedTeamMember) {
-        // Update the local state with the saved team member
-        setTeamMembers(prevTeamMembers =>
-          prevTeamMembers.map(member => (member.id === memberId ? savedTeamMember : member))
-        );
-        
-        toast({
-          title: "Permissies gewijzigd",
-          description: "De permissies van het teamlid zijn succesvol gewijzigd.",
-        });
-      } else {
-        toast({
-          title: "Fout",
-          description: "Er is een fout opgetreden bij het wijzigen van de permissies van het teamlid",
-          variant: "destructive",
-        });
-      }
-    } catch (err) {
-      console.error('Error updating team member permissions:', err);
-      setError(err instanceof Error ? err : new Error('Failed to update team member permissions'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het wijzigen van de permissies van het teamlid",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, []);
 
-  const saveTeamSettingsContext = async (settings: TeamSettings) => {
+  // Save team member
+  const saveTeamMember = useCallback(async (member: TeamMember) => {
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .upsert([
+          {
+            id: member.id,
+            team_id: member.teamId,
+            name: member.name,
+            hours: member.hours,
+            balance: member.balance || 0
+          }
+        ]);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving team member:', error);
+      throw error;
+    }
+  }, []);
+
+  // Delete team member
+  const deleteTeamMember = useCallback(async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error deleting team member:', error);
+      throw error;
+    }
+  }, []);
+
+  // Save period
+  const savePeriod = useCallback(async (period: Period) => {
+    try {
+      const { error } = await supabase
+        .from('periods')
+        .upsert([
+          {
+            id: period.id,
+            team_id: period.teamId,
+            name: period.name,
+            start_date: period.startDate,
+            end_date: period.endDate,
+            is_active: period.isActive,
+            is_paid: period.isPaid,
+            auto_close_date: period.autoCloseDate,
+            average_tip_per_hour: period.averageTipPerHour,
+            notes: period.notes
+          }
+        ]);
+
+      if (error) throw error;
+      
+      // Handle tips if they exist
+      if (period.tips && period.tips.length > 0) {
+        for (const tip of period.tips) {
+          if (!tip.id) {
+            // This is a new tip
+            const { error: tipError } = await supabase
+              .from('tips')
+              .insert([
+                {
+                  period_id: period.id,
+                  amount: tip.amount,
+                  date: tip.date,
+                  added_by: tip.addedBy || null,
+                  note: tip.note
+                }
+              ]);
+              
+            if (tipError) {
+              console.error('Error adding tip:', tipError);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error saving period:', error);
+      throw error;
+    }
+  }, []);
+
+  // Delete period
+  const deletePeriod = useCallback(async (periodId: string) => {
+    try {
+      const { error } = await supabase
+        .from('periods')
+        .delete()
+        .eq('id', periodId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error deleting period:', error);
+      throw error;
+    }
+  }, []);
+
+  // Save payout
+  const savePayout = useCallback(async (payout: Payout) => {
+    try {
+      // Insert payout
+      const { data: payoutData, error: payoutError } = await supabase
+        .from('payouts')
+        .insert([
+          {
+            id: payout.id,
+            team_id: payout.teamId,
+            date: payout.date,
+            payout_time: payout.payoutTime,
+            total_tips: payout.totalTips,
+            total_hours: payout.totalHours,
+            payer_name: payout.payerName
+          }
+        ])
+        .select();
+
+      if (payoutError) throw payoutError;
+      
+      // Insert payout distributions
+      for (const dist of payout.distribution) {
+        const { error: distError } = await supabase
+          .from('payout_distributions')
+          .insert([
+            {
+              payout_id: payout.id,
+              team_member_id: dist.memberId,
+              amount: dist.amount,
+              actual_amount: dist.actualAmount,
+              hours: dist.hours,
+              balance: dist.balance
+            }
+          ]);
+          
+        if (distError) {
+          console.error('Error adding payout distribution:', distError);
+        }
+      }
+      
+      // Link periods to this payout
+      for (const periodId of payout.periodIds) {
+        const { error: periodLinkError } = await supabase
+          .from('payout_periods')
+          .insert([
+            {
+              payout_id: payout.id,
+              period_id: periodId
+            }
+          ]);
+          
+        if (periodLinkError) {
+          console.error('Error linking period to payout:', periodLinkError);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving payout:', error);
+      throw error;
+    }
+  }, []);
+
+  // Delete payout
+  const deletePayout = useCallback(async (payoutId: string) => {
+    try {
+      const { error } = await supabase
+        .from('payouts')
+        .delete()
+        .eq('id', payoutId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error deleting payout:', error);
+      throw error;
+    }
+  }, []);
+  
+  // Refresh team data
+  const refreshTeamData = useCallback(async () => {
     if (!teamId) {
-      console.error('Cannot save team settings without a team ID');
+      console.warn('No team ID found, skipping data refresh.');
       return;
     }
 
-    setLoading(true);
-    setError(null);
-
     try {
-      // Save the team settings to the database
-      const savedSettings = await saveTeamSettings({ ...settings, teamId });
+      console.log(`Refreshing data for team ${teamId}`);
 
-      if (savedSettings) {
-        // Update the local state with the saved team settings
-        setTeamSettings(savedSettings);
+      // Fetch team members
+      const fetchedTeamMembers = await fetchTeamMembers(teamId);
+      setTeamMembers(fetchedTeamMembers);
+      console.log(`Fetched ${fetchedTeamMembers.length} team members`);
 
-        toast({
-          title: "Team instellingen opgeslagen",
-          description: "De team instellingen zijn succesvol opgeslagen.",
-        });
+      // Fetch periods
+      const fetchedPeriods = await fetchTeamPeriods(teamId);
+      const mappedPeriods = fetchedPeriods.map(mapDatabasePeriodToModel);
+      setPeriods(mappedPeriods);
+      console.log(`Fetched ${mappedPeriods.length} periods`);
+
+      // Fetch payouts
+      const fetchedPayouts = await fetchPayouts(teamId);
+      setPayouts(fetchedPayouts);
+      console.log(`Fetched ${fetchedPayouts.length} payouts`);
+
+      // Find current period
+      const activePeriod = mappedPeriods.find((period) => period.isActive);
+      setCurrentPeriod(activePeriod);
+      if (activePeriod) {
+        console.log(`Current period found: ${activePeriod.id}`);
       } else {
-        toast({
-          title: "Fout",
-          description: "Er is een fout opgetreden bij het opslaan van de team instellingen",
-          variant: "destructive",
-        });
+        console.log('No current period found');
       }
-    } catch (err) {
-      console.error('Error saving team settings:', err);
-      setError(err instanceof Error ? err : new Error('Failed to save team settings'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het opslaan van de team instellingen",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const calculateTipDistribution = (periodIds: string[]): TeamMember[] => {
-    if (!teamId) {
-      console.error('Cannot calculate tip distribution without a team ID');
-      return [];
+      // Find most recent payout
+      const recentPayout = fetchedPayouts.length > 0 ? fetchedPayouts[0] : undefined;
+      setMostRecentPayout(recentPayout);
+      if (recentPayout) {
+        console.log(`Most recent payout found: ${recentPayout.id}`);
+      } else {
+        console.log('No payouts found');
+      }
+    } catch (error) {
+      console.error('Error refreshing team data:', error);
+      throw error;
     }
-  
-    const distribution = calculateDistribution(periodIds, periods, teamMembers);
-    return distribution;
-  };
+  }, [teamId, fetchTeamMembers, fetchTeamPeriods, fetchPayouts]);
 
-  const markPeriodsAsPaid = async (periodIds: string[], distribution: any[]) => {
-    setLoading(true);
-    setError(null);
+  // Add team member
+  const addTeamMember = useCallback(async (name: string, hours: number, balance: number) => {
+    if (!teamId) return;
+    const newMember: TeamMember = {
+      id: uuidv4(),
+      teamId: teamId,
+      name,
+      hours,
+      balance,
+      tipAmount: 0,
+    };
+    try {
+      await saveTeamMember(newMember);
+      await refreshTeamData();
+    } catch (error) {
+      console.error('Error adding team member:', error);
+      throw error;
+    }
+  }, [teamId, saveTeamMember, refreshTeamData]);
+
+  // Update team member
+  const updateTeamMember = useCallback(async (id: string, updates: Partial<TeamMember>) => {
+    try {
+      const member = teamMembers.find(m => m.id === id);
+      if (!member) throw new Error(`Team member with ID ${id} not found`);
+      
+      const updatedMember = { ...member, ...updates };
+      await saveTeamMember(updatedMember);
+      await refreshTeamData();
+    } catch (error) {
+      console.error('Error updating team member:', error);
+      throw error;
+    }
+  }, [teamMembers, saveTeamMember, refreshTeamData]);
+
+  // Add tip
+  const addTip = useCallback(async (amount: number, note?: string, date?: string) => {
+    if (!teamId || !currentPeriod) return;
+
+    const newTip: TipEntry = {
+      id: uuidv4(),
+      periodId: currentPeriod.id,
+      amount,
+      date: date || new Date().toISOString(),
+      note,
+      addedBy: 'user', // Replace with actual user ID if needed
+    };
+
+    const updatedPeriod: Period = {
+      ...currentPeriod,
+      tips: [...currentPeriod.tips, newTip],
+    };
 
     try {
-      // Mark periods as paid in the database
-      await Promise.all(
-        periodIds.map(async (periodId) => {
-          const periodToUpdate = periods.find(period => period.id === periodId);
-          if (!periodToUpdate) {
-            console.error('Period not found in local state');
-            return;
-          }
+      await savePeriod(updatedPeriod);
+      await refreshTeamData();
+    } catch (error) {
+      console.error('Error adding tip:', error);
+      throw error;
+    }
+  }, [teamId, currentPeriod, savePeriod, refreshTeamData]);
 
-          // Update the period with the isPaid flag
-          const updatedPeriod = { ...periodToUpdate, isPaid: true };
+  // Start new period
+  const startNewPeriod = useCallback(async () => {
+    if (!teamId) return;
 
-          // Save the updated period to the database
-          await savePeriod(updatedPeriod);
-        })
-      );
+    // Check if there's already an active period
+    if (periods.some(period => period.isActive)) {
+      console.warn('Cannot start a new period while another is active.');
+      return;
+    }
 
-      // Save payout information to the database
-      const payoutData: Omit<Payout, 'id' | 'createdAt'> = {
-        teamId: teamId!,
-        periodIds: periodIds,
-        distribution: distribution,
-        totalTips: distribution.reduce((acc: number, member: any) => acc + member.amount, 0),
-        totalHours: teamMembers.reduce((acc: number, member: TeamMember) => acc + member.hours, 0),
-        payoutDate: new Date().toISOString(),
+    const newPeriod: Period = {
+      id: uuidv4(),
+      teamId: teamId,
+      startDate: new Date().toISOString(),
+      endDate: undefined,
+      isActive: true,
+      isPaid: false,
+      tips: [],
+      name: undefined,
+      notes: undefined,
+      autoCloseDate: autoClosePeriods ? calculateAutoCloseDate(new Date().toISOString(), periodDuration) : undefined,
+      averageTipPerHour: undefined,
+    };
+
+    try {
+      await savePeriod(newPeriod);
+      await refreshTeamData();
+    } catch (error) {
+      console.error('Error starting new period:', error);
+      throw error;
+    }
+  }, [teamId, periods, autoClosePeriods, periodDuration, savePeriod, refreshTeamData]);
+
+  // End current period
+  const endCurrentPeriod = useCallback(async () => {
+    if (!teamId || !currentPeriod) return;
+
+    const updatedPeriod: Period = {
+      ...currentPeriod,
+      isActive: false,
+      endDate: new Date().toISOString(),
+    };
+
+    try {
+      await savePeriod(updatedPeriod);
+      await refreshTeamData();
+    } catch (error) {
+      console.error('Error ending current period:', error);
+      throw error;
+    }
+  }, [teamId, currentPeriod, savePeriod, refreshTeamData]);
+
+  // Update period
+  const updatePeriod = useCallback(async (periodId: string, updates: Partial<Period>) => {
+    try {
+      const periodToUpdate = periods.find(p => p.id === periodId);
+      if (!periodToUpdate) {
+        console.warn(`Period with ID ${periodId} not found.`);
+        return;
+      }
+
+      const updatedPeriod: Period = {
+        ...periodToUpdate,
+        ...updates,
       };
 
-      // Save the payout to the database
-      const savedPayout = await savePayout(payoutData);
-
-      if (savedPayout) {
-        // Update the local state with the updated periods
-        setPeriods(prevPeriods =>
-          prevPeriods.map(period =>
-            periodIds.includes(period.id) ? { ...period, isPaid: true } : period
-          )
-        );
-
-        // Update the local state with the new payout
-        setPayouts(prevPayouts => [...prevPayouts, savedPayout]);
-
-        toast({
-          title: "Periode(s) uitbetaald",
-          description: "De periode(s) zijn succesvol uitbetaald.",
-        });
-      } else {
-        toast({
-          title: "Fout",
-          description: "Er is een fout opgetreden bij het uitbetalen van de periode(s)",
-          variant: "destructive",
-        });
-      }
-    } catch (err) {
-      console.error('Error marking periods as paid:', err);
-      setError(err instanceof Error ? err : new Error('Failed to mark periods as paid'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het uitbetalen van de periode(s)",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      await savePeriod(updatedPeriod);
+      await refreshTeamData();
+    } catch (error) {
+      console.error('Error updating period:', error);
+      throw error;
     }
-  };
-  
-  const deletePeriod = async (periodId: string) => {
-    setLoading(true);
-    setError(null);
-    
+  }, [periods, savePeriod, refreshTeamData]);
+
+  // Mark periods as paid
+  const markPeriodsAsPaid = useCallback(async (periodIds: string[], distribution: TeamMember[]) => {
+    if (!teamId) return;
+
+    // 1. Mark periods as paid
+    const updatedPeriods = periods.map(period => {
+      if (periodIds.includes(period.id)) {
+        return { ...period, isPaid: true };
+      }
+      return period;
+    });
+
+    // 2. Save payout data
+    const payoutData: Payout = {
+      id: uuidv4(),
+      teamId: teamId,
+      date: new Date().toISOString(),
+      payoutTime: new Date().toISOString(),
+      totalTips: distribution.reduce((sum, member) => sum + (member.tipAmount || 0), 0),
+      totalHours: teamMembers.reduce((sum, member) => sum + member.hours, 0),
+      payerName: 'Admin', // Replace with actual payer name if needed
+      distribution: distribution.map(m => ({
+        memberId: m.id,
+        amount: m.tipAmount || 0,
+        hours: m.hours,
+        balance: m.balance,
+      })),
+      periodIds: periodIds,
+    };
+
     try {
-      // Delete the period from the database
-      await deletePeriod(periodId);
-      
-      // Update the local state by filtering out the deleted period
-      setPeriods(prevPeriods => prevPeriods.filter(period => period.id !== periodId));
-      
-      // If the deleted period was the current period, set the current period to null
-      if (currentPeriod?.id === periodId) {
-        setCurrentPeriod(null);
-      }
-      
-      // If the deleted period was the active period, set the active period to null
-      if (activePeriod?.id === periodId) {
-        setActivePeriod(null);
-      }
-      
-      toast({
-        title: "Periode verwijderd",
-        description: "De periode is succesvol verwijderd.",
-      });
-    } catch (err) {
-      console.error('Error deleting period:', err);
-      setError(err instanceof Error ? err : new Error('Failed to delete period'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het verwijderen van de periode",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const deletePayout = async (payoutId: string) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Delete the payout from the database
-      await deletePayout(payoutId);
-      
-      // Update the local state by filtering out the deleted payout
-      setPayouts(prevPayouts => prevPayouts.filter(payout => payout.id !== payoutId));
-      
-      toast({
-        title: "Uitbetaling verwijderd",
-        description: "De uitbetaling is succesvol verwijderd.",
-      });
-    } catch (err) {
-      console.error('Error deleting payout:', err);
-      setError(err instanceof Error ? err : new Error('Failed to delete payout'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het verwijderen van de uitbetaling",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+      // Save each updated period
+      await Promise.all(updatedPeriods.map(async (updatedPeriod) => {
+        await savePeriod(updatedPeriod);
+      }));
 
-  const contextValue = {
+      // Save the payout data
+      await savePayout(payoutData);
+
+      // Refresh team data
+      await refreshTeamData();
+    } catch (error) {
+      console.error('Error marking periods as paid:', error);
+      throw error;
+    }
+  }, [teamId, periods, teamMembers, savePeriod, savePayout, refreshTeamData]);
+
+  // Delete paid periods
+  const deletePaidPeriods = useCallback(async () => {
+    if (!teamId) return;
+
+    // Filter out paid periods
+    const paidPeriodIds = periods.filter(period => period.isPaid).map(period => period.id);
+
+    try {
+      // Delete each paid period
+      await Promise.all(paidPeriodIds.map(async (periodId) => {
+        await deletePeriod(periodId);
+      }));
+
+      // Refresh team data
+      await refreshTeamData();
+    } catch (error) {
+      console.error('Error deleting paid periods:', error);
+      throw error;
+    }
+  }, [teamId, periods, deletePeriod, refreshTeamData]);
+
+  // Calculate tip distribution
+  const calculateTipDistribution = useCallback((periodIds: string[]): TeamMember[] => {
+    // Filter periods by selected periodIds
+    const selectedPeriods = periods.filter(period => periodIds.includes(period.id));
+
+    // Calculate total tips for selected periods
+    const totalTips = selectedPeriods.reduce((sum, period) => {
+      return sum + period.tips.reduce((periodSum, tip) => periodSum + tip.amount, 0);
+    }, 0);
+
+    // Calculate total hours for all team members
+    const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+
+    // Calculate tip per hour
+    const tipPerHour = totalHours > 0 ? totalTips / totalHours : 0;
+
+    // Distribute tips to each team member
+    const distribution = teamMembers.map(member => {
+      const tipAmount = member.hours * tipPerHour;
+      return { ...member, tipAmount };
+    });
+
+    return distribution;
+  }, [periods, teamMembers]);
+
+  // Get unpaid periods count
+  const getUnpaidPeriodsCount = useCallback((): number => {
+    return periods.filter(period => !period.isPaid).length;
+  }, [periods]);
+
+  // Has reached period limit
+  const hasReachedPeriodLimit = useCallback((): boolean => {
+    const tierPeriodLimit = Infinity;
+    return periods.filter(period => !period.isPaid).length >= tierPeriodLimit;
+  }, [periods]);
+
+  // Schedule auto close
+  const scheduleAutoClose = useCallback(async (autoCloseDate: string) => {
+    if (!currentPeriod) return;
+
+    const updatedPeriod: Period = {
+      ...currentPeriod,
+      autoCloseDate: autoCloseDate,
+    };
+
+    try {
+      await savePeriod(updatedPeriod);
+      await refreshTeamData();
+    } catch (error) {
+      console.error('Error scheduling auto close:', error);
+      throw error;
+    }
+  }, [currentPeriod, savePeriod, refreshTeamData]);
+
+  // Get next auto close date
+  const getNextAutoCloseDate = useCallback((): string | null => {
+    if (!currentPeriod || !autoClosePeriods) {
+      return null;
+    }
+    return currentPeriod.autoCloseDate || null;
+  }, [currentPeriod, autoClosePeriods]);
+
+  // Get formatted closing time
+  const getFormattedClosingTime = useCallback((): string => {
+    const { hour, minute } = closingTime;
+    const formattedHour = String(hour).padStart(2, '0');
+    const formattedMinute = String(minute).padStart(2, '0');
+    return `${formattedHour}:${formattedMinute}`;
+  }, [closingTime]);
+
+  const value = {
     teamId,
-    periods,
+    setTeamId,
     teamMembers,
-    teamSettings,
+    setTeamMembers,
+    periods,
+    setPeriods,
     payouts,
+    setPayouts,
     currentPeriod,
-    activePeriod,
-    loading,
-    error,
+    setCurrentPeriod,
+    mostRecentPayout,
+    setMostRecentPayout,
+    periodDuration,
+    setPeriodDuration,
+    autoClosePeriods,
+    setAutoClosePeriods,
+    alignWithCalendar,
+    setAlignWithCalendar,
+    closingTime,
+    setClosingTime,
+    isDemo,
+    setIsDemo,
     refreshTeamData,
-    startNewPeriod,
-    savePeriodName,
-    addTip,
-    updateTip,
-    deleteTip,
     addTeamMember,
-    updateTeamMemberHours,
-    updateTeamMemberName,
+    updateTeamMember,
     deleteTeamMember,
-    saveTeamMemberRole,
-    saveTeamMemberPermissions,
-    saveTeamSettingsContext,
-    calculateTipDistribution,
-    markPeriodsAsPaid,
+    addTip,
+    startNewPeriod,
+    endCurrentPeriod,
+    updatePeriod,
     deletePeriod,
+    markPeriodsAsPaid,
+    deletePaidPeriods,
     deletePayout,
-    subscribeToChannel,
-    selectedMonth,
-    setSelectedMonth,
-    nextMonth,
-    prevMonth,
-    formatMonth,
+    calculateTipDistribution,
+    hasReachedPeriodLimit,
+    getUnpaidPeriodsCount,
+    calculateAverageTipPerHour: (periodId?: string) => calculateAverageTipPerHour(periods, teamMembers, periodId),
+    calculateAutoCloseDate,
+    scheduleAutoClose,
+    getNextAutoCloseDate,
+    getFormattedClosingTime,
   };
 
-  return (
-    <AppContext.Provider value={contextValue}>
-      {children}
-    </AppContext.Provider>
-  );
+  return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
 };
 
-export const useApp = () => {
-  const context = useContext(AppContext);
+export const useAppData = () => {
+  const context = React.useContext(AppDataContext);
   if (context === undefined) {
-    throw new Error('useApp must be used within an AppProvider');
+    throw new Error('useAppData must be used within an AppDataProvider');
   }
   return context;
 };

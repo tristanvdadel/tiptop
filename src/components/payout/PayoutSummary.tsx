@@ -80,7 +80,7 @@ const PayoutSummary: React.FC<PayoutSummaryProps> = ({ onPayoutCompleted, onClos
       totalTips: totalTips,
       totalHours: totalHours,
       payerName: paidBy,
-      totalAmount: totalTips, // Adding the required totalAmount property
+      totalAmount: totalTips,
       distribution: distribution.map(m => ({
         memberId: m.id,
         amount: m.tipAmount || 0,

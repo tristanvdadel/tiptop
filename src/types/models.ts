@@ -20,7 +20,7 @@ export interface HourRegistration {
 
 export interface TeamMember {
   id: string;
-  team_id: string;
+  teamId: string;
   user_id?: string;
   name: string;
   hours: number;
@@ -54,7 +54,7 @@ export interface Period {
   name?: string;
   autoCloseDate?: string;
   averageTipPerHour?: number;
-  tips?: TipEntry[];
+  tips: TipEntry[];
   createdAt?: string;
 }
 
@@ -89,6 +89,9 @@ export interface Payout {
   distribution: PayoutDistribution[];
   periodIds: string[];
   createdAt?: string;
+  totalAmount?: number; // Add this field for consistency
 }
 
 export type PayoutData = Omit<Payout, 'id'>;
+
+export type PeriodDuration = 'day' | 'week' | 'month';

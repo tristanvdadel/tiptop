@@ -1,5 +1,6 @@
 
-import { Period, TeamMember, Payout, PeriodDuration } from '@/types/models';
+import { Period, TeamMember } from '@/types/models';
+import { PeriodDuration } from '@/types/contextTypes';
 import { addDays, addWeeks, addMonths, getDay, endOfWeek, endOfMonth } from 'date-fns';
 
 /**

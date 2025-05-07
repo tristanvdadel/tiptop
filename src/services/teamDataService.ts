@@ -62,22 +62,24 @@ export const calculateDistribution = (periodIds: string[], periods: any[], teamM
 // Process imported hours and update team members
 export const processImportedHours = (
   hourData: { name: string; hours: number; date: string; exists: boolean },
-  teamMembers: any[],
+  teamMembers: TeamMember[],
   addTeamMember: (name: string, hours: number) => Promise<void>,
   updateTeamMemberHours: (memberId: string, hours: number) => Promise<void>
 ) => {
-  const { name, hours, exists } = hourData;
+  const { name, hours, date, exists } = hourData;
   
-  // If the team member exists, update their hours
-  if (exists) {
-    const existingMember = teamMembers.find(
-      member => member.name.toLowerCase() === name.toLowerCase()
-    );
-    
-    if (existingMember) {
-      console.log(`Updating hours for existing team member: ${name}, hours: ${hours}`);
-      updateTeamMemberHours(existingMember.id, existingMember.hours + hours);
-    }
+  console.log(`Processing import for: ${name}, hours: ${hours}, exists: ${exists}`);
+  
+  // First check if this member already exists by comparing names
+  const existingMember = teamMembers.find(
+    member => member.name.toLowerCase() === name.toLowerCase()
+  );
+  
+  if (existingMember) {
+    // If the team member exists, update their hours
+    console.log(`Updating hours for existing team member: ${name} (${existingMember.id}), current hours: ${existingMember.hours}, adding: ${hours}`);
+    // Add the imported hours to the existing hours
+    updateTeamMemberHours(existingMember.id, existingMember.hours + hours);
   } else {
     // If the team member doesn't exist, add them
     console.log(`Adding new team member: ${name} with hours: ${hours}`);

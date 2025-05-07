@@ -49,7 +49,18 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
   const validateAndSetFile = (uploadedFile: File) => {
     // Currently supporting CSV and Excel files
     const validTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
-    if (!validTypes.includes(uploadedFile.type)) {
+    
+    console.log("File type:", uploadedFile.type);
+    
+    // If the file type is empty or unrecognized, check the extension
+    if (!uploadedFile.type || !validTypes.includes(uploadedFile.type)) {
+      const fileName = uploadedFile.name.toLowerCase();
+      if (fileName.endsWith('.csv') || fileName.endsWith('.xls') || fileName.endsWith('.xlsx')) {
+        console.log("File validated by extension:", fileName);
+        setFile(uploadedFile);
+        return;
+      }
+      
       console.log("Invalid file type:", uploadedFile.type);
       toast({
         title: "Ongeldig bestandstype",
@@ -58,6 +69,7 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
       });
       return;
     }
+    
     console.log("File validated and set:", uploadedFile.name);
     setFile(uploadedFile);
   };
@@ -82,8 +94,12 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
 
   const handleSelectFileClick = () => {
     // Manually trigger the file input click
+    console.log("Attempting to trigger file input click");
     if (fileInputRef.current) {
+      console.log("File input ref exists, clicking it");
       fileInputRef.current.click();
+    } else {
+      console.error("File input ref is null");
     }
   };
 
@@ -92,8 +108,10 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
     
     setIsUploading(true);
     try {
+      console.log("Starting to process file:", file.name);
       // Process the file and call the parent's onImport function
       await onImport(file);
+      console.log("File processed successfully, imported data:", importedHours.length);
       
       // Show the review dialog
       setShowReview(true);
@@ -110,6 +128,7 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
   };
 
   const handleConfirmHours = (confirmedHours: ImportedHour[]) => {
+    console.log("Confirming hours for import:", confirmedHours.length);
     setShowReview(false);
     // Call onConfirm to allow parent component to handle the imported hours
     onConfirm(confirmedHours);
@@ -168,7 +187,6 @@ const ImportHoursDialog: React.FC<ImportHoursDialogProps> = ({
                 className="hidden"
                 accept=".csv,.xls,.xlsx"
                 onChange={handleFileChange}
-                onClick={(e) => console.log("File input clicked")}
               />
               <Button 
                 variant="outline" 

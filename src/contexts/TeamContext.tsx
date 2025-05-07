@@ -1,9 +1,8 @@
-
 import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
 import { TeamMember } from '@/contexts/AppContext';
 import { useApp } from '@/contexts/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { calculateTipDistributionTotals } from '@/services/teamDataService';
+import { calculateTipDistributionTotals, processImportedHours } from '@/services/teamDataService';
 import { debounce } from '@/services/payoutService';
 import { fetchTeamPeriods } from '@/services/periodService';
 
@@ -157,10 +156,13 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       console.log(`Extracted ${extractedData.length} hour entries from file`);
       
-      const existingNames = new Set(teamMembers.map(m => m.name.toLowerCase()));
+      // Check if names already exist in the team members
+      const existingNames = teamMembers.map(m => m.name.toLowerCase());
+      console.log("Existing team member names:", existingNames);
+      
       const processedData = extractedData.map(item => ({
         ...item,
-        exists: existingNames.has(item.name.toLowerCase())
+        exists: existingNames.includes(item.name.toLowerCase())
       }));
       
       console.log('Processed extracted data:', processedData);
@@ -174,7 +176,6 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const handleConfirmImportedHours = (confirmedHours: ImportedHour[]) => {
     console.log(`Confirming import of ${confirmedHours.length} hour entries`);
-    const { processImportedHours } = require('@/services/teamDataService');
     
     for (const hourData of confirmedHours) {
       console.log(`Processing hours for ${hourData.name}: ${hourData.hours} hours on ${hourData.date}`);

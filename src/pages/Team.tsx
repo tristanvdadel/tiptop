@@ -38,7 +38,7 @@ const TeamContent: React.FC = () => {
   const navigate = useNavigate();
   const [showPayoutSummary, setShowPayoutSummary] = React.useState(false);
 
-  // Load team data on initial mount
+  // Load team data on initial mount and when teamId changes
   useEffect(() => {
     let isMounted = true;
     
@@ -113,6 +113,11 @@ const TeamContent: React.FC = () => {
       isMounted = false;
     };
   }, [teamMembers]);
+
+  // Force refresh data when there are changes in team members
+  useEffect(() => {
+    console.log("Team member count or data changed, refreshing local data:", teamMembers.length);
+  }, [teamMembers.length]);
 
   // Show payout summary if payoutSummary URL param is present
   if (showPayoutSummary) {

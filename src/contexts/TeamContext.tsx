@@ -1,10 +1,11 @@
 
 import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
-import { TeamMember, ImportedHour } from '@/types/models';
+import { TeamMember } from '@/contexts/AppContext';
 import { useApp } from '@/contexts/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { calculateTipDistributionTotals, processImportedHours } from '@/services/teamDataService';
 import { debounce } from '@/services/payoutService';
+import { fetchTeamPeriods } from '@/services/periodService';
 
 interface TeamContextType {
   selectedPeriods: string[];
@@ -25,19 +26,25 @@ interface TeamContextType {
   handleRefresh: () => Promise<void>;
 }
 
+export interface ImportedHour {
+  name: string;
+  hours: number;
+  date: string;
+  exists: boolean;
+}
+
 const TeamContext = createContext<TeamContextType | undefined>(undefined);
 
 export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const {
     teamMembers,
     addTeamMember,
-    updateTeamMember,
+    updateTeamMemberHours,
     calculateTipDistribution,
     markPeriodsAsPaid,
     periods,
     refreshTeamData,
-    teamId,
-    updateTeamMemberHours
+    teamId
   } = useApp();
   
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
@@ -181,9 +188,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await processImportedHours(
           hourData, 
           teamMembers, 
-          async (name: string, hours: number) => {
-            await addTeamMember(name, hours, 0);
-          }, 
+          addTeamMember, 
           updateTeamMemberHours
         );
       }

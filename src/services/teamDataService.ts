@@ -1,35 +1,5 @@
 
-import { TeamMember, ImportedHour } from '@/types/models';
-import { supabase } from "@/integrations/supabase/client";
-
-export const checkTeamMembersWithAccounts = async (teamMembers: TeamMember[]) => {
-  try {
-    // Extract all team member IDs
-    const memberIds = teamMembers.map(member => member.id);
-    
-    // Query team_members table with user_id IS NOT NULL
-    const { data, error } = await supabase
-      .from('team_members')
-      .select('id, user_id')
-      .in('id', memberIds)
-      .not('user_id', 'is', null);
-      
-    if (error) {
-      throw error;
-    }
-    
-    // Create dictionary of member IDs with hasAccount = true
-    const membersWithAccounts = data.reduce((acc: Record<string, boolean>, member) => {
-      acc[member.id] = true;
-      return acc;
-    }, {});
-    
-    return membersWithAccounts;
-  } catch (error) {
-    console.error('Error checking team members with accounts:', error);
-    throw error;
-  }
-};
+import { TeamMember } from '@/types/models';
 
 export const calculateTipDistributionTotals = (
   selectedPeriods: string[],
@@ -38,45 +8,97 @@ export const calculateTipDistributionTotals = (
 ) => {
   let totalTips = 0;
   let totalHours = 0;
-  
-  // Filter periods by selected periodIds
-  const filteredPeriods = periods.filter(period => selectedPeriods.includes(period.id));
-  
-  // Calculate total tips for selected periods
-  totalTips = filteredPeriods.reduce((sum, period) => {
-    return sum + period.tips.reduce((periodSum: number, tip: any) => periodSum + tip.amount, 0);
-  }, 0);
-  
-  // Calculate total hours for all team members
-  totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
-  
+
+  for (const periodId of selectedPeriods) {
+    const period = periods.find((p: any) => p.id === periodId);
+    if (period && period.tips) {
+      totalTips += period.tips.reduce((sum: number, tip: any) => sum + tip.amount, 0);
+    }
+
+    for (const member of teamMembers) {
+      totalHours += member.hours;
+    }
+  }
+
   return { totalTips, totalHours };
 };
 
-export async function processImportedHours(
-  hourData: ImportedHour,
+export const checkTeamMembersWithAccounts = async (teamMembers: TeamMember[]) => {
+  console.log('Checking team members with accounts, count:', teamMembers.length);
+  
+  for (const member of teamMembers) {
+    console.log(`Checking account status for team member: ${member.name} (ID: ${member.id})`);
+  }
+};
+
+export const calculateDistribution = (periodIds: string[], periods: any[], teamMembers: TeamMember[]) => {
+  let totalTips = 0;
+  let totalHours = 0;
+
+  // Calculate total tips and hours for selected periods
+  for (const periodId of periodIds) {
+    const period = periods.find((p: any) => p.id === periodId);
+    if (period && period.tips) {
+      totalTips += period.tips.reduce((sum: number, tip: any) => sum + tip.amount, 0);
+    }
+  }
+
+  for (const member of teamMembers) {
+    totalHours += member.hours;
+  }
+
+  // Calculate tip amount per team member
+  const distribution = teamMembers.map(member => {
+    const tipAmount = (member.hours / totalHours) * totalTips;
+    return {
+      ...member,
+      tipAmount: parseFloat(tipAmount.toFixed(2)),
+      hours: member.hours // Include hours in the distribution
+    };
+  });
+
+  return distribution;
+};
+
+// Process imported hours and update team members
+export const processImportedHours = async (
+  hourData: { name: string; hours: number; date: string; exists: boolean },
   teamMembers: TeamMember[],
-  addMember: (name: string, hours: number) => Promise<void>,
-  updateMember: (id: string, hours: number) => Promise<void>
-) {
+  addTeamMember: (name: string, hours: number) => Promise<void>,
+  updateTeamMemberHours: (memberId: string, hours: number) => Promise<void>
+) => {
+  const { name, hours, date, exists } = hourData;
+  
+  console.log(`Processing import for: ${name}, hours: ${hours}, exists: ${exists}`);
+  
   try {
-    // Normalize the name for comparison
-    const normalizedName = hourData.name.toLowerCase().trim();
-    
-    // Find existing member with this name
-    const existingMember = teamMembers.find(m => m.name.toLowerCase().trim() === normalizedName);
+    // First check if this member already exists by comparing names (case insensitive)
+    const existingMember = teamMembers.find(
+      member => member.name.toLowerCase() === name.toLowerCase()
+    );
     
     if (existingMember) {
-      // Update existing member hours
-      await updateMember(existingMember.id, hourData.hours);
-      return { success: true, message: `Updated hours for ${hourData.name}` };
+      // If the team member exists, update their hours
+      const currentHours = existingMember.hours || 0;
+      console.log(`Updating hours for existing team member: ${name} (${existingMember.id}), current hours: ${currentHours}, adding: ${hours}`);
+      
+      // Add the imported hours to the existing hours
+      const newTotalHours = currentHours + hours;
+      console.log(`New total hours will be: ${newTotalHours}`);
+      
+      // Wait for the update to complete
+      await updateTeamMemberHours(existingMember.id, newTotalHours);
+      console.log(`Hours updated successfully for ${name}: new total = ${newTotalHours}`);
     } else {
-      // Add new member
-      await addMember(hourData.name, hourData.hours);
-      return { success: true, message: `Added new member ${hourData.name}` };
+      // If the team member doesn't exist, add them
+      console.log(`Adding new team member: ${name} with hours: ${hours}`);
+      await addTeamMember(name, hours);
+      console.log(`Team member ${name} added successfully with ${hours} hours`);
     }
+    
+    return true;
   } catch (error) {
-    console.error('Error processing imported hours:', error);
-    return { success: false, message: `Error processing ${hourData.name}: ${error}` };
+    console.error(`Error processing hours for ${name}:`, error);
+    throw error;
   }
-}
+};

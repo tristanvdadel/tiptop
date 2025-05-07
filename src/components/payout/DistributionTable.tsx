@@ -3,7 +3,7 @@ import React, { useRef } from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from '@/components/ui/input';
-import { TeamMember } from '@/types/models';
+import { TeamMember } from '@/contexts/AppContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface PayoutDetailWithEdits {

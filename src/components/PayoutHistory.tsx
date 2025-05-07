@@ -277,13 +277,6 @@ const PayoutHistory = () => {
     );
   };
 
-  // Calculate total hours for a payout from its distribution
-  const calculateTotalHours = (payout) => {
-    return payout.distribution.reduce((sum, dist) => {
-      return sum + (dist.hours || 0);
-    }, 0);
-  };
-
   return (
     <>
       <Carousel
@@ -355,7 +348,10 @@ const PayoutHistory = () => {
                                   0
                                 );
                                 
-                                const totalHours = calculateTotalHours(payout);
+                                const totalHours = payout.distribution.reduce(
+                                  (sum, dist) => sum + (dist.hours || 0),
+                                  0
+                                );
                                 
                                 const hasAdjustment = hasAdjustments(payout);
                                 const hasBalance = hasBalances(payout);

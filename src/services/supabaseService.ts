@@ -1,12 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { Period, TeamMember } from '@/contexts/AppContext';
-import { PayoutData } from '@/types/models';
-
-/**
- * Helper functions for Supabase service
- * This file contains functions that interact with the Supabase database
- */
+import { Period, TeamMember, PayoutData } from '@/contexts/AppContext';
 
 /**
  * Saves a period and its associated tips to the database

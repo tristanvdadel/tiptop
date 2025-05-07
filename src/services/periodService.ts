@@ -1,6 +1,122 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { Period } from '@/types/models';
+import { Period } from '@/contexts/AppContext';
+
+/**
+ * Saves a period and its associated tips to the database
+ */
+export const savePeriod = async (teamId: string, period: Period) => {
+  const { id, startDate, endDate, isActive, isPaid, notes, name, autoCloseDate, tips, averageTipPerHour } = period;
+  
+  try {
+    console.log(`periodService: Saving period ${id} with name "${name}" to team ${teamId}`);
+    console.log(`periodService: Period data:`, { 
+      startDate, 
+      endDate, 
+      isActive, 
+      isPaid, 
+      autoCloseDate, 
+      tipsCount: tips?.length || 0,
+      averageTipPerHour
+    });
+    
+    // First update or insert the period
+    const { data: updatedPeriod, error: periodError } = await supabase
+      .from('periods')
+      .upsert({
+        id,
+        team_id: teamId,
+        start_date: startDate,
+        end_date: endDate,
+        is_active: isActive,
+        is_paid: isPaid,
+        notes,
+        name,
+        auto_close_date: autoCloseDate,
+        average_tip_per_hour: averageTipPerHour
+      })
+      .select()
+      .single();
+    
+    if (periodError) {
+      console.error('periodService: Error saving period:', periodError);
+      throw periodError;
+    }
+    
+    console.log('periodService: Period saved successfully:', updatedPeriod);
+    
+    // Then handle tips (if any)
+    if (tips && tips.length > 0) {
+      console.log(`periodService: Processing ${tips.length} tips for period ${id}`);
+      
+      // Get existing tips
+      const { data: existingTips, error: getTipsError } = await supabase
+        .from('tips')
+        .select('id')
+        .eq('period_id', id);
+      
+      if (getTipsError) {
+        console.error('periodService: Error fetching existing tips:', getTipsError);
+        throw getTipsError;
+      }
+      
+      const existingTipIds = existingTips.map(t => t.id);
+      const currentTipIds = tips.map(t => t.id);
+      
+      // Find tips to delete (in existing but not in current)
+      const tipsToDelete = existingTipIds.filter(id => !currentTipIds.includes(id));
+      
+      if (tipsToDelete.length > 0) {
+        console.log(`periodService: Deleting ${tipsToDelete.length} outdated tips`);
+        const { error: deleteError } = await supabase
+          .from('tips')
+          .delete()
+          .in('id', tipsToDelete);
+        
+        if (deleteError) {
+          console.error('periodService: Error deleting tips:', deleteError);
+          throw deleteError;
+        }
+        
+        console.log('periodService: Outdated tips deleted successfully');
+      }
+      
+      // Batch upsert all current tips in chunks to improve performance
+      const CHUNK_SIZE = 50; // Optimal chunk size for Supabase
+      
+      console.log(`periodService: Upserting ${tips.length} tips in chunks of ${CHUNK_SIZE}`);
+      
+      for (let i = 0; i < tips.length; i += CHUNK_SIZE) {
+        const chunk = tips.slice(i, i + CHUNK_SIZE);
+        const formattedTips = chunk.map(tip => ({
+          id: tip.id,
+          period_id: id,
+          amount: tip.amount,
+          date: tip.date,
+          note: tip.note,
+          added_by: tip.addedBy
+        }));
+        
+        const { error: upsertError } = await supabase
+          .from('tips')
+          .upsert(formattedTips);
+        
+        if (upsertError) {
+          console.error(`periodService: Error upserting tips chunk ${i} to ${i + chunk.length}:`, upsertError);
+          throw upsertError;
+        }
+      }
+      
+      console.log('periodService: All tips upserted successfully');
+    }
+    
+    console.log(`periodService: Successfully saved period ${id} with all its tips`);
+    return updatedPeriod;
+  } catch (error) {
+    console.error('periodService: Error saving period:', error);
+    throw error;
+  }
+};
 
 /**
  * Fetches all periods for a team from the database
@@ -51,7 +167,6 @@ export const fetchTeamPeriods = async (teamId: string) => {
           averageTipPerHour: period.average_tip_per_hour,
           tips: tips.map(tip => ({
             id: tip.id,
-            periodId: period.id,
             amount: tip.amount,
             date: tip.date,
             note: tip.note,
@@ -81,121 +196,6 @@ export const fetchTeamPeriods = async (teamId: string) => {
     return periodsWithTips;
   } catch (error) {
     console.error('periodService: Error fetching team periods:', error);
-    throw error;
-  }
-};
-
-// Alias for backward compatibility
-export const fetchPeriods = fetchTeamPeriods;
-
-/**
- * Saves a period and its associated tips to the database
- */
-export const savePeriod = async (period: Period) => {
-  const { id, teamId, startDate, endDate, isActive, isPaid, notes, name, autoCloseDate, tips, averageTipPerHour } = period;
-  
-  try {
-    console.log(`periodService: Saving period ${id} with name "${name}" to team ${teamId}`);
-    
-    // First update or insert the period
-    const { data: updatedPeriod, error: periodError } = await supabase
-      .from('periods')
-      .upsert({
-        id,
-        team_id: teamId,
-        start_date: startDate,
-        end_date: endDate,
-        is_active: isActive,
-        is_paid: isPaid,
-        notes,
-        name,
-        auto_close_date: autoCloseDate,
-        average_tip_per_hour: averageTipPerHour
-      })
-      .select()
-      .single();
-    
-    if (periodError) {
-      console.error('periodService: Error saving period:', periodError);
-      throw periodError;
-    }
-    
-    // Handle tips if provided
-    if (tips && tips.length > 0) {
-      // Get existing tips
-      const { data: existingTips, error: getTipsError } = await supabase
-        .from('tips')
-        .select('id')
-        .eq('period_id', id);
-      
-      if (getTipsError) {
-        console.error('periodService: Error fetching existing tips:', getTipsError);
-        throw getTipsError;
-      }
-      
-      const existingTipIds = existingTips.map(t => t.id);
-      const currentTipIds = tips.map(t => t.id);
-      
-      // Find tips to delete (in existing but not in current)
-      const tipsToDelete = existingTipIds.filter(id => !currentTipIds.includes(id));
-      
-      if (tipsToDelete.length > 0) {
-        console.log(`periodService: Deleting ${tipsToDelete.length} outdated tips`);
-        const { error: deleteError } = await supabase
-          .from('tips')
-          .delete()
-          .in('id', tipsToDelete);
-        
-        if (deleteError) {
-          console.error('periodService: Error deleting tips:', deleteError);
-          throw deleteError;
-        }
-      }
-      
-      // Upsert all current tips
-      for (const tip of tips) {
-        const { error: upsertError } = await supabase
-          .from('tips')
-          .upsert({
-            id: tip.id,
-            period_id: id,
-            amount: tip.amount,
-            date: tip.date,
-            note: tip.note,
-            added_by: tip.addedBy
-          });
-        
-        if (upsertError) {
-          console.error(`periodService: Error upserting tip ${tip.id}:`, upsertError);
-          throw upsertError;
-        }
-      }
-    }
-    
-    return updatedPeriod;
-  } catch (error) {
-    console.error('periodService: Error saving period:', error);
-    throw error;
-  }
-};
-
-/**
- * Delete a period by ID
- */
-export const deletePeriod = async (periodId: string) => {
-  try {
-    const { error } = await supabase
-      .from('periods')
-      .delete()
-      .eq('id', periodId);
-    
-    if (error) {
-      throw error;
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error deleting period:', error);
     throw error;
   }
 };

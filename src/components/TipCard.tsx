@@ -5,8 +5,7 @@ import { nl } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2 } from 'lucide-react';
-import { useApp } from '@/contexts/AppContext';
-import { TipEntry } from '@/types/models';
+import { TipEntry, useApp } from '@/contexts/AppContext';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,10 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import EditTipDialog from './EditTipDialog';
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-
-// Import the correct TeamMemberPermissions type
-import type { TeamMemberPermissions } from "@/types/models";
+import { supabase, TeamMemberPermissions } from "@/integrations/supabase/client";
 
 interface TipCardProps {
   tip: TipEntry;
@@ -90,13 +86,6 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
     });
   };
 
-  // This adapter is needed to handle the different function signatures
-  const handleUpdateTip = (periodId: string, tipId: string, updates: Partial<TipEntry>) => {
-    if (updateTip) {
-      updateTip(periodId, tipId, updates);
-    }
-  };
-
   return (
     <>
       <Card className="mb-3 relative group">
@@ -157,7 +146,7 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
         onClose={() => setIsEditDialogOpen(false)}
         tip={tip}
         periodId={actualPeriodId}
-        onSave={handleUpdateTip}
+        onSave={updateTip}
       />
     </>
   );

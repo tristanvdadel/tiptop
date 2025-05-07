@@ -78,3 +78,33 @@ export const saveTeamSettings = async (settings: TeamSettings) => {
     throw error;
   }
 };
+
+/**
+ * Get user teams safely using RPC function
+ */
+export const getUserTeamsSafe = async (userId: string) => {
+  try {
+    const { data, error } = await supabase.rpc('get_user_teams_safe', { user_id_param: userId });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error getting user teams:', error);
+    return [];
+  }
+};
+
+/**
+ * Get team members safely using RPC function
+ */
+export const getTeamMembersSafe = async (teamId: string) => {
+  try {
+    const { data, error } = await supabase.rpc('get_team_members_safe', { team_id_param: teamId });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error getting team members:', error);
+    return [];
+  }
+};

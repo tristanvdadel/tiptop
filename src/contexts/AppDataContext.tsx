@@ -177,52 +177,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setTeamId(fetchedTeamId);
       
       // Fetch all data in parallel
-      const [
-        periodsData,
-        membersData, 
-        settingsData,
-        payoutsData,
-      ] = await Promise.all([
-        fetchPeriods(fetchedTeamId),
-        fetchTeamMembers(fetchedTeamId),
-        fetchTeamSettings(fetchedTeamId),
-        fetchPayouts(fetchedTeamId),
-      ]);
-      
-      if (periodsError) {
-        console.error('Error fetching periods:', periodsError);
-        setError(periodsError);
+      try {
+        const [
+          periodsData,
+          membersData, 
+          settingsData,
+          payoutsData,
+        ] = await Promise.all([
+          fetchPeriods(fetchedTeamId),
+          fetchTeamMembers(fetchedTeamId),
+          fetchTeamSettings(fetchedTeamId),
+          fetchPayouts(fetchedTeamId),
+        ]);
+
+        // Update state with fetched data
+        setPeriods(periodsData || []);
+        setTeamMembers(membersData || []);
+        setTeamSettings(settingsData || null);
+        setPayouts(payoutsData || []);
+        
+        // Determine current and active periods
+        const now = new Date();
+        const active = periodsData?.find(
+          (period) => new Date(period.startDate) <= now && new Date(period.endDate) >= now
+        ) || null;
+        const current = active || periodsData?.[0] || null;
+        
+        setActivePeriod(active);
+        setCurrentPeriod(current);
+        
+        console.log('Team data refreshed successfully');
+      } catch (err) {
+        console.error('Error fetching team data:', err);
+        setError(err instanceof Error ? err : new Error('Failed to fetch team data'));
       }
-      if (membersError) {
-        console.error('Error fetching team members:', membersError);
-        setError(membersError);
-      }
-      if (settingsError) {
-        console.error('Error fetching team settings:', settingsError);
-        setError(settingsError);
-      }
-      if (payoutsError) {
-        console.error('Error fetching payouts:', payoutsError);
-        setError(payoutsError);
-      }
-      
-      // Update state with fetched data
-      setPeriods(periodsData || []);
-      setTeamMembers(membersData || []);
-      setTeamSettings(settingsData || null);
-      setPayouts(payoutsData || []);
-      
-      // Determine current and active periods
-      const now = new Date();
-      const active = periodsData?.find(
-        (period) => new Date(period.startDate) <= now && new Date(period.endDate) >= now
-      ) || null;
-      const current = active || periodsData?.[0] || null;
-      
-      setActivePeriod(active);
-      setCurrentPeriod(current);
-      
-      console.log('Team data refreshed successfully');
     } catch (err) {
       console.error('Error refreshing team data:', err);
       setError(err instanceof Error ? err : new Error('Failed to refresh team data'));
@@ -269,7 +257,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const startDate = startOfMonth(now).toISOString();
       const endDate = endOfMonth(now).toISOString();
 
-      const newPeriod: Omit<Period, 'id' | 'createdAt' | 'tips'> = {
+      const newPeriod = {
         teamId: teamId,
         startDate: startDate,
         endDate: endDate,
@@ -279,13 +267,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       // Save the new period to the database
-      const savedPeriod = await savePeriod(newPeriod);
+      const savedPeriod = await savePeriod(newPeriod as Period);
 
       if (savedPeriod) {
+        // Map database response to application model
+        const mappedPeriod: Period = {
+          id: savedPeriod.id,
+          teamId: savedPeriod.team_id,
+          startDate: savedPeriod.start_date,
+          endDate: savedPeriod.end_date,
+          isActive: savedPeriod.is_active,
+          isPaid: savedPeriod.is_paid,
+          name: savedPeriod.name,
+          autoCloseDate: savedPeriod.auto_close_date,
+          averageTipPerHour: savedPeriod.average_tip_per_hour,
+          notes: savedPeriod.notes,
+          tips: [],
+          createdAt: savedPeriod.created_at
+        };
+
         // Update the local state with the new period
-        setPeriods(prevPeriods => [savedPeriod, ...prevPeriods]);
-        setCurrentPeriod(savedPeriod);
-        setActivePeriod(savedPeriod);
+        setPeriods(prevPeriods => [mappedPeriod, ...prevPeriods]);
+        setCurrentPeriod(mappedPeriod);
+        setActivePeriod(mappedPeriod);
 
         toast({
           title: "Nieuwe periode gestart",
@@ -570,18 +574,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setError(null);
 
     try {
-      const newTeamMember: Omit<TeamMember, 'id'> = {
+      const newTeamMember = {
         team_id: teamId,
         name: name,
         hours: hours,
+        role: 'member',
+        permissions: {
+          add_tips: true,
+          add_hours: true,
+          view_team: true,
+          view_reports: true
+        }
       };
 
       // Save the new team member to the database
-      const savedTeamMember = await saveTeamMember(newTeamMember);
+      const savedTeamMember = await saveTeamMember(newTeamMember as unknown as TeamMember);
 
       if (savedTeamMember) {
         // Update the local state with the new team member
-        setTeamMembers(prevTeamMembers => [...prevTeamMembers, savedTeamMember as TeamMember]);
+        setTeamMembers(prevTeamMembers => [...prevTeamMembers, savedTeamMember]);
 
         toast({
           title: "Teamlid toegevoegd",

@@ -45,15 +45,22 @@ export const getUserEmail = async (userId: string) => {
   }
 };
 
-// Import safe team functions from service layer
-import { getUserTeamsSafe, getTeamMembersSafe } from '@/services/teamService';
+// Import function from service layer
+import { getUserTeamsSafe } from '@/services/teamService';
 
 // Verbeterde team member queries met veilige functies
 export const getTeamMembers = async (teamId: string) => {
   try {
     console.log('Fetching team members for team:', teamId);
     
-    const data = await getTeamMembersSafe(teamId);
+    // Use direct query instead of RPC function
+    const { data, error } = await supabase
+      .from('team_members')
+      .select('*')
+      .eq('team_id', teamId);
+      
+    if (error) throw error;
+    
     return { data, error: null };
   } catch (error) {
     console.error('Unexpected error in getTeamMembers:', error);

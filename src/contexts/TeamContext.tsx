@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo } from 'react';
+
+import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
 import { TeamMember, ImportedHour } from '@/types/models';
 import { useApp } from '@/contexts/AppContext';
 import { useNavigate } from 'react-router-dom';
@@ -179,7 +180,9 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await processImportedHours(
           hourData, 
           teamMembers, 
-          addTeamMember, 
+          async (name: string, hours: number) => {
+            await addTeamMember(name, hours);
+          }, 
           updateTeamMemberHours
         );
       }

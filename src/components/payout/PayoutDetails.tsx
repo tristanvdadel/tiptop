@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TeamMember } from '@/types/models';
+import { TeamMember, PayoutDistribution } from '@/types/models';
 import { formatCurrency } from '@/lib/utils';
 
 interface PayoutDetailItem {
@@ -13,6 +13,11 @@ interface PayoutDetailItem {
   hours?: number;
 }
 
+// Extended TeamMember type for display purposes
+interface DisplayTeamMember extends TeamMember {
+  actualAmount?: number;
+}
+
 export interface PayoutData {
   id: string;
   date: string;
@@ -21,7 +26,7 @@ export interface PayoutData {
 }
 
 interface PayoutDetailsProps {
-  distribution?: TeamMember[];
+  distribution?: DisplayTeamMember[];
   totalTips?: number;
   totalHours?: number;
   payout?: PayoutData;
@@ -47,8 +52,9 @@ const PayoutDetails = ({ distribution, totalTips, totalHours, payout }: PayoutDe
         hours: item.hours || 0,
         tipAmount: item.amount,
         balance: item.balance || 0,
-        actualAmount: item.actualAmount
-      } as TeamMember & { actualAmount?: number };
+        actualAmount: item.actualAmount,
+        team_id: '' // Required by TeamMember type
+      } as DisplayTeamMember;
       return member;
     }) || []);
 

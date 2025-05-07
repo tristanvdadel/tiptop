@@ -31,6 +31,7 @@ export const extractHoursFromExcel = async (file: File): Promise<ExtractedHourDa
 
     // Log the structure of the first row to help with debugging
     console.log("First row structure:", Object.keys(data[0]));
+    console.log("First row data sample:", data[0]);
     
     // Specifiek zoeken naar kolommen voor namen en gewerkte uren
     const headers = Object.keys(data[0] || {});
@@ -102,9 +103,20 @@ export const extractHoursFromExcel = async (file: File): Promise<ExtractedHourDa
       .filter(row => row[nameColumn] && row[hoursColumn] !== undefined)
       .map(row => {
         const name = String(row[nameColumn]).trim();
+        
         // Converteer uren naar een nummer, vervang komma door punt indien nodig
-        const hourString = String(row[hoursColumn]).replace(',', '.');
-        const hours = parseFloat(hourString);
+        let hourValue = row[hoursColumn];
+        let hours = 0;
+        
+        if (typeof hourValue === 'string') {
+          // Replace comma with dot for decimal parsing
+          hourValue = hourValue.replace(',', '.');
+          hours = parseFloat(hourValue);
+        } else if (typeof hourValue === 'number') {
+          hours = hourValue;
+        }
+        
+        console.log(`Extracted: Name=${name}, Hours=${hours} (original value: ${row[hoursColumn]})`);
         
         return {
           name,

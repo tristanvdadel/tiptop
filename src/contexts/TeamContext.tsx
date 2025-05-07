@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
 import { TeamMember } from '@/contexts/AppContext';
 import { useApp } from '@/contexts/AppContext';
@@ -177,18 +178,30 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const handleConfirmImportedHours = (confirmedHours: ImportedHour[]) => {
     console.log(`Confirming import of ${confirmedHours.length} hour entries`);
     
-    for (const hourData of confirmedHours) {
-      console.log(`Processing hours for ${hourData.name}: ${hourData.hours} hours on ${hourData.date}`);
-      processImportedHours(
-        hourData, 
-        teamMembers, 
-        addTeamMember, 
-        updateTeamMemberHours
-      );
+    try {
+      for (const hourData of confirmedHours) {
+        console.log(`Processing hours for ${hourData.name}: ${hourData.hours} hours on ${hourData.date}`);
+        
+        processImportedHours(
+          hourData, 
+          teamMembers, 
+          addTeamMember, 
+          updateTeamMemberHours
+        );
+      }
+      
+      console.log('Import process completed');
+      setShowImportDialog(false);
+      
+      // Force a team data refresh after the import
+      setTimeout(() => {
+        console.log('Refreshing team data after import');
+        refreshTeamData();
+      }, 500);
+      
+    } catch (error) {
+      console.error('Error during hour import:', error);
     }
-    
-    console.log('Import process completed');
-    setShowImportDialog(false);
   };
 
   const handleRefresh = useCallback(async () => {

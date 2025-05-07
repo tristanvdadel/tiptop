@@ -70,16 +70,22 @@ export const processImportedHours = (
   
   console.log(`Processing import for: ${name}, hours: ${hours}, exists: ${exists}`);
   
-  // First check if this member already exists by comparing names
+  // First check if this member already exists by comparing names (case insensitive)
   const existingMember = teamMembers.find(
     member => member.name.toLowerCase() === name.toLowerCase()
   );
   
   if (existingMember) {
     // If the team member exists, update their hours
-    console.log(`Updating hours for existing team member: ${name} (${existingMember.id}), current hours: ${existingMember.hours}, adding: ${hours}`);
+    const currentHours = existingMember.hours || 0;
+    console.log(`Updating hours for existing team member: ${name} (${existingMember.id}), current hours: ${currentHours}, adding: ${hours}`);
+    
     // Add the imported hours to the existing hours
-    updateTeamMemberHours(existingMember.id, existingMember.hours + hours);
+    const newTotalHours = currentHours + hours;
+    console.log(`New total hours will be: ${newTotalHours}`);
+    
+    // Update hours in the database
+    updateTeamMemberHours(existingMember.id, newTotalHours);
   } else {
     // If the team member doesn't exist, add them
     console.log(`Adding new team member: ${name} with hours: ${hours}`);

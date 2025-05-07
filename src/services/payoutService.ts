@@ -39,7 +39,7 @@ export const fetchPayouts = async (teamId: string) => {
         teamId: payout.team_id,
         date: payout.date,
         payoutTime: payout.payout_time,
-        totalTips: payout.total_tips,
+        totalTips: payout.total_tips || 0, // Add default value
         totalHours: payout.total_hours,
         payerName: payout.payer_name,
         periodIds: periodConnections.map(pc => pc.period_id),
@@ -73,7 +73,7 @@ export const savePayout = async (payoutData: PayoutData) => {
         team_id: payoutData.teamId,
         date: payoutData.date,
         payout_time: payoutData.payoutTime,
-        total_tips: payoutData.totalTips,
+        total_tips: payoutData.totalTips || 0, // Add default value
         total_hours: payoutData.totalHours,
         payer_name: payoutData.payerName
       }])

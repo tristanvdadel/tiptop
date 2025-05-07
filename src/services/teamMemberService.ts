@@ -18,7 +18,7 @@ export const fetchTeamMembers = async (teamId: string) => {
     // Map to application model format
     const mappedMembers: TeamMember[] = members.map(member => ({
       id: member.id,
-      team_id: member.team_id,
+      teamId: member.team_id,
       name: member.name || `Member ${member.id.substring(0, 5)}`,
       hours: member.hours || 0,
       user_id: member.user_id,
@@ -43,7 +43,7 @@ export const saveTeamMember = async (member: Omit<TeamMember, "id">) => {
     const { data, error } = await supabase
       .from('team_members')
       .insert([{
-        team_id: member.team_id,
+        team_id: member.teamId,
         name: member.name,
         hours: member.hours,
         user_id: member.user_id,
@@ -56,9 +56,17 @@ export const saveTeamMember = async (member: Omit<TeamMember, "id">) => {
       
     if (error) throw error;
     
+    // Map database response to application model
     return {
-      ...data,
+      id: data.id,
+      teamId: data.team_id,
       name: data.name || `Member ${data.id.substring(0, 5)}`,
+      hours: data.hours || 0,
+      user_id: data.user_id,
+      role: data.role,
+      permissions: data.permissions,
+      created_at: data.created_at,
+      balance: data.balance || 0
     } as TeamMember;
   } catch (error) {
     console.error("Error saving team member:", error);
@@ -73,7 +81,7 @@ export const updateTeamMember = async (memberId: string, member: Partial<TeamMem
   try {
     const updateData: any = {};
     
-    // Only include fields that exist in member
+    // Only include fields that exist in member and map to database columns
     if (member.name !== undefined) updateData.name = member.name;
     if (member.hours !== undefined) updateData.hours = member.hours;
     if (member.role !== undefined) updateData.role = member.role;
@@ -89,9 +97,17 @@ export const updateTeamMember = async (memberId: string, member: Partial<TeamMem
       
     if (error) throw error;
     
+    // Map database response to application model
     return {
-      ...data,
+      id: data.id,
+      teamId: data.team_id,
       name: data.name || `Member ${data.id.substring(0, 5)}`,
+      hours: data.hours || 0,
+      user_id: data.user_id,
+      role: data.role,
+      permissions: data.permissions,
+      created_at: data.created_at,
+      balance: data.balance || 0
     } as TeamMember;
   } catch (error) {
     console.error(`Error updating team member ${memberId}:`, error);

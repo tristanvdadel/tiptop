@@ -77,7 +77,21 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
         .eq('team_id', teamId);
 
       if (error) throw error;
-      return data as TeamMember[];
+      
+      // Map database format to application model format
+      const mappedMembers: TeamMember[] = (data || []).map(member => ({
+        id: member.id,
+        teamId: member.team_id,
+        name: member.name || `Member ${member.id.substring(0, 5)}`,
+        hours: member.hours || 0,
+        user_id: member.user_id,
+        role: member.role,
+        permissions: member.permissions,
+        created_at: member.created_at,
+        balance: member.balance || 0,
+      }));
+      
+      return mappedMembers;
     } catch (error) {
       console.error('Error fetching team members:', error);
       throw error;
@@ -154,7 +168,7 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
     }
   }, []);
 
-  // Save team member
+  // Save team member - updated to match database schema
   const saveTeamMember = useCallback(async (member: TeamMember) => {
     try {
       const { error } = await supabase
@@ -165,7 +179,9 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
             team_id: member.teamId,
             name: member.name,
             hours: member.hours,
-            balance: member.balance || 0
+            balance: member.balance || 0,
+            role: member.role || 'member', // Add default role
+            user_id: member.user_id || null // Ensure user_id field is present
           }
         ]);
 
@@ -384,7 +400,7 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
   }, [teamId, fetchTeamMembers, fetchTeamPeriods, fetchPayouts]);
 
   // Add team member
-  const addTeamMember = useCallback(async (name: string, hours: number, balance: number) => {
+  const addTeamMember = useCallback(async (name: string, hours: number, balance: number = 0) => {
     if (!teamId) return;
     const newMember: TeamMember = {
       id: uuidv4(),
@@ -445,6 +461,81 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
     }
   }, [teamId, currentPeriod, savePeriod, refreshTeamData]);
 
+  // Update tip
+  const updateTip = useCallback(async (periodId: string, tipId: string, updates: Partial<TipEntry>) => {
+    try {
+      const period = periods.find(p => p.id === periodId);
+      if (!period) throw new Error(`Period with ID ${periodId} not found`);
+      
+      const tipIndex = period.tips.findIndex(t => t.id === tipId);
+      if (tipIndex === -1) throw new Error(`Tip with ID ${tipId} not found`);
+      
+      const updatedTips = [...period.tips];
+      updatedTips[tipIndex] = { ...updatedTips[tipIndex], ...updates };
+      
+      const updatedPeriod = { ...period, tips: updatedTips };
+      
+      await savePeriod(updatedPeriod);
+      await refreshTeamData();
+    } catch (error) {
+      console.error('Error updating tip:', error);
+      throw error;
+    }
+  }, [periods, savePeriod, refreshTeamData]);
+
+  // Delete tip
+  const deleteTip = useCallback(async (periodId: string, tipId: string) => {
+    try {
+      const period = periods.find(p => p.id === periodId);
+      if (!period) throw new Error(`Period with ID ${periodId} not found`);
+      
+      const updatedTips = period.tips.filter(t => t.id !== tipId);
+      const updatedPeriod = { ...period, tips: updatedTips };
+      
+      await savePeriod(updatedPeriod);
+      await refreshTeamData();
+    } catch (error) {
+      console.error('Error deleting tip:', error);
+      throw error;
+    }
+  }, [periods, savePeriod, refreshTeamData]);
+
+  // Update team member hours
+  const updateTeamMemberHours = useCallback(async (id: string, hours: number) => {
+    try {
+      await updateTeamMember(id, { hours });
+    } catch (error) {
+      console.error('Error updating team member hours:', error);
+      throw error;
+    }
+  }, [updateTeamMember]);
+
+  // Delete hour registration
+  const deleteHourRegistration = useCallback(async (regId: string) => {
+    try {
+      const { error } = await supabase
+        .from('hour_registrations')
+        .delete()
+        .eq('id', regId);
+
+      if (error) throw error;
+      await refreshTeamData();
+    } catch (error) {
+      console.error('Error deleting hour registration:', error);
+      throw error;
+    }
+  }, [refreshTeamData]);
+
+  // Update team member name
+  const updateTeamMemberName = useCallback(async (id: string, name: string) => {
+    try {
+      await updateTeamMember(id, { name });
+    } catch (error) {
+      console.error('Error updating team member name:', error);
+      throw error;
+    }
+  }, [updateTeamMember]);
+  
   // Start new period
   const startNewPeriod = useCallback(async () => {
     if (!teamId) return;
@@ -520,7 +611,7 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
   }, [periods, savePeriod, refreshTeamData]);
 
   // Mark periods as paid
-  const markPeriodsAsPaid = useCallback(async (periodIds: string[], distribution: TeamMember[]) => {
+  const markPeriodsAsPaid = useCallback(async (periodIds: string[], distribution: any[]) => {
     if (!teamId) return;
 
     // 1. Mark periods as paid
@@ -537,12 +628,12 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
       teamId: teamId,
       date: new Date().toISOString(),
       payoutTime: new Date().toISOString(),
-      totalTips: distribution.reduce((sum, member) => sum + (member.tipAmount || 0), 0),
+      totalTips: distribution.reduce((sum, member) => sum + (member.amount || 0), 0),
       totalHours: teamMembers.reduce((sum, member) => sum + member.hours, 0),
       payerName: 'Admin', // Replace with actual payer name if needed
       distribution: distribution.map(m => ({
-        memberId: m.id,
-        amount: m.tipAmount || 0,
+        memberId: m.memberId || m.id,
+        amount: m.amount || m.tipAmount || 0,
         hours: m.hours,
         balance: m.balance,
       })),
@@ -685,6 +776,11 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
     updateTeamMember,
     deleteTeamMember,
     addTip,
+    updateTip,
+    deleteTip,
+    updateTeamMemberHours,
+    deleteHourRegistration,
+    updateTeamMemberName,
     startNewPeriod,
     endCurrentPeriod,
     updatePeriod,

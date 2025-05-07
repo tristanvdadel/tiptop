@@ -31,11 +31,16 @@ export interface AppContextType {
   updateTeamMember: (id: string, updates: Partial<TeamMember>) => Promise<void>;
   deleteTeamMember: (id: string) => Promise<void>;
   addTip: (amount: number, note?: string, date?: string) => Promise<void>;
+  updateTip: (periodId: string, tipId: string, updates: Partial<TipEntry>) => Promise<void>;
+  deleteTip: (periodId: string, tipId: string) => Promise<void>;
+  updateTeamMemberHours: (id: string, hours: number) => Promise<void>;
+  deleteHourRegistration: (regId: string) => Promise<void>;
+  updateTeamMemberName: (id: string, name: string) => Promise<void>;
   startNewPeriod: () => Promise<void>;
   endCurrentPeriod: () => Promise<void>;
   updatePeriod: (periodId: string, updates: Partial<Period>) => Promise<void>;
   deletePeriod: (periodId: string) => Promise<void>;
-  markPeriodsAsPaid: (periodIds: string[], distribution: TeamMember[]) => Promise<void>;
+  markPeriodsAsPaid: (periodIds: string[], distribution: any[]) => Promise<void>;
   deletePaidPeriods: () => Promise<void>;
   deletePayout: (payoutId: string) => Promise<void>;
   calculateTipDistribution: (periodIds: string[]) => TeamMember[];

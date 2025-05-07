@@ -95,3 +95,12 @@ export interface Payout {
 export type PayoutData = Omit<Payout, 'id'>;
 
 export type PeriodDuration = 'day' | 'week' | 'month';
+
+// Add ImportedHour type for the TeamContext
+export interface ImportedHour {
+  name: string;
+  hours: number;
+  date: string;
+  exists?: boolean;
+  status?: string;
+}

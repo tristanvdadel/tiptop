@@ -16,7 +16,7 @@ const TeamContent: React.FC = () => {
   const {
     teamMembers,
     addTeamMember,
-    removeTeamMember,
+    deleteTeamMember,
     updateTeamMemberHours,
     deleteHourRegistration,
     refreshTeamData,
@@ -148,7 +148,7 @@ const TeamContent: React.FC = () => {
       <TeamMemberList 
         teamMembers={sortedTeamMembers}
         addTeamMember={addTeamMember}
-        removeTeamMember={removeTeamMember}
+        removeTeamMember={deleteTeamMember}
         updateTeamMemberHours={updateTeamMemberHours}
         deleteHourRegistration={deleteHourRegistration}
         updateTeamMemberName={updateTeamMemberName}

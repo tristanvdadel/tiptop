@@ -31,12 +31,13 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const {
     teamMembers,
     addTeamMember,
-    updateTeamMemberHours,
+    updateTeamMember,
     calculateTipDistribution,
     markPeriodsAsPaid,
     periods,
     refreshTeamData,
-    teamId
+    teamId,
+    updateTeamMemberHours
   } = useApp();
   
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
@@ -181,7 +182,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           hourData, 
           teamMembers, 
           async (name: string, hours: number) => {
-            await addTeamMember(name, hours);
+            await addTeamMember(name, hours, 0);
           }, 
           updateTeamMemberHours
         );

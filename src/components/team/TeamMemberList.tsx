@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { TeamMember, HourRegistration } from '@/types/models';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -100,7 +101,7 @@ const TeamMemberList: React.FC<TeamMemberListProps> = ({
     }
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>, id: string) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, id: string) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleHoursSubmit(id);

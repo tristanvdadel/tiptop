@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,9 +9,10 @@ import { Payout, PayoutData, TeamMember } from '@/types/models';
 
 interface PayoutSummaryProps {
   onPayoutCompleted?: () => void;
+  onClose?: () => void;
 }
 
-const PayoutSummary: React.FC<PayoutSummaryProps> = ({ onPayoutCompleted }) => {
+const PayoutSummary: React.FC<PayoutSummaryProps> = ({ onPayoutCompleted, onClose }) => {
   const { teamId, periods, teamMembers, payouts, calculateTipDistribution, markPeriodsAsPaid, mostRecentPayout, refreshTeamData } = useApp();
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
   const [distribution, setDistribution] = useState<TeamMember[]>([]);
@@ -70,7 +72,7 @@ const PayoutSummary: React.FC<PayoutSummaryProps> = ({ onPayoutCompleted }) => {
   const savePayoutData = async () => {
     if (!teamId || !selectedPeriods.length || !paidBy || !distribution.length) return;
     
-    // Create payout data without totalAmount
+    // Create payout data
     const payoutData: PayoutData = {
       teamId,
       date: new Date().toISOString(),
@@ -140,9 +142,17 @@ const PayoutSummary: React.FC<PayoutSummaryProps> = ({ onPayoutCompleted }) => {
           />
         </div>
         
-        <Button onClick={handlePayout} disabled={isSaving} className="bg-green-500 hover:bg-green-600 text-white">
-          {isSaving ? 'Uitbetalen...' : 'Uitbetalen'}
-        </Button>
+        <div className="flex justify-between gap-2">
+          <Button onClick={handlePayout} disabled={isSaving} className="bg-green-500 hover:bg-green-600 text-white">
+            {isSaving ? 'Uitbetalen...' : 'Uitbetalen'}
+          </Button>
+          
+          {onClose && (
+            <Button onClick={onClose} variant="outline">
+              Annuleren
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

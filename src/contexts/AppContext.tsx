@@ -38,6 +38,9 @@ import { nl } from 'date-fns/locale';
 // Export type definitions
 export type PeriodDuration = 'day' | 'week' | 'month';
 
+// Export models from types for components to use
+export { Period, TeamMember, HourRegistration, TipEntry } from '@/types/models';
+
 export interface AppContextType {
   teamId: string | null;
   periods: Period[];
@@ -71,13 +74,13 @@ export interface AppContextType {
   nextMonth: () => void;
   prevMonth: () => void;
   formatMonth: (date: Date) => string;
-  // Adding missing properties required by PeriodSummary.tsx
+  // Add required API methods for other components
   updatePeriod: (periodId: string, updates: Partial<Period>) => Promise<void>;
   endCurrentPeriod: () => Promise<void>;
   hasReachedPeriodLimit: () => boolean;
   autoClosePeriods: boolean;
   calculateAverageTipPerHour: (periodId?: string) => number;
-  // Adding missing properties required by PeriodSettings.tsx
+  // Add required properties for PeriodSettings.tsx
   periodDuration: PeriodDuration;
   setPeriodDuration: (duration: PeriodDuration) => void;
   setAutoClosePeriods: (auto: boolean) => void;
@@ -89,7 +92,7 @@ export interface AppContextType {
   closingTime: { hour: number, minute: number };
   setClosingTime: (time: { hour: number, minute: number }) => void;
   getFormattedClosingTime: () => string;
-  // Adding missing properties required by PayoutSummary.tsx
+  // Add required properties for PayoutSummary.tsx
   mostRecentPayout: Payout | null;
   updateTeamMemberBalance: (memberId: string, balance: number) => Promise<void>;
   clearTeamMemberHours: (memberId: string) => Promise<void>;
@@ -150,7 +153,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
-  // Implement the missing methods needed by PeriodSummary
+  // Implement the missing methods needed by various components
   const calculateAverageTipPerHour = (periodId?: string) => {
     // Implementation logic
     return 0;
@@ -173,7 +176,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Implementation logic
   };
   
-  // Implement the missing methods needed by PayoutSummary
   const updateTeamMemberBalance = async (memberId: string, balance: number) => {
     // Implementation logic
   };
@@ -182,7 +184,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Implementation logic
   };
   
-  // Implement the missing methods needed by PeriodSettings
   const calculateAutoCloseDate = (startDate: string, duration: PeriodDuration): string => {
     // Implementation logic 
     return new Date().toISOString();
@@ -205,78 +206,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Helper to delete paid periods
   const deletePaidPeriods = () => {
     // Implementation logic
-  };
-
-  // Fixed markPeriodsAsPaid function with correct property name
-  const markPeriodsAsPaid = async (periodIds: string[], distribution: any[]) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Mark periods as paid in the database
-      await Promise.all(
-        periodIds.map(async (periodId) => {
-          const periodToUpdate = periods.find(period => period.id === periodId);
-          if (!periodToUpdate) {
-            console.error('Period not found in local state');
-            return;
-          }
-
-          // Update the period with the isPaid flag
-          const updatedPeriod = { ...periodToUpdate, isPaid: true };
-
-          // Save the updated period to the database
-          await savePeriod(updatedPeriod);
-        })
-      );
-
-      // Save payout information to the database - fix incorrect property name
-      const payoutData: PayoutData = {
-        teamId: teamId!,
-        periodIds: periodIds,
-        distribution: distribution,
-        totalTips: distribution.reduce((acc: number, member: any) => acc + member.amount, 0),
-        totalHours: teamMembers.reduce((acc: number, member: TeamMember) => acc + member.hours, 0),
-        payoutTime: new Date().toISOString(), // Fixed: was payoutDate, now payoutTime
-        date: new Date().toISOString(),
-      };
-
-      // Save the payout to the database
-      const savedPayout = await savePayout(payoutData);
-
-      if (savedPayout) {
-        // Update the local state with the updated periods
-        setPeriods(prevPeriods =>
-          prevPeriods.map(period =>
-            periodIds.includes(period.id) ? { ...period, isPaid: true } : period
-          )
-        );
-
-        // Update the local state with the new payout
-        setPayouts(prevPayouts => [...prevPayouts, savedPayout]);
-
-        toast({
-          title: "Periode(s) uitbetaald",
-          description: "De periode(s) zijn succesvol uitbetaald.",
-        });
-      } else {
-        toast({
-          title: "Fout",
-          description: "Er is een fout opgetreden bij het uitbetalen van de periode(s)",
-          variant: "destructive",
-        });
-      }
-    } catch (err) {
-      console.error('Error marking periods as paid:', err);
-      setError(err instanceof Error ? err : new Error('Failed to mark periods as paid'));
-      toast({
-        title: "Fout",
-        description: "Er is een fout opgetreden bij het uitbetalen van de periode(s)",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
   };
 
   const refreshTeamData = useCallback(async () => {
@@ -335,14 +264,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ]);
 
         // Update state with fetched data, ensuring proper mapping
-        setPeriods(periodsData?.map(mapDbPeriodToAppPeriod) || []);
+        const mappedPeriods = periodsData?.map(mapDbPeriodToAppPeriod) || [];
+        setPeriods(mappedPeriods);
         setTeamMembers(membersData || []);
         setTeamSettings(settingsData || null);
         setPayouts(payoutsData || []);
         
         // Determine current and active periods
         const now = new Date();
-        const mappedPeriods = periodsData?.map(mapDbPeriodToAppPeriod) || [];
         const active = mappedPeriods.find(
           (period) => new Date(period.startDate) <= now && new Date(period.endDate) >= now
         ) || null;
@@ -757,7 +686,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const addTeamMember = async (name: string, hours: number) => {
+  const addTeamMember = async (name: string, hours: number = 0) => {
     if (!teamId) {
       console.error('Cannot add team member without a team ID');
       return;
@@ -1111,7 +1040,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         distribution: distribution,
         totalTips: distribution.reduce((acc: number, member: any) => acc + member.amount, 0),
         totalHours: teamMembers.reduce((acc: number, member: TeamMember) => acc + member.hours, 0),
-        payoutTime: new Date().toISOString(), // Fixed: was payoutDate, now payoutTime
+        payoutTime: new Date().toISOString(),
         date: new Date().toISOString(),
       };
 

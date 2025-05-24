@@ -62,7 +62,7 @@ const TipInput = () => {
         // Then add the tip to the new period after a small delay to allow state updates
         setTimeout(() => {
           console.log('TipInput: Adding tip to newly created period');
-          addTip(parsedAmount, note.trim() || undefined, date.toISOString());
+          addTip(currentPeriod?.id || '', parsedAmount, note.trim() || undefined, date.toISOString());
           resetForm();
           setIsCreatingPeriod(false);
         }, 500);
@@ -78,7 +78,7 @@ const TipInput = () => {
     } else {
       // Normal flow when period exists
       console.log('TipInput: Adding tip to existing period:', currentPeriod.id);
-      addTip(parsedAmount, note.trim() || undefined, date.toISOString());
+      addTip(currentPeriod.id, parsedAmount, note.trim() || undefined, date.toISOString());
       resetForm();
     }
   };

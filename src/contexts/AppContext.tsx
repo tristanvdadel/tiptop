@@ -3,7 +3,7 @@ import React, { createContext, useContext } from 'react';
 import { AppDataProvider, useAppData } from './AppDataContext';
 
 // Re-export types
-export type { TeamMember, Period, TipEntry, PayoutData, PeriodDuration } from './contextTypes';
+export type { TeamMember, Period, TipEntry, PayoutData, PeriodDuration, HourRegistration, ClosingTime } from './contextTypes';
 export type { ImportedHour, DisplayTeamMember } from '@/types/models';
 
 // Context type definition
@@ -30,6 +30,11 @@ export interface AppContextType {
   addPeriod: (name?: string) => void;
   closePeriod: (periodId: string) => void;
   markPeriodsAsPaid: (periodIds: string[], distribution: any[]) => void;
+  startNewPeriod: () => Promise<void>;
+  endCurrentPeriod: () => Promise<void>;
+  updatePeriod: (periodId: string, updates: Partial<Period>) => Promise<void>;
+  deletePeriod: (periodId: string) => void;
+  deletePaidPeriods: () => void;
 
   // Tip operations
   addTip: (periodId: string, amount: number, note?: string, date?: string) => void;
@@ -39,6 +44,22 @@ export interface AppContextType {
   // Calculation functions
   calculateTipDistribution: (periodIds: string[]) => TeamMember[];
   calculateAverageTipPerHour: (periodId?: string) => number;
+  hasReachedPeriodLimit: () => boolean;
+  getUnpaidPeriodsCount: () => number;
+
+  // Period settings
+  periodDuration: PeriodDuration;
+  setPeriodDuration: (duration: PeriodDuration) => void;
+  autoClosePeriods: boolean;
+  setAutoClosePeriods: (enabled: boolean) => void;
+  alignWithCalendar: boolean;
+  setAlignWithCalendar: (enabled: boolean) => void;
+  closingTime: ClosingTime;
+  setClosingTime: (time: ClosingTime) => void;
+  calculateAutoCloseDate: (startDate: string, duration: PeriodDuration) => string;
+  scheduleAutoClose: (date: string) => void;
+  getNextAutoCloseDate: () => string | null;
+  getFormattedClosingTime: () => string;
 
   // Data refresh
   refreshTeamData: () => Promise<void>;
@@ -46,7 +67,7 @@ export interface AppContextType {
 }
 
 // Import TeamMember, Period, TipEntry types
-import type { TeamMember, Period, TipEntry, PayoutData, PeriodDuration } from './contextTypes';
+import type { TeamMember, Period, TipEntry, PayoutData, PeriodDuration, HourRegistration, ClosingTime } from './contextTypes';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 

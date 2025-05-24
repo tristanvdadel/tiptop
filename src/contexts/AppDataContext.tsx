@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { TeamMember, Period, TipEntry, PayoutData } from './contextTypes';
+import { TeamMember, Period, TipEntry, PayoutData, PeriodDuration, ClosingTime } from './contextTypes';
 import { v4 as uuidv4 } from 'uuid';
 import { saveTeamMemberService, savePeriodService, savePayoutToSupabase } from '@/services';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +27,11 @@ interface AppDataContextType {
   addPeriod: (name?: string) => void;
   closePeriod: (periodId: string) => void;
   markPeriodsAsPaid: (periodIds: string[], distribution: any[]) => void;
+  startNewPeriod: () => Promise<void>;
+  endCurrentPeriod: () => Promise<void>;
+  updatePeriod: (periodId: string, updates: Partial<Period>) => Promise<void>;
+  deletePeriod: (periodId: string) => void;
+  deletePaidPeriods: () => void;
 
   // Tip operations
   addTip: (periodId: string, amount: number, note?: string, date?: string) => void;
@@ -36,6 +41,22 @@ interface AppDataContextType {
   // Calculation functions
   calculateTipDistribution: (periodIds: string[]) => TeamMember[];
   calculateAverageTipPerHour: (periodId?: string) => number;
+  hasReachedPeriodLimit: () => boolean;
+  getUnpaidPeriodsCount: () => number;
+
+  // Period settings
+  periodDuration: PeriodDuration;
+  setPeriodDuration: (duration: PeriodDuration) => void;
+  autoClosePeriods: boolean;
+  setAutoClosePeriods: (enabled: boolean) => void;
+  alignWithCalendar: boolean;
+  setAlignWithCalendar: (enabled: boolean) => void;
+  closingTime: ClosingTime;
+  setClosingTime: (time: ClosingTime) => void;
+  calculateAutoCloseDate: (startDate: string, duration: PeriodDuration) => string;
+  scheduleAutoClose: (date: string) => void;
+  getNextAutoCloseDate: () => string | null;
+  getFormattedClosingTime: () => string;
 
   // Data refresh
   refreshTeamData: () => Promise<void>;
@@ -51,6 +72,13 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [payouts, setPayouts] = useState<PayoutData[]>([]);
   const [mostRecentPayout, setMostRecentPayout] = useState<PayoutData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Period settings
+  const [periodDuration, setPeriodDuration] = useState<PeriodDuration>('week');
+  const [autoClosePeriods, setAutoClosePeriods] = useState(false);
+  const [alignWithCalendar, setAlignWithCalendar] = useState(false);
+  const [closingTime, setClosingTime] = useState<ClosingTime>({ hour: 0, minute: 0 });
+
   const { toast } = useToast();
 
   const currentPeriod = periods.find(p => p.isActive) || null;
@@ -165,30 +193,29 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setTeamMembers(prev => [...prev, newMember]);
 
     try {
-      // Don't save to database for local team members
-      const dbMembers = teamMembers.filter(m => !m.id.startsWith('local-'));
-      const memberToSave = {
-        ...newMember,
-        role: 'member' as const,
-        user_id: null,
-        permissions: {
-          add_tips: false,
-          edit_tips: false,
-          add_hours: false,
-          view_team: true,
-          view_reports: false,
-          close_periods: false,
-          manage_payouts: false
-        } as any
-      };
-
       await supabase
         .from('team_members')
-        .insert([memberToSave]);
+        .insert([{
+          id: newMember.id,
+          team_id: teamId,
+          user_id: uuidv4(),
+          role: 'member',
+          permissions: {
+            add_tips: false,
+            edit_tips: false,
+            add_hours: false,
+            view_team: true,
+            view_reports: false,
+            close_periods: false,
+            manage_payouts: false
+          },
+          hours: hours,
+          balance: balance
+        }]);
     } catch (error) {
       console.error('Error saving team member:', error);
     }
-  }, [teamId, teamMembers]);
+  }, [teamId]);
 
   const removeTeamMember = useCallback((id: string) => {
     setTeamMembers(prev => prev.filter(member => member.id !== id));
@@ -245,6 +272,61 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setPeriods(prev => [...prev, newPeriod]);
   }, [teamId]);
+
+  const startNewPeriod = useCallback(async () => {
+    if (!teamId) return;
+
+    // Close current period if exists
+    if (currentPeriod) {
+      setPeriods(prev => 
+        prev.map(period => 
+          period.id === currentPeriod.id 
+            ? { ...period, isActive: false, endDate: new Date().toISOString() }
+            : period
+        )
+      );
+    }
+
+    const newPeriod: Period = {
+      id: uuidv4(),
+      startDate: new Date().toISOString(),
+      endDate: null,
+      isActive: true,
+      isPaid: false,
+      name: `Period ${new Date().toLocaleDateString()}`,
+      tips: []
+    };
+
+    setPeriods(prev => [...prev, newPeriod]);
+  }, [teamId, currentPeriod]);
+
+  const endCurrentPeriod = useCallback(async () => {
+    if (!currentPeriod) return;
+
+    setPeriods(prev => 
+      prev.map(period => 
+        period.id === currentPeriod.id 
+          ? { ...period, isActive: false, endDate: new Date().toISOString() }
+          : period
+      )
+    );
+  }, [currentPeriod]);
+
+  const updatePeriod = useCallback(async (periodId: string, updates: Partial<Period>) => {
+    setPeriods(prev => 
+      prev.map(period => 
+        period.id === periodId ? { ...period, ...updates } : period
+      )
+    );
+  }, []);
+
+  const deletePeriod = useCallback((periodId: string) => {
+    setPeriods(prev => prev.filter(period => period.id !== periodId));
+  }, []);
+
+  const deletePaidPeriods = useCallback(() => {
+    setPeriods(prev => prev.filter(period => !period.isPaid));
+  }, []);
 
   const closePeriod = useCallback((periodId: string) => {
     setPeriods(prev => 
@@ -353,6 +435,47 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return totalHours > 0 ? totalTips / totalHours : 0;
   }, [periods, teamMembers]);
 
+  const hasReachedPeriodLimit = useCallback(() => {
+    return false; // For now, no limit
+  }, []);
+
+  const getUnpaidPeriodsCount = useCallback(() => {
+    return periods.filter(p => !p.isPaid && !p.isActive).length;
+  }, [periods]);
+
+  const calculateAutoCloseDate = useCallback((startDate: string, duration: PeriodDuration): string => {
+    const start = new Date(startDate);
+    const close = new Date(start);
+    
+    switch (duration) {
+      case 'day':
+        close.setDate(start.getDate() + 1);
+        break;
+      case 'week':
+        close.setDate(start.getDate() + 7);
+        break;
+      case 'month':
+        close.setMonth(start.getMonth() + 1);
+        break;
+    }
+    
+    close.setHours(closingTime.hour, closingTime.minute, 0, 0);
+    return close.toISOString();
+  }, [closingTime]);
+
+  const scheduleAutoClose = useCallback((date: string) => {
+    // Implementation for scheduling auto close
+  }, []);
+
+  const getNextAutoCloseDate = useCallback((): string | null => {
+    if (!currentPeriod?.autoCloseDate) return null;
+    return currentPeriod.autoCloseDate;
+  }, [currentPeriod]);
+
+  const getFormattedClosingTime = useCallback((): string => {
+    return `${closingTime.hour.toString().padStart(2, '0')}:${closingTime.minute.toString().padStart(2, '0')}`;
+  }, [closingTime]);
+
   // Initialize team data
   useEffect(() => {
     const initializeTeam = async () => {
@@ -401,11 +524,30 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     addPeriod,
     closePeriod,
     markPeriodsAsPaid,
+    startNewPeriod,
+    endCurrentPeriod,
+    updatePeriod,
+    deletePeriod,
+    deletePaidPeriods,
     addTip,
     deleteTip,
     updateTip,
     calculateTipDistribution,
     calculateAverageTipPerHour,
+    hasReachedPeriodLimit,
+    getUnpaidPeriodsCount,
+    periodDuration,
+    setPeriodDuration,
+    autoClosePeriods,
+    setAutoClosePeriods,
+    alignWithCalendar,
+    setAlignWithCalendar,
+    closingTime,
+    setClosingTime,
+    calculateAutoCloseDate,
+    scheduleAutoClose,
+    getNextAutoCloseDate,
+    getFormattedClosingTime,
     refreshTeamData,
     setMostRecentPayout
   };

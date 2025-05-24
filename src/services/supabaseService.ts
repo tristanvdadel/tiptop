@@ -1,6 +1,6 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { Period, TeamMember, PayoutData } from '@/contexts/AppContext';
+import { Period, TeamMember } from '@/contexts/AppContext';
+import { PayoutData } from '@/types/models';
 
 /**
  * Saves a period and its associated tips to the database

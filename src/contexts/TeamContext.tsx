@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
 import { TeamMember } from '@/contexts/AppContext';
+import { ImportedHour } from '@/types/models';
 import { useApp } from '@/contexts/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { calculateTipDistributionTotals, processImportedHours } from '@/services/teamDataService';
@@ -24,13 +25,6 @@ interface TeamContextType {
   handleConfirmImportedHours: (confirmedHours: ImportedHour[]) => void;
   closeImportDialog: () => void;
   handleRefresh: () => Promise<void>;
-}
-
-export interface ImportedHour {
-  name: string;
-  hours: number;
-  date: string;
-  exists: boolean;
 }
 
 const TeamContext = createContext<TeamContextType | undefined>(undefined);
@@ -188,7 +182,9 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await processImportedHours(
           hourData, 
           teamMembers, 
-          addTeamMember, 
+          async (name: string, hours: number) => {
+            await addTeamMember(name, hours, 0);
+          },
           updateTeamMemberHours
         );
       }

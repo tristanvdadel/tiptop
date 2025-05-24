@@ -42,7 +42,7 @@ export interface AppContextType {
   updateTip: (periodId: string, tipId: string, updates: Partial<TipEntry>) => void;
 
   // Calculation functions
-  calculateTipDistribution: (periodIds: string[]) => TeamMember[];
+  calculateTipDistribution: (periodIds?: string[]) => TeamMember[];
   calculateAverageTipPerHour: (periodId?: string) => number;
   hasReachedPeriodLimit: () => boolean;
   getUnpaidPeriodsCount: () => number;

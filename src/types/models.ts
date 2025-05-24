@@ -17,6 +17,7 @@ export interface PayoutData {
     amount: number;
     actualAmount: number;
     balance: number;
+    hours?: number;
   }[];
   periodIds: string[];
 }
@@ -29,4 +30,6 @@ export interface DisplayTeamMember {
   tipAmount: number;
   balance: number;
   actualAmount: number;
+  hasAccount?: boolean;
+  user_id?: string;
 }

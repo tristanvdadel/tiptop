@@ -7,6 +7,8 @@ export interface TeamMember {
   balance: number;
   hourRegistrations: HourRegistration[];
   tipAmount?: number;
+  hasAccount?: boolean;
+  user_id?: string;
 }
 
 export interface HourRegistration {
@@ -49,6 +51,7 @@ export interface PayoutData {
     amount: number;
     actualAmount: number;
     balance: number;
+    hours?: number;
   }[];
   periodIds: string[];
 }

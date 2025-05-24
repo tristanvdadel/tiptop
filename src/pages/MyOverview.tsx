@@ -107,7 +107,7 @@ const MyOverview = () => {
 
   // Calculate total tips for current user across all periods
   const totalTip = periods.reduce((total, period) => {
-    const distribution = calculateTipDistribution();
+    const distribution = calculateTipDistribution([period.id]);
     const userTip = distribution.find(member => member.id === currentUser.id)?.tipAmount || 0;
     return total + userTip;
   }, 0);

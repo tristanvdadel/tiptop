@@ -39,7 +39,7 @@ interface AppDataContextType {
   updateTip: (periodId: string, tipId: string, updates: Partial<TipEntry>) => void;
 
   // Calculation functions
-  calculateTipDistribution: (periodIds: string[]) => TeamMember[];
+  calculateTipDistribution: (periodIds?: string[]) => TeamMember[];
   calculateAverageTipPerHour: (periodId?: string) => number;
   hasReachedPeriodLimit: () => boolean;
   getUnpaidPeriodsCount: () => number;
@@ -410,9 +410,9 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     );
   }, []);
 
-  const calculateTipDistribution = useCallback((periodIds: string[]): TeamMember[] => {
-    const selectedPeriods = periods.filter(p => periodIds.includes(p.id));
-    const totalTips = selectedPeriods.reduce((sum, period) => 
+  const calculateTipDistribution = useCallback((periodIds?: string[]): TeamMember[] => {
+    const targetPeriods = periodIds ? periods.filter(p => periodIds.includes(p.id)) : periods.filter(p => !p.isPaid && !p.isActive);
+    const totalTips = targetPeriods.reduce((sum, period) => 
       sum + period.tips.reduce((tipSum, tip) => tipSum + tip.amount, 0), 0
     );
     const totalHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);

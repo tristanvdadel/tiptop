@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -146,7 +145,7 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
         onClose={() => setIsEditDialogOpen(false)}
         tip={tip}
         periodId={actualPeriodId}
-        onSave={updateTip}
+        onSave={(periodId, tipId, updates) => updateTip(periodId, tipId, updates)}
       />
     </>
   );

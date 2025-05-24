@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -91,12 +90,13 @@ const FastTip = () => {
   
   const handleSave = () => {
     if (amount > 0) {
-      addTip(amount, note, date.toISOString());
-      toast({
-        title: "Fooi toegevoegd",
-        description: `€${amount.toFixed(2)} is toegevoegd aan de huidige periode.`,
-      });
-      
+      if (currentPeriod) {
+        addTip(currentPeriod.id, amount);
+        toast({
+          title: "Fooi toegevoegd!",
+          description: `€${amount.toFixed(2)} is toegevoegd aan de huidige periode.`,
+        });
+      }
       setAmount(0);
       
       if (!keepOpen) {

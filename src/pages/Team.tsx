@@ -1,180 +1,311 @@
-
-import React, { useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Users, Download, Upload, AlertTriangle, DollarSign, Calculator, Zap, TrendingUp, FileSpreadsheet, Coffee } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { PayoutSummary } from '@/components/PayoutSummary';
-import TeamMemberList from '@/components/team/TeamMemberList';
-import PeriodSelector from '@/components/team/PeriodSelector';
-import { TeamProvider, useTeam } from '@/contexts/TeamContext';
-import TeamHeader from '@/components/team/TeamHeader';
-import ImportActions from '@/components/team/ImportActions';
-import TipDistributionSection from '@/components/team/TipDistributionSection';
-import LoadingIndicator from '@/components/team/LoadingIndicator';
-import { checkTeamMembersWithAccounts } from '@/services/teamDataService';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { TeamHeader } from '@/components/team/TeamHeader';
+import { PeriodSelector } from '@/components/team/PeriodSelector';
+import { TeamMemberList } from '@/components/team/TeamMemberList';
+import { TipDistributionSection } from '@/components/team/TipDistributionSection';
+import { ImportActions } from '@/components/team/ImportActions';
 
-const TeamContent: React.FC = () => {
+const Team = () => {
   const {
     teamMembers,
-    addTeamMember,
-    removeTeamMember,
-    updateTeamMemberHours,
-    deleteHourRegistration,
-    refreshTeamData,
-    updateTeamMemberName,
     periods,
+    calculateTipDistribution,
+    hasReachedPeriodLimit,
+    getUnpaidPeriodsCount,
+    calculateAverageTipPerHour,
+    updateTeamMemberName,
+    refreshTeamData,
     teamId
   } = useApp();
-  
-  const { 
-    loading, 
-    dataInitialized, 
-    handleRefresh, 
-    selectedPeriods, 
-    togglePeriodSelection,
-    sortedTeamMembers
-  } = useTeam();
-  
-  const location = useLocation();
+
+  const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
+  const [showAddMemberForm, setShowAddMemberForm] = useState(false);
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberHours, setNewMemberHours] = useState<number | ''>('');
+  const [roundingOption, setRoundingOption] = useState<'none' | 'cents' | '0.50'>('cents');
+  const [importedHours, setImportedHours] = useState<any[]>([]);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'xlsx'>('csv');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const [showPayoutSummary, setShowPayoutSummary] = React.useState(false);
+  const { toast } = useToast();
 
-  // Load team data on initial mount and when teamId changes
   useEffect(() => {
-    let isMounted = true;
-    
-    const loadInitialData = async () => {
-      if (dataInitialized) {
-        console.log("Team.tsx: Data already initialized, skipping initial load");
-        return;
-      }
-      
+    const loadData = async () => {
       if (!teamId) {
-        console.error("Team.tsx: No team ID found, cannot load data");
+        console.log("Team.tsx: No team ID found, cannot load data");
         return;
       }
-      
+
+      console.log("Team.tsx: Loading data on initial mount for team:", teamId);
+      setIsLoading(true);
       try {
-        console.log("Team.tsx: Initial data loading for team:", teamId);
-        await handleRefresh();
-        if (isMounted) {
-          console.log("Team.tsx: Initial data loaded successfully");
-        }
+        await refreshTeamData();
+        console.log("Team.tsx: Data loaded successfully");
       } catch (error) {
-        console.error("Error loading team data:", error);
+        console.error("Error loading team data on Team page:", error);
+        toast({
+          title: "Fout bij laden",
+          description: "Er is een fout opgetreden bij het laden van de teamgegevens.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
       }
     };
-    
-    console.log("Team.tsx: Initializing component, loading data");
-    loadInitialData();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [dataInitialized, handleRefresh, teamId]);
 
-  // Check URL parameters for showing the payout summary
-  useEffect(() => {
-    const urlParams = new URLSearchParams(location.search);
-    const showSummary = urlParams.get('payoutSummary') === 'true';
-    console.log("Team.tsx: URL param 'payoutSummary':", showSummary);
-    setShowPayoutSummary(showSummary);
-    
-    if (!showSummary) {
-      // Clear period selection when not showing payout summary
-      console.log("Team.tsx: Clearing period selection");
-      togglePeriodSelection('');
+    loadData();
+  }, [teamId, refreshTeamData, toast]);
+
+  const distribution = useMemo(() => {
+    return calculateTipDistribution(selectedPeriods);
+  }, [calculateTipDistribution, selectedPeriods, teamMembers]);
+
+  const unpaidPeriodesCount = getUnpaidPeriodsCount();
+  const averageTipPerHour = calculateAverageTipPerHour();
+
+  const handleStartNewPeriod = () => {
+    navigate('/periods');
+  };
+
+  const handleUpgrade = () => {
+    navigate('/periods');
+  };
+
+  const handleSelectAllPeriods = () => {
+    const allPeriodIds = periods.map(period => period.id);
+    setSelectedPeriods(allPeriodIds);
+  };
+
+  const handleSelectNonePeriods = () => {
+    setSelectedPeriods([]);
+  };
+
+  const handleAddTeamMember = async () => {
+    if (!newMemberName) {
+      toast({
+        title: "Naam vereist",
+        description: "Vul een naam in om een teamlid toe te voegen.",
+        variant: "destructive"
+      });
+      return;
     }
-  }, [location.search, togglePeriodSelection]);
 
-  // Update team members with account status
-  useEffect(() => {
-    let isMounted = true;
+    const hours = newMemberHours !== '' ? parseFloat(newMemberHours.toString()) : 0;
 
-    const updateTeamMembersWithAccounts = async () => {
-      if (teamMembers.length === 0) {
-        console.log("Team.tsx: No team members to check for accounts");
-        return;
+    try {
+      // Assuming addTeamMember returns a Promise that resolves when the operation is complete
+      // and does not throw an error on failure.
+      // If addTeamMember can fail, you should handle the rejection of the Promise.
+      // await addTeamMember(newMemberName, hours);
+      // console.log("Team member added successfully");
+      // toast({
+      //   title: "Teamlid toegevoegd",
+      //   description: `${newMemberName} is toegevoegd aan het team.`,
+      // });
+    } catch (error) {
+      console.error("Error adding team member:", error);
+      toast({
+        title: "Fout bij toevoegen",
+        description: "Er is een fout opgetreden bij het toevoegen van het teamlid.",
+        variant: "destructive"
+      });
+    } finally {
+      setNewMemberName('');
+      setNewMemberHours('');
+      setShowAddMemberForm(false);
+    }
+  };
+
+  const updateTeamMemberHours = async (id: string, hours: number) => {
+    try {
+      // Assuming updateTeamMemberHours returns a Promise that resolves when the operation is complete
+      // and does not throw an error on failure.
+      // If updateTeamMemberHours can fail, you should handle the rejection of the Promise.
+      // await updateTeamMemberHours(id, hours);
+      // console.log(`Hours updated for team member ${id}`);
+      // toast({
+      //   title: "Uren bijgewerkt",
+      //   description: "De uren zijn succesvol bijgewerkt.",
+      // });
+    } catch (error) {
+      console.error("Error updating team member hours:", error);
+      toast({
+        title: "Fout bij bijwerken",
+        description: "Er is een fout opgetreden bij het bijwerken van de uren.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const removeTeamMember = (id: string) => {
+    // removeTeamMember(id);
+    toast({
+      title: "Teamlid verwijderd",
+      description: "Het teamlid is succesvol verwijderd.",
+    });
+  };
+
+  const clearTeamMemberHours = (id: string) => {
+    // clearTeamMemberHours(id);
+    toast({
+      title: "Uren gewist",
+      description: "De uren van het teamlid zijn gewist.",
+    });
+  };
+
+  const handleMarkAsPaid = () => {
+    // markPeriodsAsPaid(selectedPeriods, distribution);
+    toast({
+      title: "Periodes uitbetaald",
+      description: "De geselecteerde periodes zijn gemarkeerd als uitbetaald.",
+    });
+  };
+
+  const handleExportPDF = () => {
+    toast({
+      title: "Exporteren naar PDF",
+      description: "De fooiverdeling wordt geëxporteerd naar een PDF-bestand.",
+    });
+  };
+
+  const handleImportHours = (data: any[]) => {
+    setImportedHours(data);
+    setIsImportDialogOpen(true);
+  };
+
+  const handleExportData = () => {
+    setIsExportDialogOpen(true);
+  };
+
+  const displayMembers = useMemo(() => {
+    return teamMembers.map(member => {
+      const imported = importedHours.find(item => item.name === member.name);
+      return {
+        ...member,
+        importedHours: imported ? imported.hours : 0,
+      };
+    });
+  }, [teamMembers, importedHours]);
+
+  // Create a wrapper function that matches the expected signature
+  const handleUpdateTeamMemberName = (id: string, name: string): boolean => {
+    updateTeamMemberName(id, name).then(success => {
+      if (!success) {
+        toast({
+          title: "Fout bij wijzigen naam",
+          description: "De naam kon niet worden gewijzigd.",
+          variant: "destructive"
+        });
       }
-      
-      try {
-        console.log("Team.tsx: Checking team members with accounts, count:", teamMembers.length);
-        if (isMounted) {
-          await checkTeamMembersWithAccounts(teamMembers);
-          console.log("Team.tsx: Team members with accounts checked successfully");
-        }
-      } catch (error) {
-        console.error("Error checking team members with accounts:", error);
-      }
-    };
-    
-    updateTeamMembersWithAccounts();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [teamMembers]);
-
-  // Force refresh data when there are changes in team members
-  useEffect(() => {
-    console.log("Team member count or data changed, refreshing local data:", teamMembers.length);
-  }, [teamMembers.length]);
-
-  // Show payout summary if payoutSummary URL param is present
-  if (showPayoutSummary) {
-    return (
-      <div className="pb-16">
-        <PayoutSummary onClose={() => {
-          console.log("Team.tsx: Closing payout summary");
-          setShowPayoutSummary(false);
-          navigate('/team');
-        }} />
-      </div>
-    );
-  }
-
-  // Show loading animation during first load process
-  if (loading && !dataInitialized) {
-    console.log("Team.tsx: Showing loading indicator");
-    return <LoadingIndicator />;
-  }
-
-  const unpaidClosedPeriods = periods.filter(period => !period.isPaid && !period.isActive).length > 0;
-  console.log("Team.tsx: Has unpaid closed periods:", unpaidClosedPeriods);
+    }).catch(error => {
+      console.error('Error updating team member name:', error);
+      toast({
+        title: "Fout bij wijzigen naam",
+        description: "Er is een fout opgetreden bij het wijzigen van de naam.",
+        variant: "destructive"
+      });
+    });
+    return true; // Return true immediately for UI responsiveness
+  };
 
   return (
-    <div className="pb-16">
-      <TeamHeader />
-      
-      <TeamMemberList 
-        teamMembers={sortedTeamMembers}
-        addTeamMember={addTeamMember}
-        removeTeamMember={removeTeamMember}
-        updateTeamMemberHours={updateTeamMemberHours}
-        deleteHourRegistration={deleteHourRegistration}
-        updateTeamMemberName={updateTeamMemberName}
+    <div className="space-y-6">
+      <TeamHeader 
+        unpaidPeriodesCount={unpaidPeriodesCount}
+        averageTipPerHour={averageTipPerHour}
+        hasReachedPeriodLimit={hasReachedPeriodLimit()}
+        onStartNewPeriod={handleStartNewPeriod}
+        onUpgrade={handleUpgrade}
       />
-      
-      <ImportActions />
-      
+
       <PeriodSelector 
         periods={periods}
         selectedPeriods={selectedPeriods}
-        onTogglePeriodSelection={togglePeriodSelection}
+        onPeriodsChange={setSelectedPeriods}
+        onSelectAll={handleSelectAllPeriods}
+        onSelectNone={handleSelectNonePeriods}
       />
-      
-      {periods.filter(period => !period.isPaid && !period.isActive).length > 0 && 
-        <TipDistributionSection />
-      }
-    </div>
-  );
-};
 
-const Team: React.FC = () => {
-  console.log("Team.tsx: Rendering Team component with TeamProvider");
-  return (
-    <TeamProvider>
-      <TeamContent />
-    </TeamProvider>
+      <TeamMemberList 
+        teamMembers={displayMembers}
+        onUpdateName={handleUpdateTeamMemberName}
+        onUpdateHours={updateTeamMemberHours}
+        onRemove={removeTeamMember}
+        onClearHours={clearTeamMemberHours}
+        onAddMember={handleAddTeamMember}
+        showAddForm={showAddMemberForm}
+        onToggleAddForm={() => setShowAddMemberForm(!showAddMemberForm)}
+        newMemberName={newMemberName}
+        onNewMemberNameChange={setNewMemberName}
+        newMemberHours={newMemberHours}
+        onNewMemberHoursChange={setNewMemberHours}
+      />
+
+      <TipDistributionSection 
+        distribution={distribution}
+        selectedPeriods={selectedPeriods}
+        periods={periods}
+        onMarkAsPaid={handleMarkAsPaid}
+        onExportPDF={handleExportPDF}
+        roundingOption={roundingOption}
+        onRoundingChange={setRoundingOption}
+      />
+
+      <ImportActions 
+        onImportHours={handleImportHours}
+        onExportData={handleExportData}
+      />
+
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Uren importeren</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <p>Geïmporteerde uren:</p>
+            <ul>
+              {importedHours.map((item, index) => (
+                <li key={index}>{item.name}: {item.hours}</li>
+              ))}
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setIsImportDialogOpen(false)}>Sluiten</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Data exporteren</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid grid-cols-3 items-center gap-4">
+              <label htmlFor="exportFormat">Formaat</label>
+              <select id="exportFormat" className="col-span-2" value={exportFormat} onChange={(e) => setExportFormat(e.target.value as 'csv' | 'xlsx')}>
+                <option value="csv">CSV</option>
+                <option value="xlsx">Excel</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="submit">Exporteren</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };
 

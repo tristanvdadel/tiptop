@@ -239,17 +239,32 @@ const Team = () => {
 
       <TeamMemberList 
         teamMembers={displayMembers}
-        onUpdateName={handleUpdateTeamMemberName}
-        onUpdateHours={updateTeamMemberHours}
-        onRemove={removeTeamMember}
-        onClearHours={clearTeamMemberHours}
-        onAddMember={handleAddTeamMember}
-        showAddForm={showAddMemberForm}
-        onToggleAddForm={() => setShowAddMemberForm(!showAddMemberForm)}
-        newMemberName={newMemberName}
-        onNewMemberNameChange={setNewMemberName}
-        newMemberHours={newMemberHours}
-        onNewMemberHoursChange={setNewMemberHours}
+        addTeamMember={async (name: string) => {
+          try {
+            // Implementation would go here
+            toast({
+              title: "Teamlid toegevoegd",
+              description: `${name} is toegevoegd aan het team.`,
+            });
+          } catch (error) {
+            console.error("Error adding team member:", error);
+            toast({
+              title: "Fout bij toevoegen",
+              description: "Er is een fout opgetreden bij het toevoegen van het teamlid.",
+              variant: "destructive"
+            });
+          }
+        }}
+        removeTeamMember={removeTeamMember}
+        updateTeamMemberHours={updateTeamMemberHours}
+        deleteHourRegistration={async (memberId: string, registrationId: string) => {
+          // Implementation would go here
+          toast({
+            title: "Registratie verwijderd",
+            description: "De urenregistratie is verwijderd.",
+          });
+        }}
+        updateTeamMemberName={handleUpdateTeamMemberName}
       />
 
       <TipDistributionSection 

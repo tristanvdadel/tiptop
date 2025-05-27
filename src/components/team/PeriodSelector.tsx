@@ -1,20 +1,25 @@
 
-import React from 'react';
+import React, { Dispatch, SetStateAction } from 'react';
 import { Period } from '@/contexts/AppContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Button } from '@/components/ui/button';
 
 interface PeriodSelectorProps {
   periods: Period[];
   selectedPeriods: string[];
-  onTogglePeriodSelection: (periodId: string) => void;
+  onPeriodsChange: Dispatch<SetStateAction<string[]>>;
+  onSelectAll: () => void;
+  onSelectNone: () => void;
 }
 
 const PeriodSelector: React.FC<PeriodSelectorProps> = ({
   periods,
   selectedPeriods,
-  onTogglePeriodSelection
+  onPeriodsChange,
+  onSelectAll,
+  onSelectNone
 }) => {
   const availablePeriods = periods.filter(period => !period.isPaid && !period.isActive);
 
@@ -22,9 +27,27 @@ const PeriodSelector: React.FC<PeriodSelectorProps> = ({
     return null;
   }
 
+  const handleTogglePeriod = (periodId: string) => {
+    onPeriodsChange(prev => 
+      prev.includes(periodId) 
+        ? prev.filter(id => id !== periodId)
+        : [...prev, periodId]
+    );
+  };
+
   return (
     <div className="mb-6">
-      <h2 className="text-lg font-medium mb-2">Selecteer periode om uit te betalen</h2>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-lg font-medium">Selecteer periode om uit te betalen</h2>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onSelectAll}>
+            Alles selecteren
+          </Button>
+          <Button variant="outline" size="sm" onClick={onSelectNone}>
+            Niets selecteren
+          </Button>
+        </div>
+      </div>
       <Card className="border-green-500/30 bg-green-500/5">
         <CardContent className="p-4">
           <ul className="space-y-2">
@@ -36,7 +59,7 @@ const PeriodSelector: React.FC<PeriodSelectorProps> = ({
                   <Checkbox 
                     id={`period-${period.id}`} 
                     checked={selectedPeriods.includes(period.id)} 
-                    onCheckedChange={() => onTogglePeriodSelection(period.id)} 
+                    onCheckedChange={() => handleTogglePeriod(period.id)} 
                     className={selectedPeriods.includes(period.id) ? "border-green-500 bg-green-500/20" : ""}
                   />
                   <Label 

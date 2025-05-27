@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -85,6 +86,14 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
     });
   };
 
+  const handleSave = (periodId: string, tipId: string, amount: number, note?: string, date?: string) => {
+    updateTip(periodId, tipId, {
+      amount,
+      note,
+      date: date || tip.date
+    });
+  };
+
   return (
     <>
       <Card className="mb-3 relative group">
@@ -145,7 +154,7 @@ const TipCard = ({ tip, periodId }: TipCardProps) => {
         onClose={() => setIsEditDialogOpen(false)}
         tip={tip}
         periodId={actualPeriodId}
-        onSave={(periodId, tipId, updates) => updateTip(periodId, tipId, updates)}
+        onSave={handleSave}
       />
     </>
   );

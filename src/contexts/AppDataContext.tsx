@@ -18,7 +18,7 @@ interface AppDataContextType {
   addTeamMember: (name: string, hours?: number, balance?: number) => Promise<void>;
   removeTeamMember: (id: string) => void;
   updateTeamMemberHours: (id: string, hours: number) => Promise<void>;
-  updateTeamMemberName: (id: string, name: string) => Promise<void>;
+  updateTeamMemberName: (id: string, name: string) => Promise<boolean>;
   updateTeamMemberBalance: (id: string, balance: number) => void;
   clearTeamMemberHours: (id: string) => void;
   deleteHourRegistration: (memberId: string, registrationId: string) => Promise<void>;
@@ -229,12 +229,18 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     );
   }, []);
 
-  const updateTeamMemberName = useCallback(async (id: string, name: string) => {
-    setTeamMembers(prev => 
-      prev.map(member => 
-        member.id === id ? { ...member, name } : member
-      )
-    );
+  const updateTeamMemberName = useCallback(async (id: string, name: string): Promise<boolean> => {
+    try {
+      setTeamMembers(prev => 
+        prev.map(member => 
+          member.id === id ? { ...member, name } : member
+        )
+      );
+      return true;
+    } catch (error) {
+      console.error('Error updating team member name:', error);
+      return false;
+    }
   }, []);
 
   const updateTeamMemberBalance = useCallback((id: string, balance: number) => {

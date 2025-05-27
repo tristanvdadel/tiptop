@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext } from 'react';
 import { AppDataProvider, useAppData } from './AppDataContext';
 
@@ -21,7 +20,7 @@ export interface AppContextType {
   addTeamMember: (name: string, hours?: number, balance?: number) => Promise<void>;
   removeTeamMember: (id: string) => void;
   updateTeamMemberHours: (id: string, hours: number) => Promise<void>;
-  updateTeamMemberName: (id: string, name: string) => Promise<void>;
+  updateTeamMemberName: (id: string, name: string) => Promise<boolean>;
   updateTeamMemberBalance: (id: string, balance: number) => void;
   clearTeamMemberHours: (id: string) => void;
   deleteHourRegistration: (memberId: string, registrationId: string) => Promise<void>;

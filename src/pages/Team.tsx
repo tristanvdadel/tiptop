@@ -8,11 +8,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { TeamHeader } from '@/components/team/TeamHeader';
-import { PeriodSelector } from '@/components/team/PeriodSelector';
-import { TeamMemberList } from '@/components/team/TeamMemberList';
-import { TipDistributionSection } from '@/components/team/TipDistributionSection';
-import { ImportActions } from '@/components/team/ImportActions';
+import TeamHeader from '@/components/team/TeamHeader';
+import PeriodSelector from '@/components/team/PeriodSelector';
+import TeamMemberList from '@/components/team/TeamMemberList';
+import TipDistributionSection from '@/components/team/TipDistributionSection';
+import ImportActions from '@/components/team/ImportActions';
 
 const Team = () => {
   const {
